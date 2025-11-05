@@ -226,3 +226,204 @@ export interface DashboardData {
 export interface Env {
   DB: D1Database
 }
+
+// Quiz System Types
+
+export type QuizType = 'intake' | 'connection_compass' | 'custom'
+
+export type QuestionType =
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'likert_scale'
+  | 'ranking'
+  | 'forced_choice'
+
+export type ConnectionStyle =
+  | 'verbal_appreciation'
+  | 'focused_presence'
+  | 'thoughtful_gestures'
+  | 'supportive_partnership'
+  | 'physical_connection'
+  | 'growth_championing'
+
+export interface Quiz {
+  id: string
+  name: string
+  type: QuizType
+  title: string
+  description?: string
+  version: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface QuizQuestion {
+  id: string
+  quiz_id: string
+  question_number: number
+  question_text: string
+  question_type: QuestionType
+  question_data: QuestionData
+  scoring_data?: ScoringData
+  is_required: boolean
+  created_at: string
+}
+
+export interface QuestionData {
+  subtitle?: string
+  emoji?: string
+  options?: QuestionOption[]
+  scale_min?: number
+  scale_max?: number
+  scale_labels?: { min: string; max: string }
+  max_selections?: number
+  items_to_rank?: string[]
+}
+
+export interface QuestionOption {
+  id: string
+  text: string
+  emoji?: string
+  value?: string | number
+  description?: string
+}
+
+export interface ScoringData {
+  points_map?: Record<string, number | Record<ConnectionStyle, number>>
+  style_weights?: Record<ConnectionStyle, number>
+  calculation_method?: 'sum' | 'weighted' | 'custom'
+}
+
+export interface UserQuizResponse {
+  id: string
+  user_id: string
+  quiz_id: string
+  started_at: string
+  completed_at?: string
+  current_question: number
+  is_completed: boolean
+}
+
+export interface QuizAnswerResponse {
+  id: string
+  user_quiz_response_id: string
+  question_id: string
+  answer_data: AnswerData
+  answered_at: string
+}
+
+export interface AnswerData {
+  selected_option_ids?: string[]
+  selected_values?: (string | number)[]
+  scale_value?: number
+  ranked_items?: string[]
+  text_response?: string
+}
+
+export interface QuizResult {
+  id: string
+  user_quiz_response_id: string
+  user_id: string
+  quiz_id: string
+  result_data: ResultData
+  primary_style?: ConnectionStyle
+  secondary_style?: ConnectionStyle
+  full_breakdown?: StyleBreakdown
+  ai_analysis?: string
+  is_visible_to_partner: boolean
+  created_at: string
+}
+
+export interface ResultData {
+  scores: Record<string, number>
+  profile_summary: string
+  recommendations: string[]
+  action_steps: ActionStep[]
+}
+
+export interface StyleBreakdown {
+  [key: string]: {
+    percentage: number
+    score: number
+    description: string
+  }
+}
+
+export interface ActionStep {
+  title: string
+  description: string
+  priority: 'high' | 'medium' | 'low'
+  category: string
+}
+
+export interface CoupleCompatibilityReport {
+  id: string
+  relationship_id: string
+  user1_result_id: string
+  user2_result_id: string
+  compatibility_score?: number
+  compatibility_data: CompatibilityData
+  recommendations?: Recommendation[]
+  created_at: string
+}
+
+export interface CompatibilityData {
+  style_overlap: number
+  complementary_score: number
+  potential_conflicts: string[]
+  strengths: string[]
+  growth_areas: string[]
+}
+
+export interface Recommendation {
+  type: 'activity' | 'communication' | 'challenge' | 'learning'
+  title: string
+  description: string
+  reason: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+// Quiz API Request Types
+
+export interface StartQuizRequest {
+  user_id: string
+  quiz_id: string
+}
+
+export interface SubmitAnswerRequest {
+  user_quiz_response_id: string
+  question_id: string
+  answer_data: AnswerData
+}
+
+export interface CompleteQuizRequest {
+  user_quiz_response_id: string
+}
+
+// Intake Quiz Specific Types
+
+export interface IntakeQuizAnswers {
+  relationship_status?: string
+  connection_goals?: string[]
+  current_challenge?: string
+  ideal_date_vibe?: string
+  energy_level?: string
+  budget_comfort?: string
+  planning_style?: string
+  social_preference?: string
+  growth_mindset?: string
+  communication_check?: string
+  love_expression?: string
+  availability?: string[]
+}
+
+// Connection Compass Specific Types
+
+export interface ConnectionCompassAnswers {
+  forced_choices: Record<number, string>
+  scenario_preferences: Record<number, string>
+  likert_responses: Record<number, number>
+  style_ranking: ConnectionStyle[]
+  disconnection_trigger: ConnectionStyle
+}

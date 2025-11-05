@@ -8,10 +8,13 @@ import { loginHtml } from './pages/login'
 import { paywallHtml } from './pages/paywall'
 import { loginSystemHtml } from './pages/login-system'
 import { userPortalHtml } from './pages/user-portal'
+import { renderIntakeQuizPage } from './pages/intake-quiz'
+import { renderConnectionCompassPage } from './pages/connection-compass'
+import { renderQuizResultsPage } from './pages/quiz-results'
 import analyticsApi from './api/analytics'
 import {
-  generateId, 
-  getCurrentDate, 
+  generateId,
+  getCurrentDate,
   getCurrentDateTime,
   isValidEmail,
   getUserByEmail,
@@ -23,7 +26,12 @@ import {
   getUpcomingDates,
   checkAchievements,
   sendNotification,
-  calculateAnalytics
+  calculateAnalytics,
+  calculateConnectionCompassScores,
+  getTopConnectionStyles,
+  generateConnectionCompassSummary,
+  generateConnectionCompassActionSteps,
+  calculateCoupleCompatibility
 } from './utils'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -985,6 +993,366 @@ app.get('/premium-pricing.html', async (c) => {
 
 // Analytics API Routes
 app.route('/api/analytics', analyticsApi)
+
+// =============================================================================
+// QUIZ SYSTEM API
+// =============================================================================
+
+// Start a quiz
+app.post('/api/quizzes/start', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const { user_id, quiz_id } = await c.req.json()
+
+    if (!user_id || !quiz_id) {
+      return c.json({ error: 'user_id and quiz_id are required' }, 400)
+    }
+
+    const responseId = generateId()
+    const now = getCurrentDateTime()
+
+    await c.env.DB.prepare(`
+      INSERT INTO user_quiz_responses (id, user_id, quiz_id, started_at, current_question, is_completed)
+      VALUES (?, ?, ?, ?, 1, 0)
+    `).bind(responseId, user_id, quiz_id, now).run()
+
+    return c.json({ quiz_response_id: responseId, started_at: now }, 201)
+  } catch (error) {
+    console.error('Start quiz error:', error)
+    return c.json({ error: 'Failed to start quiz' }, 500)
+  }
+})
+
+// Submit an answer to a quiz question
+app.post('/api/quizzes/answer', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const { user_quiz_response_id, question_id, answer_data } = await c.req.json()
+
+    if (!user_quiz_response_id || !question_id || !answer_data) {
+      return c.json({ error: 'user_quiz_response_id, question_id, and answer_data are required' }, 400)
+    }
+
+    const answerId = generateId()
+    const now = getCurrentDateTime()
+
+    // Check if answer already exists and update it, or insert new
+    const existing = await c.env.DB.prepare(`
+      SELECT id FROM quiz_answer_responses
+      WHERE user_quiz_response_id = ? AND question_id = ?
+    `).bind(user_quiz_response_id, question_id).first()
+
+    if (existing) {
+      await c.env.DB.prepare(`
+        UPDATE quiz_answer_responses
+        SET answer_data = ?, answered_at = ?
+        WHERE id = ?
+      `).bind(JSON.stringify(answer_data), now, existing.id).run()
+    } else {
+      await c.env.DB.prepare(`
+        INSERT INTO quiz_answer_responses (id, user_quiz_response_id, question_id, answer_data, answered_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(answerId, user_quiz_response_id, question_id, JSON.stringify(answer_data), now).run()
+    }
+
+    return c.json({ success: true, answer_id: existing ? existing.id : answerId })
+  } catch (error) {
+    console.error('Submit answer error:', error)
+    return c.json({ error: 'Failed to submit answer' }, 500)
+  }
+})
+
+// Complete a quiz and calculate results
+app.post('/api/quizzes/complete', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const { user_quiz_response_id } = await c.req.json()
+
+    if (!user_quiz_response_id) {
+      return c.json({ error: 'user_quiz_response_id is required' }, 400)
+    }
+
+    // Get the quiz response
+    const quizResponse: any = await c.env.DB.prepare(`
+      SELECT * FROM user_quiz_responses WHERE id = ?
+    `).bind(user_quiz_response_id).first()
+
+    if (!quizResponse) {
+      return c.json({ error: 'Quiz response not found' }, 404)
+    }
+
+    // Get all answers with their questions
+    const answersResult = await c.env.DB.prepare(`
+      SELECT qar.*, qq.question_type, qq.scoring_data
+      FROM quiz_answer_responses qar
+      JOIN quiz_questions qq ON qar.question_id = qq.id
+      WHERE qar.user_quiz_response_id = ?
+      ORDER BY qq.question_number
+    `).bind(user_quiz_response_id).all()
+
+    const answers = answersResult.results || []
+
+    // Calculate results based on quiz type
+    let resultData: any = {}
+    let primaryStyle: string | null = null
+    let secondaryStyle: string | null = null
+    let fullBreakdown: any = null
+
+    if (quizResponse.quiz_id === 'connection-compass-v1') {
+      // Process answers for Connection Compass
+      const processedAnswers = answers.map((a: any) => ({
+        question: {
+          id: a.question_id,
+          question_type: a.question_type,
+          scoring_data: a.scoring_data ? JSON.parse(a.scoring_data) : null
+        },
+        answer: JSON.parse(a.answer_data)
+      }))
+
+      // Calculate scores
+      fullBreakdown = calculateConnectionCompassScores(processedAnswers)
+      const topStyles = getTopConnectionStyles(fullBreakdown)
+      primaryStyle = topStyles.primary
+      secondaryStyle = topStyles.secondary
+
+      // Generate summary and action steps
+      const summary = generateConnectionCompassSummary(primaryStyle, secondaryStyle)
+      const actionSteps = generateConnectionCompassActionSteps(primaryStyle, secondaryStyle)
+
+      resultData = {
+        scores: Object.fromEntries(
+          Object.entries(fullBreakdown).map(([k, v]: [string, any]) => [k, v.percentage])
+        ),
+        profile_summary: summary,
+        recommendations: [],
+        action_steps: actionSteps
+      }
+
+      // Update user's connection styles
+      await c.env.DB.prepare(`
+        UPDATE users
+        SET primary_connection_style = ?,
+            secondary_connection_style = ?,
+            connection_compass_completed = 1
+        WHERE id = ?
+      `).bind(primaryStyle, secondaryStyle, quizResponse.user_id).run()
+    } else if (quizResponse.quiz_id === 'intake-quiz-v1') {
+      // Simple storage for intake quiz
+      const intakeAnswers: any = {}
+      answers.forEach((a: any) => {
+        intakeAnswers[a.question_id] = JSON.parse(a.answer_data)
+      })
+
+      resultData = {
+        scores: {},
+        profile_summary: 'Thank you for completing the intake quiz! Your responses will help us personalize your experience.',
+        recommendations: [],
+        action_steps: []
+      }
+
+      // Update user
+      await c.env.DB.prepare(`
+        UPDATE users SET intake_quiz_completed = 1 WHERE id = ?
+      `).bind(quizResponse.user_id).run()
+    }
+
+    // Save results
+    const resultId = generateId()
+    const now = getCurrentDateTime()
+
+    await c.env.DB.prepare(`
+      INSERT INTO quiz_results (
+        id, user_quiz_response_id, user_id, quiz_id,
+        result_data, primary_style, secondary_style, full_breakdown,
+        is_visible_to_partner, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    `).bind(
+      resultId,
+      user_quiz_response_id,
+      quizResponse.user_id,
+      quizResponse.quiz_id,
+      JSON.stringify(resultData),
+      primaryStyle,
+      secondaryStyle,
+      JSON.stringify(fullBreakdown),
+      now
+    ).run()
+
+    // Mark quiz response as completed
+    await c.env.DB.prepare(`
+      UPDATE user_quiz_responses
+      SET completed_at = ?, is_completed = 1
+      WHERE id = ?
+    `).bind(now, user_quiz_response_id).run()
+
+    return c.json({
+      success: true,
+      result_id: resultId,
+      primary_style: primaryStyle,
+      secondary_style: secondaryStyle
+    })
+  } catch (error) {
+    console.error('Complete quiz error:', error)
+    return c.json({ error: 'Failed to complete quiz', details: String(error) }, 500)
+  }
+})
+
+// Get quiz results
+app.get('/api/quizzes/results/:resultId', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const resultId = c.req.param('resultId')
+
+    const result: any = await c.env.DB.prepare(`
+      SELECT * FROM quiz_results WHERE id = ?
+    `).bind(resultId).first()
+
+    if (!result) {
+      return c.json({ error: 'Result not found' }, 404)
+    }
+
+    // Parse JSON fields
+    return c.json({
+      id: result.id,
+      user_id: result.user_id,
+      quiz_id: result.quiz_id,
+      result_data: JSON.parse(result.result_data),
+      primary_style: result.primary_style,
+      secondary_style: result.secondary_style,
+      full_breakdown: JSON.parse(result.full_breakdown || '{}'),
+      ai_analysis: result.ai_analysis,
+      is_visible_to_partner: result.is_visible_to_partner,
+      created_at: result.created_at
+    })
+  } catch (error) {
+    console.error('Get quiz results error:', error)
+    return c.json({ error: 'Failed to get quiz results' }, 500)
+  }
+})
+
+// Get user's quiz history
+app.get('/api/quizzes/user/:userId', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const userId = c.req.param('userId')
+
+    const results = await c.env.DB.prepare(`
+      SELECT qr.*, q.name, q.title, q.type
+      FROM quiz_results qr
+      JOIN quizzes q ON qr.quiz_id = q.id
+      WHERE qr.user_id = ?
+      ORDER BY qr.created_at DESC
+    `).bind(userId).all()
+
+    return c.json({ results: results.results || [] })
+  } catch (error) {
+    console.error('Get user quizzes error:', error)
+    return c.json({ error: 'Failed to get user quizzes' }, 500)
+  }
+})
+
+// Generate couple compatibility report
+app.post('/api/quizzes/compatibility', async (c) => {
+  const dbCheck = checkDatabase(c)
+  if (dbCheck) return dbCheck
+
+  try {
+    const { relationship_id } = await c.req.json()
+
+    if (!relationship_id) {
+      return c.json({ error: 'relationship_id is required' }, 400)
+    }
+
+    // Get relationship
+    const relationship: any = await c.env.DB.prepare(`
+      SELECT * FROM relationships WHERE id = ?
+    `).bind(relationship_id).first()
+
+    if (!relationship) {
+      return c.json({ error: 'Relationship not found' }, 404)
+    }
+
+    // Get both users' Connection Compass results
+    const user1Result: any = await c.env.DB.prepare(`
+      SELECT * FROM quiz_results
+      WHERE user_id = ? AND quiz_id = 'connection-compass-v1'
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(relationship.user_1_id).first()
+
+    const user2Result: any = await c.env.DB.prepare(`
+      SELECT * FROM quiz_results
+      WHERE user_id = ? AND quiz_id = 'connection-compass-v1'
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(relationship.user_2_id).first()
+
+    if (!user1Result || !user2Result) {
+      return c.json({ error: 'Both partners must complete the Connection Compass' }, 400)
+    }
+
+    const user1Breakdown = JSON.parse(user1Result.full_breakdown)
+    const user2Breakdown = JSON.parse(user2Result.full_breakdown)
+
+    // Calculate compatibility
+    const compatibilityData = calculateCoupleCompatibility(user1Breakdown, user2Breakdown)
+
+    // Save compatibility report
+    const reportId = generateId()
+    const now = getCurrentDateTime()
+
+    await c.env.DB.prepare(`
+      INSERT INTO couple_compatibility_reports (
+        id, relationship_id, user1_result_id, user2_result_id,
+        compatibility_score, compatibility_data, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      reportId,
+      relationship_id,
+      user1Result.id,
+      user2Result.id,
+      compatibilityData.compatibility_score,
+      JSON.stringify(compatibilityData),
+      now
+    ).run()
+
+    return c.json({
+      report_id: reportId,
+      compatibility_score: compatibilityData.compatibility_score,
+      ...compatibilityData
+    })
+  } catch (error) {
+    console.error('Generate compatibility error:', error)
+    return c.json({ error: 'Failed to generate compatibility report' }, 500)
+  }
+})
+
+// =============================================================================
+// QUIZ PAGE ROUTES
+// =============================================================================
+
+// Intake Quiz
+app.get('/intake-quiz.html', (c) => {
+  return c.html(renderIntakeQuizPage())
+})
+
+// Connection Compass Assessment
+app.get('/connection-compass.html', (c) => {
+  return c.html(renderConnectionCompassPage())
+})
+
+// Quiz Results
+app.get('/quiz-results.html', (c) => {
+  return c.html(renderQuizResultsPage())
+})
 
 // =============================================================================
 // AUTHENTICATION & USER PORTAL
