@@ -4,12 +4,14 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { renderer } from './renderer'
 import type { Env } from './types'
 import { dashboardHtml } from './pages/dashboard'
+import { analyticsDashboardHtml } from './pages/analytics-dashboard'
 import { loginHtml } from './pages/login'
 import { paywallHtml } from './pages/paywall'
 import { loginSystemHtml } from './pages/login-system'
 import { userPortalHtml } from './pages/user-portal'
 import analyticsApi from './api/analytics'
 import emailApi from './api/email'
+import pushApi from './api/push-notifications'
 import {
   generateId, 
   getCurrentDate, 
@@ -960,6 +962,11 @@ app.get('/dashboard.html', (c) => {
   return c.html(dashboardHtml)
 })
 
+// Admin Analytics Dashboard
+app.get('/admin/analytics', (c) => {
+  return c.html(analyticsDashboardHtml)
+})
+
 // Subscription Boxes
 app.get('/subscription-boxes.html', async (c) => {
   const { subscriptionBoxesHtml } = await import('./pages/subscription-boxes');
@@ -989,6 +996,9 @@ app.route('/api/analytics', analyticsApi)
 
 // Email API Routes
 app.route('/api/email', emailApi)
+
+// Push Notification API Routes
+app.route('/api/push', pushApi)
 
 // =============================================================================
 // AUTHENTICATION & USER PORTAL
