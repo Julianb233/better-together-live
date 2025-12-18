@@ -5,5 +5,55 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  // D1 Database Configuration
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "better-together-production",
+      // NOTE: Replace with actual D1 database ID from:
+      // wrangler d1 create better-together-production
+      "database_id": "local"
+      // Production ID example: "abc123def-456-789-ghi-jkl012mno345"
+    }
+  ],
+  // Custom Domain Configuration
+  // After deploying to Cloudflare Pages, set up custom domain:
+  // wrangler pages domain add better-together.app --project-name better-together
+  // DNS Configuration Required:
+  // - Add CNAME record: @ -> better-together.pages.dev
+  // - Add CNAME record: www -> better-together.pages.dev
+  // SSL/TLS will be automatically provisioned by Cloudflare
+
+  // Environment-specific configuration
+  "env": {
+    "production": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "better-together-production",
+          "database_id": "REPLACE_WITH_PRODUCTION_DB_ID"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "better-together.app/*",
+          "custom_domain": true
+        },
+        {
+          "pattern": "www.better-together.app/*",
+          "custom_domain": true
+        }
+      ]
+    },
+    "staging": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "better-together-staging",
+          "database_id": "REPLACE_WITH_STAGING_DB_ID"
+        }
+      ]
+    }
+  }
 }
