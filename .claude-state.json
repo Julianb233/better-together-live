@@ -1,43 +1,48 @@
 {
   "version": "2.1",
   "project": "better-together-live",
-  "lastUpdated": "2025-12-18T01:20:00Z",
-  "expiresAt": "2025-12-22T01:20:00Z",
+  "lastUpdated": "2025-12-18T02:00:00Z",
+  "expiresAt": "2025-12-22T02:00:00Z",
   "currentWork": {
-    "description": "Email API registered - T4 ready for testing",
-    "status": "in_progress"
+    "description": "T5 Push Notifications + T6 Analytics Dashboard completed",
+    "status": "completed"
   },
   "swarm": {
     "id": "swarm_1766020323234_b3u8hlej6",
     "topology": "hierarchical",
-    "status": "active",
+    "status": "completed",
     "coordinatorTerminal": "main"
   },
   "tasks": [
     {"id": "T1", "description": "D1 Production Database Setup", "status": "completed"},
     {"id": "T2", "description": "Custom Domain Configuration + CI/CD", "status": "completed"},
     {"id": "T3", "description": "Stripe Payment Integration", "status": "completed"},
-    {"id": "T4", "description": "Email Integration System", "status": "code_complete", "note": "API registered, needs RESEND_API_KEY env var"},
-    {"id": "T5", "description": "Push Notification System", "status": "pending", "blockedBy": ["T4 testing"]},
-    {"id": "T6", "description": "Advanced Analytics Dashboard", "status": "pending"},
+    {"id": "T4", "description": "Email Integration System", "status": "code_complete", "note": "Needs RESEND_API_KEY env var to test"},
+    {"id": "T5", "description": "Push Notification System", "status": "code_complete", "note": "Needs FCM_SERVER_KEY + APNS_KEY for production"},
+    {"id": "T6", "description": "Advanced Analytics Dashboard", "status": "completed", "route": "/admin/analytics"},
     {"id": "T7", "description": "Mobile App Foundation (React Native)", "status": "completed"},
     {"id": "T8", "description": "Subscription Box Fulfillment System", "status": "completed"}
   ],
   "recentChanges": {
-    "commit": "d2ae2d6",
-    "message": "feat: Register email API routes for T4 email integration",
-    "files": ["src/index.tsx"],
-    "pushedAt": "2025-12-18T01:20:00Z"
+    "commit": "dc21f11",
+    "message": "feat: Add T5 Push Notifications and T6 Analytics Dashboard",
+    "files": ["src/api/push-notifications.ts", "src/pages/analytics-dashboard.ts", "src/index.tsx", "migrations/0004_push_notifications.sql"],
+    "pushedAt": "2025-12-18T02:00:00Z"
   },
   "context": {
-    "keyFiles": ["src/index.tsx", "src/api/email.ts", "wrangler.jsonc"],
-    "techStack": ["Hono", "TypeScript", "Cloudflare Workers", "D1 SQLite", "Resend", "Stripe"]
+    "keyFiles": ["src/index.tsx", "src/api/email.ts", "src/api/push-notifications.ts", "src/pages/analytics-dashboard.ts"],
+    "techStack": ["Hono", "TypeScript", "Cloudflare Workers", "D1 SQLite", "Resend", "Stripe", "FCM", "APNs"]
   },
   "nextActions": [
-    "Add RESEND_API_KEY to wrangler.jsonc secrets",
-    "Test email endpoints",
-    "Build T5 Push Notifications",
-    "Build T6 Analytics Dashboard"
+    "Add RESEND_API_KEY to Cloudflare secrets",
+    "Add FCM_SERVER_KEY and APNS credentials for push notifications",
+    "Run migration 0004_push_notifications.sql",
+    "Deploy to Cloudflare Workers"
   ],
-  "resumeInstructions": "T4 Email code complete (commit d2ae2d6). Needs RESEND_API_KEY env var to test. T5 blocked until T4 tested. T6 can proceed in parallel."
+  "blockers": [
+    {"type": "env_var", "key": "RESEND_API_KEY", "for": "T4 Email"},
+    {"type": "env_var", "key": "FCM_SERVER_KEY", "for": "T5 Push (Android)"},
+    {"type": "env_var", "key": "APNS_KEY", "for": "T5 Push (iOS)"}
+  ],
+  "resumeInstructions": "7/8 tasks complete. T4, T5, T6 code done. Blocked on API keys. Run migration 0004 before testing push. Analytics dashboard ready at /admin/analytics."
 }
