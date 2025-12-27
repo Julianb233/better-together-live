@@ -3,6 +3,8 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { createDatabase } from '../db'
+import type { Env } from '../types'
 
 const paymentsApi = new Hono()
 
@@ -106,7 +108,7 @@ paymentsApi.post('/webhook', async (c: Context) => {
     // For now, parse the event directly
     const event = JSON.parse(body)
 
-    const db = (c.env as any)?.DB
+    const db = createDatabase(c.env as Env)
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -114,21 +116,21 @@ paymentsApi.post('/webhook', async (c: Context) => {
         const userId = session.metadata?.userId || session.client_reference_id
         const tierId = session.metadata?.tierId
 
-        if (db && userId) {
-          await db.prepare(`
+        if (userId) {
+          await db.run(`
             INSERT INTO subscriptions (id, user_id, tier_id, stripe_subscription_id, status, created_at)
-            VALUES (?, ?, ?, ?, 'active', datetime('now'))
+            VALUES ($1, $2, $3, $4, 'active', CURRENT_TIMESTAMP)
             ON CONFLICT(user_id) DO UPDATE SET
-              tier_id = excluded.tier_id,
-              stripe_subscription_id = excluded.stripe_subscription_id,
+              tier_id = EXCLUDED.tier_id,
+              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
               status = 'active',
-              updated_at = datetime('now')
-          `).bind(
+              updated_at = CURRENT_TIMESTAMP
+          `, [
             `sub_${Date.now()}`,
             userId,
             tierId,
             session.subscription
-          ).run()
+          ])
         }
         break
       }
@@ -137,11 +139,11 @@ paymentsApi.post('/webhook', async (c: Context) => {
         const subscription = event.data.object
         const userId = subscription.metadata?.userId
 
-        if (db && userId) {
-          await db.prepare(`
-            UPDATE subscriptions SET status = ?, updated_at = datetime('now')
-            WHERE stripe_subscription_id = ?
-          `).bind(subscription.status, subscription.id).run()
+        if (userId) {
+          await db.run(`
+            UPDATE subscriptions SET status = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE stripe_subscription_id = $2
+          `, [subscription.status, subscription.id])
         }
         break
       }
@@ -149,12 +151,10 @@ paymentsApi.post('/webhook', async (c: Context) => {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object
 
-        if (db) {
-          await db.prepare(`
-            UPDATE subscriptions SET status = 'canceled', updated_at = datetime('now')
-            WHERE stripe_subscription_id = ?
-          `).bind(subscription.id).run()
-        }
+        await db.run(`
+          UPDATE subscriptions SET status = 'canceled', updated_at = CURRENT_TIMESTAMP
+          WHERE stripe_subscription_id = $1
+        `, [subscription.id])
         break
       }
 
@@ -177,24 +177,16 @@ paymentsApi.post('/webhook', async (c: Context) => {
 // Get current subscription status for user
 paymentsApi.get('/subscription-status', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.query('userId')
-    const db = (c.env as any)?.DB
 
     if (!userId) {
       return c.json({ error: 'userId required' }, 400)
     }
 
-    if (!db) {
-      return c.json({
-        hasSubscription: false,
-        tier: null,
-        status: 'none'
-      })
-    }
-
-    const subscription = await db.prepare(`
-      SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1
-    `).bind(userId).first()
+    const subscription = await db.first<any>(`
+      SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
+    `, [userId])
 
     if (!subscription) {
       return c.json({
@@ -223,18 +215,18 @@ paymentsApi.get('/subscription-status', async (c: Context) => {
 // Cancel subscription
 paymentsApi.post('/cancel-subscription', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const { userId } = await c.req.json()
     const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
-    const db = (c.env as any)?.DB
 
     if (!apiKey) {
       return c.json({ error: 'Stripe not configured' }, 500)
     }
 
     // Get subscription from database
-    const subscription = await db?.prepare(`
-      SELECT stripe_subscription_id FROM subscriptions WHERE user_id = ? AND status = 'active'
-    `).bind(userId).first()
+    const subscription = await db.first<{ stripe_subscription_id: string }>(`
+      SELECT stripe_subscription_id FROM subscriptions WHERE user_id = $1 AND status = 'active'
+    `, [userId])
 
     if (!subscription?.stripe_subscription_id) {
       return c.json({ error: 'No active subscription found' }, 404)

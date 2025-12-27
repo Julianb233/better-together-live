@@ -1495,26 +1495,165 @@ export const becomeSponsorHtml = `<!DOCTYPE html>
             this.reset();
         });
 
-        document.getElementById('smartApplicationForm').addEventListener('submit', function(e) {
+        document.getElementById('smartApplicationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // Show success message with next steps
+
+            const submitButton = document.getElementById('submitButton');
+            const submitButtonText = document.getElementById('submitButtonText');
+            const originalButtonText = submitButtonText.textContent;
+
+            // Disable button and show loading state
+            submitButton.disabled = true;
+            submitButtonText.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i>Submitting Application...';
+            submitButton.classList.remove('animate-pulse-glow');
+
+            try {
+                // Gather all form field values
+                const formData = new FormData(this);
+
+                // Map form fields to API schema
+                const applicationData = {
+                    businessName: formData.get('business_name') || '',
+                    businessType: formData.get('industry') || '',
+                    website: formData.get('website') || '',
+                    address: formData.get('business_address') || '',
+                    city: '', // Not in current form, using empty string
+                    state: '', // Not in current form, using empty string
+                    zipCode: '', // Not in current form, using empty string
+                    contactName: formData.get('contact_name') || '',
+                    contactEmail: formData.get('email') || '',
+                    contactPhone: formData.get('phone') || '',
+                    contactRole: formData.get('job_title') || '',
+                    partnershipType: formData.get('partnership_tier') || '',
+                    offerDescription: formData.get('couple_appeal') || '',
+                    targetAudience: \`Business Size: \${formData.get('business_size') || 'N/A'}, Discount: \${formData.get('discount_percentage') || 'N/A'}\`,
+                    expectedReach: formData.get('monthly_volume') || '',
+                    howDidYouHear: formData.get('referral_source') || '',
+                    additionalNotes: \`Primary Goal: \${formData.get('primary_goal') || 'N/A'}. \${formData.get('additional_info') || ''}\`
+                };
+
+                // Client-side validation
+                const requiredFields = ['businessName', 'businessType', 'website', 'contactName', 'contactEmail', 'contactPhone'];
+                const missingFields = requiredFields.filter(field => !applicationData[field] || applicationData[field].trim() === '');
+
+                if (missingFields.length > 0) {
+                    throw new Error(\`Please fill in all required fields: \${missingFields.join(', ')}\`);
+                }
+
+                // Email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(applicationData.contactEmail)) {
+                    throw new Error('Please enter a valid email address');
+                }
+
+                // URL validation
+                try {
+                    new URL(applicationData.website);
+                } catch {
+                    throw new Error('Please enter a valid website URL');
+                }
+
+                // Submit to API
+                const response = await fetch('/api/sponsors/apply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(applicationData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    // Handle 409 conflict (already submitted)
+                    if (response.status === 409) {
+                        const confirmResubmit = confirm(
+                            \`It looks like you've already submitted an application with this email address.\n\n\` +
+                            \`Application ID: \${data.existingApplicationId || 'N/A'}\n\n\` +
+                            \`Would you like to submit a new application anyway? This will create a duplicate entry.\`
+                        );
+
+                        if (!confirmResubmit) {
+                            throw new Error('Application submission cancelled');
+                        }
+
+                        // User confirmed, retry without conflict check
+                        const retryResponse = await fetch('/api/sponsors/apply?force=true', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(applicationData)
+                        });
+
+                        if (!retryResponse.ok) {
+                            const retryData = await retryResponse.json();
+                            throw new Error(retryData.error || 'Failed to submit application');
+                        }
+
+                        const retryData = await retryResponse.json();
+                        showSuccessMessage(retryData.applicationId);
+                        this.reset();
+                        updateProgress();
+                        return;
+                    }
+
+                    throw new Error(data.error || \`Server error: \${response.status}\`);
+                }
+
+                // Show success message with application ID
+                showSuccessMessage(data.applicationId);
+
+                // Reset form
+                this.reset();
+                updateProgress();
+
+            } catch (error) {
+                console.error('Application submission error:', error);
+                alert(\`❌ Application Submission Failed\n\n\${error.message}\n\nPlease try again or contact support if the problem persists.\`);
+
+                // Re-enable button
+                submitButton.disabled = false;
+                submitButtonText.textContent = originalButtonText;
+
+                // Re-check if form is complete to re-enable glow
+                const form = document.getElementById('smartApplicationForm');
+                const requiredFields = form.querySelectorAll('[required]');
+                let allFilled = true;
+
+                requiredFields.forEach(field => {
+                    if (field.type === 'checkbox' || field.type === 'radio') {
+                        if (!field.checked) allFilled = false;
+                    } else if (field.value.trim() === '') {
+                        allFilled = false;
+                    }
+                });
+
+                if (allFilled) {
+                    submitButton.classList.add('animate-pulse-glow');
+                }
+            }
+        });
+
+        // Success message helper function
+        function showSuccessMessage(applicationId) {
             const successMessage = \`
                 🎉 Application Submitted Successfully!
-                
+
+                Application ID: \${applicationId}
+
                 What happens next:
                 ✅ Review within 24-48 hours
                 📞 Personal follow-up call from our team
                 🚀 If approved, live within 48 hours
                 💰 Start seeing revenue within your first week
-                
-                We'll email you a confirmation shortly with your application reference number.
+
+                We've sent a confirmation email with your application reference number.
+                Please save your Application ID for future reference.
             \`;
-            
+
             alert(successMessage);
-            this.reset();
-            updateProgress();
-        });
+        }
 
         // Chart initialization
         function initializeChart() {

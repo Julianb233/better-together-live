@@ -15,7 +15,46 @@ interface EmailRequest {
   text?: string
 }
 
-async function sendEmail(request: EmailRequest, apiKey: string) {
+// Development mode detection
+function isDevelopmentMode(env: any): boolean {
+  const environment = env?.ENVIRONMENT || env?.NODE_ENV || 'development'
+  const hasApiKey = env?.RESEND_API_KEY && !env?.RESEND_API_KEY.includes('placeholder')
+
+  // Development mode if explicitly set OR if missing API key
+  return environment === 'development' || !hasApiKey
+}
+
+// Simulated email for development
+function simulateEmail(request: EmailRequest): { success: boolean; messageId: string; simulated: boolean } {
+  const timestamp = new Date().toISOString()
+  const simulatedId = `dev_email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+  console.log('\n📧 [DEV MODE] Email Simulated')
+  console.log('═'.repeat(50))
+  console.log(`To:      ${request.to}`)
+  console.log(`Subject: ${request.subject}`)
+  console.log(`─`.repeat(50))
+  console.log('HTML Body Preview:')
+  // Strip HTML tags for console preview
+  const textPreview = request.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200)
+  console.log(`${textPreview}...`)
+  console.log(`─`.repeat(50))
+  console.log(`Simulated ID: ${simulatedId}`)
+  console.log(`Timestamp:    ${timestamp}`)
+  console.log('═'.repeat(50))
+  console.log('⚠️  In production, configure RESEND_API_KEY')
+  console.log('')
+
+  return { success: true, messageId: simulatedId, simulated: true }
+}
+
+async function sendEmail(request: EmailRequest, apiKey: string | null, devMode: boolean) {
+  // Development mode: simulate delivery
+  if (devMode || !apiKey) {
+    return simulateEmail(request)
+  }
+
+  // Production mode: send via Resend
   try {
     const response = await fetch(RESEND_API, {
       method: 'POST',
@@ -137,14 +176,16 @@ emailApi.post('/invite-partner', async (c: Context) => {
   try {
     const { inviterName, partnerEmail, inviteToken } = await c.req.json()
     const apiKey = (c.env as any)?.RESEND_API_KEY
-
-    if (!apiKey) return c.json({ error: 'Email not configured' }, 500)
+    const devMode = isDevelopmentMode(c.env)
 
     const inviteUrl = `https://better-together.app/accept-invite?token=${inviteToken}`
     const template = templates.partnerInvitation(inviterName, inviteUrl)
-    const result = await sendEmail({ to: partnerEmail, ...template }, apiKey)
+    const result = await sendEmail({ to: partnerEmail, ...template }, apiKey, devMode)
 
-    return c.json(result)
+    return c.json({
+      ...result,
+      dev_mode: devMode || undefined
+    })
   } catch (error) {
     return c.json({ error: 'Failed to send invitation' }, 500)
   }
@@ -155,13 +196,15 @@ emailApi.post('/subscription-confirmation', async (c: Context) => {
   try {
     const { email, userName, planName, price } = await c.req.json()
     const apiKey = (c.env as any)?.RESEND_API_KEY
-
-    if (!apiKey) return c.json({ error: 'Email not configured' }, 500)
+    const devMode = isDevelopmentMode(c.env)
 
     const template = templates.subscriptionConfirmation(userName, planName, price)
-    const result = await sendEmail({ to: email, ...template }, apiKey)
+    const result = await sendEmail({ to: email, ...template }, apiKey, devMode)
 
-    return c.json(result)
+    return c.json({
+      ...result,
+      dev_mode: devMode || undefined
+    })
   } catch (error) {
     return c.json({ error: 'Failed to send confirmation' }, 500)
   }
@@ -172,14 +215,16 @@ emailApi.post('/password-reset', async (c: Context) => {
   try {
     const { email, userName, resetToken } = await c.req.json()
     const apiKey = (c.env as any)?.RESEND_API_KEY
-
-    if (!apiKey) return c.json({ error: 'Email not configured' }, 500)
+    const devMode = isDevelopmentMode(c.env)
 
     const resetUrl = `https://better-together.app/reset-password?token=${resetToken}`
     const template = templates.passwordReset(userName, resetUrl)
-    const result = await sendEmail({ to: email, ...template }, apiKey)
+    const result = await sendEmail({ to: email, ...template }, apiKey, devMode)
 
-    return c.json(result)
+    return c.json({
+      ...result,
+      dev_mode: devMode || undefined
+    })
   } catch (error) {
     return c.json({ error: 'Failed to send reset email' }, 500)
   }
@@ -190,13 +235,15 @@ emailApi.post('/notify-gift', async (c: Context) => {
   try {
     const { recipientEmail, recipientName, senderName, giftType } = await c.req.json()
     const apiKey = (c.env as any)?.RESEND_API_KEY
-
-    if (!apiKey) return c.json({ error: 'Email not configured' }, 500)
+    const devMode = isDevelopmentMode(c.env)
 
     const template = templates.giftNotification(recipientName, senderName, giftType)
-    const result = await sendEmail({ to: recipientEmail, ...template }, apiKey)
+    const result = await sendEmail({ to: recipientEmail, ...template }, apiKey, devMode)
 
-    return c.json(result)
+    return c.json({
+      ...result,
+      dev_mode: devMode || undefined
+    })
   } catch (error) {
     return c.json({ error: 'Failed to send notification' }, 500)
   }
@@ -207,13 +254,15 @@ emailApi.post('/milestone-reminder', async (c: Context) => {
   try {
     const { email, userName, partnerName, milestone, daysUntil } = await c.req.json()
     const apiKey = (c.env as any)?.RESEND_API_KEY
-
-    if (!apiKey) return c.json({ error: 'Email not configured' }, 500)
+    const devMode = isDevelopmentMode(c.env)
 
     const template = templates.milestoneReminder(userName, partnerName, milestone, daysUntil)
-    const result = await sendEmail({ to: email, ...template }, apiKey)
+    const result = await sendEmail({ to: email, ...template }, apiKey, devMode)
 
-    return c.json(result)
+    return c.json({
+      ...result,
+      dev_mode: devMode || undefined
+    })
   } catch (error) {
     return c.json({ error: 'Failed to send reminder' }, 500)
   }

@@ -480,46 +480,350 @@ export const userPortalHtml = `<!DOCTYPE html>
             }
         }
 
+        // Get auth token from cookies or localStorage
+        function getAuthToken() {
+            // First try to get from cookies (httpOnly cookies are set by auth-routes)
+            const cookieToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('access_token='))
+                ?.split('=')[1];
+
+            // Fallback to localStorage for backward compatibility
+            return cookieToken || localStorage.getItem('authToken');
+        }
+
+        // API call helper with auth
+        async function apiCall(endpoint, options = {}) {
+            const token = getAuthToken();
+
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && !document.cookie.includes('access_token=')
+                        ? { 'Authorization': 'Bearer ' + token }
+                        : {}),
+                    ...options.headers
+                },
+                credentials: 'include' // Include cookies for httpOnly tokens
+            });
+
+            if (response.status === 401) {
+                // Try to refresh token
+                const refreshed = await refreshAuthToken();
+                if (!refreshed) {
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    throw new Error('Authentication failed');
+                }
+                // Retry the original request
+                return fetch(endpoint, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    credentials: 'include'
+                });
+            }
+
+            return response;
+        }
+
+        // Refresh auth token
+        async function refreshAuthToken() {
+            try {
+                const response = await fetch('/api/auth/refresh', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.accessToken) {
+                        localStorage.setItem('authToken', data.accessToken);
+                    }
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Token refresh error:', error);
+                return false;
+            }
+        }
+
+        // Show loading state
+        function showLoading(elementId, show = true) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            if (show) {
+                element.innerHTML = '<div class="flex items-center justify-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-pink-500"></i></div>';
+            }
+        }
+
         // Load user data
         async function loadUserData() {
             try {
-                const token = localStorage.getItem('authToken');
+                // Check authentication first
+                const token = getAuthToken();
                 if (!token) {
                     window.location.href = '/login';
                     return;
                 }
 
-                const response = await fetch('/api/user/profile', {
-                    headers: {
-                        'Authorization': 'Bearer ' + token
-                    }
-                });
+                // Step 1: Verify authentication with /api/auth/me
+                showLoading('dashboard-section');
+                const authResponse = await apiCall('/api/auth/me');
 
-                if (response.ok) {
-                    const userData = await response.json();
-                    updateUIWithUserData(userData);
-                } else {
-                    // Token might be expired
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
+                if (!authResponse.ok) {
+                    throw new Error('Authentication failed');
                 }
+
+                const authData = await authResponse.json();
+                const user = authData.user;
+
+                // Update basic user info immediately
+                updateBasicUserInfo(user);
+
+                // Step 2: Load dashboard data in parallel
+                const relationshipId = user.relationshipId || localStorage.getItem('relationshipId');
+
+                if (relationshipId) {
+                    await Promise.all([
+                        loadCheckInsData(relationshipId),
+                        loadGoalsData(relationshipId),
+                        loadActivitiesData(relationshipId),
+                        loadChallengesData(relationshipId)
+                    ]);
+                } else {
+                    console.warn('No relationship ID found - some features may be limited');
+                }
+
             } catch (error) {
                 console.error('Error loading user data:', error);
+
+                // Show error message to user
+                const dashboard = document.getElementById('dashboard-section');
+                if (dashboard) {
+                    dashboard.innerHTML = '<div class="glass-card p-8 rounded-2xl shadow-lg text-center"><i class="fas fa-exclamation-triangle text-5xl text-yellow-500 mb-4"></i><h2 class="text-2xl font-bold text-gray-800 mb-2">Unable to Load Dashboard</h2><p class="text-gray-600 mb-4">We\\'re having trouble loading your data. Please try again.</p><button onclick="location.reload()" class="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-pink-600 hover:to-purple-700">Retry</button></div>';
+                }
             }
         }
 
-        function updateUIWithUserData(userData) {
-            document.getElementById('userName').textContent = userData.name;
-            document.getElementById('userEmail').textContent = userData.email;
-            
-            const initials = userData.name.split(' ').map(n => n[0]).join('').toUpperCase();
+        // Update basic user info in UI
+        function updateBasicUserInfo(user) {
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userEmail').textContent = user.email;
+
+            const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
             document.getElementById('userInitials').textContent = initials;
             document.getElementById('sidebarInitials').textContent = initials;
-            
-            if (userData.subscription) {
-                document.getElementById('planType').textContent = userData.subscription.plan_name;
+
+            // Update welcome message
+            const welcomeMessage = document.querySelector('h1');
+            if (welcomeMessage) {
+                const timeOfDay = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
+                welcomeMessage.textContent = 'Good ' + timeOfDay + ', ' + user.name.split(' ')[0] + '! 💕';
             }
         }
+
+        // Load check-ins data
+        async function loadCheckInsData(relationshipId) {
+            try {
+                const response = await apiCall('/api/checkins/' + relationshipId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const checkins = data.checkins || [];
+
+                    if (checkins.length > 0) {
+                        const latest = checkins[0];
+                        const streakDays = calculateStreak(checkins);
+
+                        // Update connection score
+                        const scoreElement = document.querySelector('.metric-card:nth-child(1) .text-2xl');
+                        if (scoreElement && latest.connection_score) {
+                            scoreElement.textContent = latest.connection_score.toFixed(1);
+                        }
+
+                        // Update streak
+                        const streakElement = document.querySelector('.metric-card:nth-child(2) .text-2xl');
+                        if (streakElement) {
+                            streakElement.textContent = streakDays;
+                        }
+
+                        // Update sidebar streak
+                        const sidebarStreak = document.querySelector('.text-orange-600');
+                        if (sidebarStreak) {
+                            sidebarStreak.textContent = streakDays + ' days';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading check-ins:', error);
+            }
+        }
+
+        // Calculate streak from check-ins
+        function calculateStreak(checkins) {
+            if (!checkins || checkins.length === 0) return 0;
+
+            let streak = 0;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            for (let i = 0; i < checkins.length; i++) {
+                const checkinDate = new Date(checkins[i].checkin_date);
+                checkinDate.setHours(0, 0, 0, 0);
+
+                const expectedDate = new Date(today);
+                expectedDate.setDate(today.getDate() - i);
+
+                if (checkinDate.getTime() === expectedDate.getTime()) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+
+            return streak;
+        }
+
+        // Load goals data
+        async function loadGoalsData(relationshipId) {
+            try {
+                const response = await apiCall('/api/goals/' + relationshipId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const goals = data.goals || [];
+
+                    const activeGoals = goals.filter(g => g.status === 'active');
+                    const completedGoals = goals.filter(g => g.status === 'completed');
+
+                    // Calculate completion percentage
+                    const totalProgress = activeGoals.reduce((sum, g) => {
+                        const progress = g.target_count ? (g.current_progress / g.target_count) * 100 : 0;
+                        return sum + progress;
+                    }, 0);
+                    const avgProgress = activeGoals.length > 0 ? Math.round(totalProgress / activeGoals.length) : 0;
+
+                    // Update goals complete metric
+                    const goalsElement = document.querySelector('.metric-card:nth-child(3) .text-2xl');
+                    if (goalsElement) {
+                        goalsElement.textContent = avgProgress + '%';
+                    }
+
+                    // Update progress bar
+                    const progressBar = document.querySelector('.metric-card:nth-child(3) .bg-gradient-to-r');
+                    if (progressBar) {
+                        progressBar.style.width = avgProgress + '%';
+                    }
+
+                    // Update sidebar goals
+                    const sidebarGoals = document.querySelector('.text-green-600');
+                    if (sidebarGoals) {
+                        sidebarGoals.textContent = completedGoals.length + '/' + goals.length;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading goals:', error);
+            }
+        }
+
+        // Load activities data
+        async function loadActivitiesData(relationshipId) {
+            try {
+                const response = await apiCall('/api/activities/' + relationshipId);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const activities = data.activities || [];
+
+                    // Find next upcoming activity
+                    const upcoming = activities
+                        .filter(a => a.status === 'planned' && a.planned_date)
+                        .sort((a, b) => new Date(a.planned_date) - new Date(b.planned_date));
+
+                    if (upcoming.length > 0) {
+                        const next = upcoming[0];
+                        updateNextDateNight(next);
+                    }
+
+                    // Count this year's date nights
+                    const thisYear = new Date().getFullYear();
+                    const thisYearActivities = activities.filter(a => {
+                        const actDate = new Date(a.planned_date || a.completed_at);
+                        return actDate.getFullYear() === thisYear && a.status === 'completed';
+                    });
+
+                    const sidebarDates = document.querySelector('.text-purple-600');
+                    if (sidebarDates) {
+                        sidebarDates.textContent = thisYearActivities.length + ' this year';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading activities:', error);
+            }
+        }
+
+        // Update next date night in UI
+        function updateNextDateNight(activity) {
+            const dateNightCard = document.querySelector('.glass-card:has(.fa-calendar-heart)');
+            if (!dateNightCard) return;
+
+            const date = new Date(activity.planned_date);
+            const dateStr = date.toLocaleDateString('en-US', { weekday: 'long' });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            const contentDiv = dateNightCard.querySelector('.bg-gradient-to-r');
+            if (contentDiv) {
+                var locationHtml = activity.location ? '<div class="text-xs text-blue-600 mt-1">' + activity.location + '</div>' : '';
+                contentDiv.innerHTML = '<div class="font-medium text-gray-800">' + activity.activity_name + '</div><div class="text-sm text-gray-600">' + dateStr + ', ' + timeStr + '</div>' + locationHtml;
+            }
+        }
+
+        // Load challenges data
+        async function loadChallengesData(relationshipId) {
+            try {
+                const response = await apiCall('/api/challenges/participation/' + relationshipId + '?status=active');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const participations = data.participations || [];
+
+                    // Update achievements count (completed challenges)
+                    const completedResponse = await apiCall('/api/challenges/participation/' + relationshipId + '?status=completed');
+                    if (completedResponse.ok) {
+                        const completedData = await completedResponse.json();
+                        const achievementsElement = document.querySelector('.metric-card:nth-child(4) .text-2xl');
+                        if (achievementsElement) {
+                            achievementsElement.textContent = (completedData.participations || []).length;
+                        }
+                    }
+
+                    // Update recent activity with challenge info
+                    if (participations.length > 0) {
+                        updateRecentActivity(participations);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading challenges:', error);
+            }
+        }
+
+        // Update recent activity section
+        function updateRecentActivity(participations) {
+            const activitySection = document.querySelector('.glass-card:has(.fa-clock) .space-y-3');
+            if (!activitySection) return;
+
+            const recentParticipation = participations[0];
+            const activityHtml = '<div class="flex items-center p-3 bg-purple-50 rounded-lg"><div class="w-2 h-2 bg-purple-500 rounded-full mr-3"></div><div class="flex-1"><div class="text-sm font-medium text-gray-800">Active: ' + recentParticipation.challenge_name + '</div><div class="text-xs text-gray-500">' + Math.round(recentParticipation.progress_percentage) + '% complete</div></div><i class="fas fa-trophy text-purple-500"></i></div>';
+
+            activitySection.insertAdjacentHTML('afterbegin', activityHtml);
+        }
+
 
         // Logout function
         function logout() {

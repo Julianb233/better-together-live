@@ -584,25 +584,246 @@ export const inAppPurchasesHtml = `<!DOCTYPE html>
 
     <!-- JavaScript -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Purchase button interactions
-            const purchaseButtons = document.querySelectorAll('button[class*="bg-"]');
-            purchaseButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // Add click animation
-                    this.style.transform = 'scale(0.98)';
-                    setTimeout(() => {
-                        this.style.transform = 'scale(1)';
-                    }, 100);
-                    
-                    // Log purchase intent (integrate with payment system)
-                    const buttonText = this.textContent.trim();
-                    console.log('Purchase button clicked:', buttonText);
-                    
-                    // Here you would integrate with Stripe, PayPal, or other payment processor
-                    // Example: initiatePayment(buttonText, getPriceFromButton(this));
+        // Stripe Checkout Integration
+        async function initiateCheckout(tierId, productType = 'subscription', metadata = {}) {
+            try {
+                // Get user info from localStorage or prompt
+                const email = localStorage.getItem('userEmail') || prompt('Enter your email to continue:');
+                if (!email) {
+                    alert('Email is required to proceed with checkout');
+                    return;
+                }
+
+                const userId = localStorage.getItem('userId') || ('temp_' + Date.now());
+
+                // Show loading state
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.id = 'checkout-loading';
+                loadingOverlay.innerHTML = '<div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999;"><div style="background: white; padding: 2rem; border-radius: 1rem; text-align: center;"><i class="fas fa-spinner fa-spin text-4xl text-pink-600 mb-4"></i><p class="text-lg font-semibold">Redirecting to secure checkout...</p></div></div>';
+                document.body.appendChild(loadingOverlay);
+
+                // Prepare request payload
+                const payload = {
+                    tierId,
+                    userId,
+                    email,
+                    productType,
+                    metadata,
+                    successUrl: window.location.origin + '/portal?success=true&session_id={CHECKOUT_SESSION_ID}',
+                    cancelUrl: window.location.href
+                };
+
+                // Call Stripe checkout session API
+                const response = await fetch('/api/payments/create-checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
                 });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to create checkout session');
+                }
+
+                const data = await response.json();
+
+                if (data.url) {
+                    // Store pending purchase info
+                    localStorage.setItem('pendingPurchase', JSON.stringify({
+                        tierId,
+                        productType,
+                        timestamp: Date.now()
+                    }));
+
+                    // Redirect to Stripe Checkout
+                    window.location.href = data.url;
+                } else {
+                    throw new Error('No checkout URL received');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+
+                // Remove loading overlay
+                const loadingOverlay = document.getElementById('checkout-loading');
+                if (loadingOverlay) {
+                    loadingOverlay.remove();
+                }
+
+                // Show error message
+                alert('Unable to process checkout: ' + error.message + '. Please try again or contact support.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Subscription Tier Purchase Buttons
+
+            // Growing Together (Couple Tier)
+            const growingTogetherBtn = document.querySelector('button.bg-pink-600');
+            if (growingTogetherBtn && growingTogetherBtn.textContent.includes('Upgrade Now')) {
+                growingTogetherBtn.addEventListener('click', function() {
+                    initiateCheckout('growing-together', 'subscription', {
+                        tier: 'couple',
+                        displayName: 'Growing Together',
+                        price: '$19.99/month'
+                    });
+                });
+            }
+
+            // Thriving Partnership (Premium Tier)
+            const premiumBtn = document.querySelector('button.bg-purple-600');
+            if (premiumBtn && premiumBtn.textContent.includes('Go Premium')) {
+                premiumBtn.addEventListener('click', function() {
+                    initiateCheckout('growing-together-plus', 'subscription', {
+                        tier: 'premium',
+                        displayName: 'Thriving Partnership',
+                        price: '$39.99/month'
+                    });
+                });
+            }
+
+            // VIP Tier
+            const vipBtn = document.querySelector('button.bg-gradient-to-r');
+            if (vipBtn && vipBtn.textContent.includes('VIP Access')) {
+                vipBtn.addEventListener('click', function() {
+                    initiateCheckout('relationship-concierge', 'subscription', {
+                        tier: 'vip',
+                        displayName: 'Relationship Concierge',
+                        price: '$99.99/month'
+                    });
+                });
+            }
+
+            // AI Credit Purchase Buttons
+            const creditButtons = [
+                { selector: 'button.bg-pink-600:not(:first-of-type)', credits: 10, price: 4.99, productId: 'credits-10' },
+                { selector: 'button.bg-purple-600:not(:first-of-type)', credits: 25, price: 9.99, productId: 'credits-25' },
+                { selector: 'button.bg-blue-600:not(:first-of-type)', credits: 50, price: 17.99, productId: 'credits-50' },
+                { selector: 'button.bg-green-600:not(:first-of-type)', credits: 100, price: 29.99, productId: 'credits-100' }
+            ];
+
+            // Find all buttons with text "Purchase" for AI credits
+            const purchaseBtns = Array.from(document.querySelectorAll('button')).filter(btn =>
+                btn.textContent.trim() === 'Purchase' &&
+                btn.closest('.grid.grid-cols-2')
+            );
+
+            purchaseBtns.forEach((btn, index) => {
+                if (index < creditButtons.length) {
+                    const creditData = creditButtons[index];
+                    btn.addEventListener('click', function() {
+                        initiateCheckout(creditData.productId, 'one-time', {
+                            type: 'ai-credits',
+                            credits: creditData.credits,
+                            price: creditData.price,
+                            displayName: creditData.credits + ' AI Credits'
+                        });
+                    });
+                }
             });
+
+            // Marketplace category buttons (Browse Flowers, Shop Food, etc.)
+            const browseFlowersBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Browse Flowers')
+            );
+            if (browseFlowersBtn) {
+                browseFlowersBtn.addEventListener('click', function() {
+                    // Navigate to gift marketplace with filter
+                    window.location.href = '/portal?category=flowers';
+                });
+            }
+
+            const shopFoodBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Shop Food')
+            );
+            if (shopFoodBtn) {
+                shopFoodBtn.addEventListener('click', function() {
+                    window.location.href = '/portal?category=food-beverages';
+                });
+            }
+
+            const viewJewelryBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('View Jewelry')
+            );
+            if (viewJewelryBtn) {
+                viewJewelryBtn.addEventListener('click', function() {
+                    window.location.href = '/portal?category=jewelry';
+                });
+            }
+
+            const bookExperienceBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Book Experience')
+            );
+            if (bookExperienceBtn) {
+                bookExperienceBtn.addEventListener('click', function() {
+                    window.location.href = '/portal?category=experiences';
+                });
+            }
+
+            // Premium Features Add-on Buttons
+            const upgradeCalendarBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Upgrade Calendar')
+            );
+            if (upgradeCalendarBtn) {
+                upgradeCalendarBtn.addEventListener('click', function() {
+                    initiateCheckout('calendar-premium', 'subscription', {
+                        type: 'feature-addon',
+                        displayName: 'Advanced Calendar Features',
+                        price: '$6.99/month'
+                    });
+                });
+            }
+
+            const enhanceCommunicationBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Enhance Communication')
+            );
+            if (enhanceCommunicationBtn) {
+                enhanceCommunicationBtn.addEventListener('click', function() {
+                    initiateCheckout('communication-premium', 'one-time', {
+                        type: 'feature-addon',
+                        displayName: 'Enhanced Communication Pack',
+                        price: '$9.99'
+                    });
+                });
+            }
+
+            const customizeAppBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Customize App')
+            );
+            if (customizeAppBtn) {
+                customizeAppBtn.addEventListener('click', function() {
+                    window.location.href = '/portal?section=customization';
+                });
+            }
+
+            // CTA Section Buttons
+            const startGrowingBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Start Growing Together')
+            );
+            if (startGrowingBtn) {
+                startGrowingBtn.addEventListener('click', function() {
+                    // Scroll to Growing Together tier or initiate checkout
+                    initiateCheckout('growing-together', 'subscription', {
+                        tier: 'couple',
+                        displayName: 'Growing Together',
+                        price: '$19.99/month'
+                    });
+                });
+            }
+
+            const learnMoreBtn = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.includes('Learn More')
+            );
+            if (learnMoreBtn) {
+                learnMoreBtn.addEventListener('click', function() {
+                    // Scroll to subscription tiers section
+                    const tiersSection = document.querySelector('section.py-16.bg-white');
+                    if (tiersSection) {
+                        tiersSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            }
 
             // Hover effects for cards
             const cards = document.querySelectorAll('.hover-lift');
@@ -614,6 +835,30 @@ export const inAppPurchasesHtml = `<!DOCTYPE html>
                     this.style.transform = 'translateY(0) scale(1)';
                 });
             });
+
+            // Check for successful checkout on page load
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('success') === 'true') {
+                const sessionId = urlParams.get('session_id');
+                const pendingPurchase = localStorage.getItem('pendingPurchase');
+
+                if (pendingPurchase) {
+                    const purchase = JSON.parse(pendingPurchase);
+
+                    // Show success message
+                    const successMessage = document.createElement('div');
+                    var purchaseTypeText = purchase.productType === 'subscription' ? 'subscription has been activated' : 'credits have been added';
+                    successMessage.innerHTML = '<div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,0.2); z-index: 9999; max-width: 400px;"><i class="fas fa-check-circle text-3xl mb-2"></i><h3 class="text-xl font-bold mb-2">Purchase Successful!</h3><p>Your ' + purchaseTypeText + '.</p><button onclick="this.parentElement.remove()" style="margin-top: 1rem; background: white; color: #059669; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600;">Close</button></div>';
+                    document.body.appendChild(successMessage);
+
+                    // Clear pending purchase
+                    localStorage.removeItem('pendingPurchase');
+
+                    // Remove success param from URL
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                }
+            }
         });
     </script>
 </body>

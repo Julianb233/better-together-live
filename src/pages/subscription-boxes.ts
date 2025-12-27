@@ -132,9 +132,12 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
                 <!-- Romance Box -->
                 <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-8 hover-lift transition-all duration-300 box-shadow-custom">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center">
-                            <i class="fas fa-heart text-white text-2xl"></i>
+                    <div class="mb-6 rounded-xl overflow-hidden">
+                        <img src="/images/generated/romance-box.png" alt="Romance Box - Premium candle, chocolates, bath bomb" class="w-full h-48 object-cover">
+                    </div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-heart text-white text-lg"></i>
                         </div>
                         <div class="profit-badge">60% Margin</div>
                     </div>
@@ -172,9 +175,12 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
 
                 <!-- Adventure Date Box -->
                 <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 hover-lift transition-all duration-300 box-shadow-custom">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                            <i class="fas fa-mountain text-white text-2xl"></i>
+                    <div class="mb-6 rounded-xl overflow-hidden">
+                        <img src="/images/generated/adventure-box.png" alt="Adventure Date Box - Hiking gear, picnic supplies" class="w-full h-48 object-cover">
+                    </div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-mountain text-white text-lg"></i>
                         </div>
                         <div class="profit-badge">62% Margin</div>
                     </div>
@@ -212,9 +218,12 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
 
                 <!-- Anniversary Box -->
                 <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-8 hover-lift transition-all duration-300 box-shadow-custom">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
-                            <i class="fas fa-gift text-white text-2xl"></i>
+                    <div class="mb-6 rounded-xl overflow-hidden">
+                        <img src="/images/generated/anniversary-box.png" alt="Anniversary Box - Champagne glasses, jewelry, keepsake" class="w-full h-48 object-cover">
+                    </div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-gift text-white text-lg"></i>
                         </div>
                         <div class="profit-badge">62% Margin</div>
                     </div>
@@ -252,9 +261,12 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
 
                 <!-- Self-Care Box -->
                 <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 hover-lift transition-all duration-300 box-shadow-custom">
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                            <i class="fas fa-leaf text-white text-2xl"></i>
+                    <div class="mb-6 rounded-xl overflow-hidden">
+                        <img src="/images/generated/selfcare-box.png" alt="Self-Care Box - Skincare, aromatherapy, tea" class="w-full h-48 object-cover">
+                    </div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-leaf text-white text-lg"></i>
                         </div>
                         <div class="profit-badge">57% Margin</div>
                     </div>

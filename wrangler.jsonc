@@ -46,12 +46,12 @@
         }
       ]
     },
-    "staging": {
+    "preview": {
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "better-together-staging",
-          "database_id": "REPLACE_WITH_STAGING_DB_ID"
+          "database_name": "better-together-preview",
+          "database_id": "REPLACE_WITH_PREVIEW_DB_ID"
         }
       ]
     }

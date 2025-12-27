@@ -503,18 +503,10 @@ export const paywallHtml = `<!DOCTYPE html>
                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent">
                             </div>
                             
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                                <input type="text" id="name" required 
-                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                            </div>
-                            
                             <div class="mb-6">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                                <div id="card-element" class="p-4 border border-gray-300 rounded-lg bg-white">
-                                    <!-- Stripe Elements will create form elements here -->
-                                </div>
-                                <div id="card-errors" role="alert" class="text-red-600 text-sm mt-2"></div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                                <input type="text" id="name" required
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent">
                             </div>
 
                             <button type="submit" id="submit-button" 
@@ -621,24 +613,8 @@ export const paywallHtml = `<!DOCTYPE html>
             });
         });
 
-        // Initialize Stripe
-        const stripe = Stripe('pk_test_your_publishable_key_here'); // Replace with your actual Stripe publishable key
-        const elements = stripe.elements();
-
-        // Create card element
-        const cardElement = elements.create('card', {
-            style: {
-                base: {
-                    fontSize: '16px',
-                    color: '#424770',
-                    '::placeholder': {
-                        color: '#aab7c4',
-                    },
-                },
-            },
-        });
-
-        cardElement.mount('#card-element');
+        // Initialize Stripe (key will be loaded from backend if needed)
+        // Using Stripe Checkout redirect flow - no Elements needed
 
         // Handle form submission
         const form = document.getElementById('payment-form');
@@ -648,7 +624,7 @@ export const paywallHtml = `<!DOCTYPE html>
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            
+
             // Disable submit button and show loading
             submitButton.disabled = true;
             buttonText.classList.add('hidden');
@@ -658,34 +634,41 @@ export const paywallHtml = `<!DOCTYPE html>
             const name = document.getElementById('name').value;
             const planType = document.querySelector('input[name="selectedPlan"]:checked').value;
 
+            // Map plan types to actual tier IDs
+            const tierIdMap = {
+                'basic': 'growing-together',
+                'premium': 'growing-together-plus'
+            };
+            const tierId = tierIdMap[planType] || 'growing-together';
+
             try {
-                // Create subscription with trial
-                const response = await fetch('/api/create-subscription', {
+                // Create checkout session and redirect to Stripe Checkout
+                const response = await fetch('/api/payments/create-checkout-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        tierId: tierId,
                         email: email,
-                        name: name,
-                        plan_type: planType,
-                        stripe_token: 'mock_token_for_demo' // In production, this would be the Stripe token
+                        userId: null, // Will be created during checkout
+                        successUrl: window.location.origin + '/portal?session_id={CHECKOUT_SESSION_ID}',
+                        cancelUrl: window.location.origin + '/paywall'
                     }),
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
-                    // Redirect to success page or portal
-                    alert('Welcome to Better Together! Your 7-day free trial has started.');
-                    window.location.href = '/portal';
+                if (data.url) {
+                    // Redirect to Stripe Checkout
+                    window.location.href = data.url;
                 } else {
-                    throw new Error(data.message || 'Subscription creation failed');
+                    throw new Error(data.error || 'Failed to create checkout session');
                 }
             } catch (error) {
-                console.error('Subscription error:', error);
-                alert('Failed to start trial: ' + error.message);
-            } finally {
+                console.error('Checkout error:', error);
+                alert('Failed to start checkout: ' + error.message);
+
                 // Re-enable submit button
                 submitButton.disabled = false;
                 buttonText.classList.remove('hidden');

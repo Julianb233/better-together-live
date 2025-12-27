@@ -287,10 +287,10 @@ export const mobileUIHtml = `<!DOCTYPE html>
                                     </div>
                                     <div class="flex-1 mobile-px-4 mobile-py-4">
                                         <div class="text-center mobile-mb-4">
-                                            <div class="mobile-w-10 mobile-h-10 bg-gray-200 mobile-rounded-full mx-auto mobile-mb-2 flex items-center justify-center">
-                                                <i class="fas fa-camera text-gray-500 mobile-text-xs"></i>
+                                            <div class="mobile-w-10 mobile-h-10 mobile-rounded-full mx-auto mobile-mb-2 overflow-hidden">
+                                                <img src="/images/generated/female-profile.png" alt="Profile photo" class="w-full h-full object-cover">
                                             </div>
-                                            <button class="text-primary-600 mobile-text-xs font-medium">Add Photo</button>
+                                            <button class="text-primary-600 mobile-text-xs font-medium">Change Photo</button>
                                         </div>
                                         <div class="space-y-3">
                                             <div>
@@ -570,8 +570,8 @@ export const mobileUIHtml = `<!DOCTYPE html>
                                             <button class="text-primary-600">
                                                 <i class="fas fa-arrow-left"></i>
                                             </button>
-                                            <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                                                <i class="fas fa-robot text-primary-600 text-sm"></i>
+                                            <div class="w-8 h-8 rounded-full overflow-hidden">
+                                                <img src="/images/generated/ai-coach-avatar.png" alt="AI Coach" class="w-full h-full object-cover">
                                             </div>
                                             <div class="flex-1">
                                                 <h1 class="font-semibold text-gray-900">AI Coach</h1>
@@ -586,8 +586,8 @@ export const mobileUIHtml = `<!DOCTYPE html>
                                     <!-- Chat Messages -->
                                     <div class="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
                                         <div class="flex items-end space-x-2">
-                                            <div class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-robot text-primary-600 text-xs"></i>
+                                            <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                                <img src="/images/generated/ai-coach-avatar.png" alt="AI Coach" class="w-full h-full object-cover">
                                             </div>
                                             <div class="chat-bubble-ai max-w-xs px-4 py-3">
                                                 <p class="text-sm">Hi Sarah! I noticed you and Mike had a great check-in yesterday. How are you both feeling about your communication lately?</p>
@@ -601,8 +601,8 @@ export const mobileUIHtml = `<!DOCTYPE html>
                                         </div>
 
                                         <div class="flex items-end space-x-2">
-                                            <div class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-robot text-primary-600 text-xs"></i>
+                                            <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                                <img src="/images/generated/ai-coach-avatar.png" alt="AI Coach" class="w-full h-full object-cover">
                                             </div>
                                             <div class="chat-bubble-ai max-w-xs px-4 py-3">
                                                 <p class="text-sm">I understand that feeling. Those planning disagreements often reflect different needs underneath. Can you tell me what felt most important to you about the weekend plans?</p>
@@ -616,8 +616,8 @@ export const mobileUIHtml = `<!DOCTYPE html>
                                         </div>
 
                                         <div class="flex items-end space-x-2">
-                                            <div class="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <i class="fas fa-robot text-primary-600 text-xs"></i>
+                                            <div class="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                                <img src="/images/generated/ai-coach-avatar.png" alt="AI Coach" class="w-full h-full object-cover">
                                             </div>
                                             <div class="chat-bubble-ai max-w-xs px-4 py-3">
                                                 <p class="text-sm">That makes perfect sense! Your love language is Quality Time, so connection feels essential to you. Mike might not have realized how important that togetherness was to you.</p>

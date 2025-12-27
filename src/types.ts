@@ -465,10 +465,11 @@ export interface TrackEventRequest {
   event_data?: Record<string, any>
 }
 
-// Cloudflare Environment Bindings
+// Environment Variables
 export interface Env {
-  DB: D1Database
+  DATABASE_URL: string
   STRIPE_SECRET_KEY: string
   STRIPE_WEBHOOK_SECRET: string
   STRIPE_PUBLISHABLE_KEY: string
+  RESEND_API_KEY?: string
 }

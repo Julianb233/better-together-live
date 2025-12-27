@@ -646,18 +646,145 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
 
     <!-- JavaScript -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Age verification
             const ageVerification = document.getElementById('ageVerification');
             const mainContent = document.getElementById('mainContent');
             const confirmAge = document.getElementById('confirmAge');
             const exitPage = document.getElementById('exitPage');
 
+            // Helper function to check authentication
+            function checkAuth() {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = '/login?redirect=/intimacy-challenges';
+                    return false;
+                }
+                return true;
+            }
+
+            // Helper function to get auth headers
+            function getAuthHeaders() {
+                const token = localStorage.getItem('authToken');
+                return {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                };
+            }
+
+            // Load user's active challenges on page load
+            async function loadActiveChallenges() {
+                if (!checkAuth()) return;
+
+                try {
+                    const response = await fetch('/api/challenges/participating', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateChallengeUI(data.participations);
+                    } else if (response.status === 401) {
+                        // Token expired, redirect to login
+                        localStorage.removeItem('authToken');
+                        window.location.href = '/login?redirect=/intimacy-challenges';
+                    }
+                } catch (error) {
+                    console.error('Failed to load active challenges:', error);
+                }
+            }
+
+            // Update UI with active challenges
+            function updateChallengeUI(participations) {
+                participations.forEach(participation => {
+                    const button = document.querySelector('[data-challenge-id="' + participation.challenge_id + '"]');
+                    if (button) {
+                        button.textContent = 'Continue (' + participation.progress_percentage + '% Complete)';
+                        button.classList.add('bg-green-600', 'hover:bg-green-700');
+                        button.classList.remove('bg-blue-600', 'bg-rose-600', 'bg-purple-600');
+                    }
+                });
+            }
+
+            // Start a new challenge
+            async function startChallenge(challengeId, challengeName) {
+                if (!checkAuth()) return;
+
+                try {
+                    const response = await fetch('/api/challenges/join', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ challengeId })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Started challenge: ' + challengeName, data);
+
+                        // Update UI to show active challenge
+                        await loadActiveChallenges();
+
+                        // Show success message
+                        showNotification('Started ' + challengeName + ' journey!', 'success');
+                    } else if (response.status === 401) {
+                        localStorage.removeItem('authToken');
+                        window.location.href = '/login?redirect=/intimacy-challenges';
+                    } else {
+                        const error = await response.json();
+                        showNotification(error.message || 'Failed to start challenge', 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to start challenge:', error);
+                    showNotification('Network error. Please try again.', 'error');
+                }
+            }
+
+            // Track challenge progress
+            async function updateProgress(participationId, progressPercentage) {
+                if (!checkAuth()) return;
+
+                try {
+                    const response = await fetch('/api/challenges/participation/' + participationId + '/progress', {
+                        method: 'PUT',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ progress_percentage: progressPercentage })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Progress updated:', data);
+                        showNotification('Progress updated to ' + progressPercentage + '%', 'success');
+                        await loadActiveChallenges();
+                    } else if (response.status === 401) {
+                        localStorage.removeItem('authToken');
+                        window.location.href = '/login?redirect=/intimacy-challenges';
+                    }
+                } catch (error) {
+                    console.error('Failed to update progress:', error);
+                }
+            }
+
+            // Show notification
+            function showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                var bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ' + bgColor + ' text-white';
+                notification.textContent = message;
+                document.body.appendChild(notification);
+
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
+            }
+
             confirmAge.addEventListener('click', function() {
                 ageVerification.classList.add('hidden');
                 mainContent.classList.remove('hidden');
                 // Set verification in localStorage (expires in 24 hours)
                 localStorage.setItem('intimacyVerified', Date.now() + (24 * 60 * 60 * 1000));
+
+                // Load user's challenges after age verification
+                loadActiveChallenges();
             });
 
             exitPage.addEventListener('click', function() {
@@ -669,6 +796,9 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
             if (verified && Date.now() < parseInt(verified)) {
                 ageVerification.classList.add('hidden');
                 mainContent.classList.remove('hidden');
+
+                // Load user's challenges if already verified
+                loadActiveChallenges();
             }
 
             // Comfort zone sliders
@@ -692,19 +822,68 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                 });
             });
 
-            // Premium purchase buttons
+            // Main "Start Intimacy Journey" button
+            const mainStartButton = document.querySelector('button:has(i.fa-fire)');
+            if (mainStartButton && mainStartButton.textContent.includes('Start Intimacy Journey')) {
+                mainStartButton.addEventListener('click', function() {
+                    if (!checkAuth()) return;
+                    // Scroll to challenge categories or show modal to choose
+                    document.querySelector('.challenge-card').scrollIntoView({ behavior: 'smooth' });
+                });
+            }
+
+            // Category-specific challenge buttons
+            const emotionalButton = document.querySelector('button:contains("Start Emotional Journey")');
+            const physicalButton = document.querySelector('button:contains("Ignite Passion")');
+            const fantasyButton = document.querySelector('button:contains("Explore Fantasies")');
+
+            // Use text content matching for buttons
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(button => {
+                const buttonText = button.textContent.trim();
+
+                if (buttonText === 'Start Emotional Journey') {
+                    button.setAttribute('data-challenge-id', 'intimacy-emotional');
+                    button.addEventListener('click', () => startChallenge('intimacy-emotional', 'Emotional Intimacy'));
+                } else if (buttonText === 'Ignite Passion') {
+                    button.setAttribute('data-challenge-id', 'intimacy-physical');
+                    button.addEventListener('click', () => startChallenge('intimacy-physical', 'Physical Connection'));
+                } else if (buttonText === 'Explore Fantasies') {
+                    button.setAttribute('data-challenge-id', 'intimacy-fantasy');
+                    button.addEventListener('click', () => startChallenge('intimacy-fantasy', 'Adventure & Fantasy'));
+                } else if (buttonText === 'Start VIP Program') {
+                    button.addEventListener('click', function() {
+                        if (!checkAuth()) return;
+                        // Start all three challenges for VIP
+                        startChallenge('intimacy-emotional', 'VIP Package - Emotional');
+                        startChallenge('intimacy-physical', 'VIP Package - Physical');
+                        startChallenge('intimacy-fantasy', 'VIP Package - Fantasy');
+                    });
+                }
+            });
+
+            // Premium purchase buttons (non-challenge specific)
             const purchaseButtons = document.querySelectorAll('button[class*="bg-"]');
             purchaseButtons.forEach(button => {
+                const buttonText = button.textContent.trim();
+
+                // Skip challenge buttons (already handled above)
+                if (buttonText.includes('Start') || buttonText.includes('Ignite') || buttonText.includes('Explore')) {
+                    return;
+                }
+
                 button.addEventListener('click', function() {
+                    if (!checkAuth()) return;
+
                     // Add purchase animation
                     this.style.transform = 'scale(0.98)';
                     setTimeout(() => {
                         this.style.transform = 'scale(1)';
                     }, 100);
-                    
+
                     // Log purchase intent
-                    console.log('Intimacy challenge purchase:', this.textContent.trim());
-                    
+                    console.log('Intimacy challenge purchase:', buttonText);
+
                     // Here you would integrate with payment system
                     // Example: initiateIntimacyPurchase(getPriceFromButton(this));
                 });
@@ -722,6 +901,9 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                     this.style.transform = 'scale(1)';
                 });
             });
+
+            // Store participation IDs for progress tracking
+            window.intimacyParticipations = {};
         });
     </script>
 </body>

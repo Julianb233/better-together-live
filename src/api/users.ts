@@ -3,24 +3,22 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { createDatabase } from '../db'
+import type { Env } from '../types'
 
 const usersApi = new Hono()
 
 // GET /api/users/:userId/preferences
 usersApi.get('/:userId/preferences', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
-    const db = (c.env as any)?.DB
 
-    if (!db) {
-      return c.json({ error: 'Database not available' }, 503)
-    }
-
-    const user = await db.prepare(`
+    const user = await db.first<any>(`
       SELECT id, name, email, primary_love_language, secondary_love_language,
              communication_style, date_preferences, budget_range, interests
-      FROM users WHERE id = ?
-    `).bind(userId).first()
+      FROM users WHERE id = $1
+    `, [userId])
 
     if (!user) {
       return c.json({ error: 'User not found' }, 404)
@@ -48,31 +46,27 @@ usersApi.get('/:userId/preferences', async (c: Context) => {
 // PUT /api/users/:userId/preferences
 usersApi.put('/:userId/preferences', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
     const body = await c.req.json()
-    const db = (c.env as any)?.DB
-
-    if (!db) {
-      return c.json({ error: 'Database not available' }, 503)
-    }
 
     const { communicationStyle, datePreferences, budgetRange, interests } = body
 
-    await db.prepare(`
+    await db.run(`
       UPDATE users SET
-        communication_style = COALESCE(?, communication_style),
-        date_preferences = COALESCE(?, date_preferences),
-        budget_range = COALESCE(?, budget_range),
-        interests = COALESCE(?, interests),
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(
+        communication_style = COALESCE($1, communication_style),
+        date_preferences = COALESCE($2, date_preferences),
+        budget_range = COALESCE($3, budget_range),
+        interests = COALESCE($4, interests),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5
+    `, [
       communicationStyle,
       datePreferences ? JSON.stringify(datePreferences) : null,
       budgetRange,
       interests ? JSON.stringify(interests) : null,
       userId
-    ).run()
+    ])
 
     return c.json({ success: true, message: 'Preferences updated' })
   } catch (error) {
@@ -84,16 +78,15 @@ usersApi.put('/:userId/preferences', async (c: Context) => {
 // GET /api/users/:userId/love-languages
 usersApi.get('/:userId/love-languages', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
-    const db = (c.env as any)?.DB
 
-    if (!db) {
-      return c.json({ error: 'Database not available' }, 503)
-    }
-
-    const user = await db.prepare(`
-      SELECT primary_love_language, secondary_love_language FROM users WHERE id = ?
-    `).bind(userId).first()
+    const user = await db.first<{
+      primary_love_language: string | null
+      secondary_love_language: string | null
+    }>(`
+      SELECT primary_love_language, secondary_love_language FROM users WHERE id = $1
+    `, [userId])
 
     if (!user) {
       return c.json({ error: 'User not found' }, 404)
@@ -121,13 +114,9 @@ usersApi.get('/:userId/love-languages', async (c: Context) => {
 // PUT /api/users/:userId/love-languages
 usersApi.put('/:userId/love-languages', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
     const { primary, secondary } = await c.req.json()
-    const db = (c.env as any)?.DB
-
-    if (!db) {
-      return c.json({ error: 'Database not available' }, 503)
-    }
 
     const validLanguages = ['words_of_affirmation', 'quality_time', 'receiving_gifts', 'acts_of_service', 'physical_touch']
 
@@ -138,13 +127,13 @@ usersApi.put('/:userId/love-languages', async (c: Context) => {
       return c.json({ error: 'Invalid secondary love language' }, 400)
     }
 
-    await db.prepare(`
+    await db.run(`
       UPDATE users SET
-        primary_love_language = COALESCE(?, primary_love_language),
-        secondary_love_language = COALESCE(?, secondary_love_language),
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(primary, secondary, userId).run()
+        primary_love_language = COALESCE($1, primary_love_language),
+        secondary_love_language = COALESCE($2, secondary_love_language),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [primary, secondary, userId])
 
     return c.json({ success: true, message: 'Love languages updated' })
   } catch (error) {
@@ -156,21 +145,12 @@ usersApi.put('/:userId/love-languages', async (c: Context) => {
 // GET /api/users/:userId/notification-settings
 usersApi.get('/:userId/notification-settings', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
-    const db = (c.env as any)?.DB
 
-    if (!db) {
-      // Return defaults if no DB
-      return c.json({
-        email: { dailyCheckins: true, weeklyDigest: true, milestoneReminders: true, partnerActivity: true, promotions: false },
-        push: { dailyCheckins: true, partnerMessages: true, challenges: true, achievements: true },
-        sms: { urgentReminders: false, anniversaryAlerts: true }
-      })
-    }
-
-    const settings = await db.prepare(`
-      SELECT notification_settings FROM users WHERE id = ?
-    `).bind(userId).first()
+    const settings = await db.first<{ notification_settings: string | null }>(`
+      SELECT notification_settings FROM users WHERE id = $1
+    `, [userId])
 
     if (!settings) {
       return c.json({ error: 'User not found' }, 404)
@@ -192,20 +172,16 @@ usersApi.get('/:userId/notification-settings', async (c: Context) => {
 // PUT /api/users/:userId/notification-settings
 usersApi.put('/:userId/notification-settings', async (c: Context) => {
   try {
+    const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
     const settings = await c.req.json()
-    const db = (c.env as any)?.DB
 
-    if (!db) {
-      return c.json({ error: 'Database not available' }, 503)
-    }
-
-    await db.prepare(`
+    await db.run(`
       UPDATE users SET
-        notification_settings = ?,
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(JSON.stringify(settings), userId).run()
+        notification_settings = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [JSON.stringify(settings), userId])
 
     return c.json({ success: true, message: 'Notification settings updated' })
   } catch (error) {

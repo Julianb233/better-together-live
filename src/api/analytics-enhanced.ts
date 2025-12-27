@@ -3,6 +3,8 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { createDatabase } from '../db'
+import type { Env } from '../types'
 
 const analyticsApi = new Hono()
 
@@ -11,49 +13,36 @@ const analyticsApi = new Hono()
 analyticsApi.get('/relationship-health/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = (c.env as any)?.DB
-
-    if (!db) {
-      // Return mock data for demo
-      return c.json({
-        score: 78,
-        breakdown: {
-          communication: 82,
-          qualityTime: 75,
-          goals: 80,
-          activities: 72,
-          consistency: 81
-        },
-        trend: 'improving',
-        recommendations: [
-          'Try scheduling a weekly check-in to improve communication',
-          'Plan more activities together based on your shared interests',
-          'Set a new goal together to strengthen your bond'
-        ]
-      })
-    }
+    const db = createDatabase(c.env as Env)
 
     // Get check-ins for last 30 days
-    const checkins = await db.prepare(`
+    const checkins = await db.first<{
+      avg_connection: number | null
+      avg_mood: number | null
+      total_checkins: number
+    }>(`
       SELECT AVG(connection_score) as avg_connection,
              AVG(mood_score) as avg_mood,
              COUNT(*) as total_checkins
       FROM daily_checkins
-      WHERE relationship_id = ? AND created_at > datetime('now', '-30 days')
-    `).bind(relationshipId).first()
+      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+    `, [relationshipId])
 
     // Get goal completion rate
-    const goals = await db.prepare(`
+    const goals = await db.first<{
+      total: number
+      completed: number
+    }>(`
       SELECT COUNT(*) as total,
              SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-      FROM shared_goals WHERE relationship_id = ?
-    `).bind(relationshipId).first()
+      FROM shared_goals WHERE relationship_id = $1
+    `, [relationshipId])
 
     // Get activity frequency
-    const activities = await db.prepare(`
+    const activities = await db.first<{ count: number }>(`
       SELECT COUNT(*) as count FROM activities
-      WHERE relationship_id = ? AND created_at > datetime('now', '-30 days')
-    `).bind(relationshipId).first()
+      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+    `, [relationshipId])
 
     // Calculate scores
     const communicationScore = Math.min(100, (checkins?.total_checkins || 0) * 3.3) // 30 checkins = 100
@@ -97,32 +86,31 @@ analyticsApi.get('/relationship-health/:relationshipId', async (c: Context) => {
 analyticsApi.get('/engagement/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = (c.env as any)?.DB
-
-    if (!db) {
-      return c.json({
-        weekly: { checkins: 5, activities: 2, goals: 1 },
-        monthly: { checkins: 18, activities: 7, goals: 3 },
-        streaks: { currentStreak: 12, longestStreak: 28 },
-        balance: { user1Participation: 55, user2Participation: 45 }
-      })
-    }
+    const db = createDatabase(c.env as Env)
 
     // Weekly stats
-    const weekly = await db.prepare(`
+    const weekly = await db.first<{
+      checkins: number
+      activities: number
+      goals: number
+    }>(`
       SELECT
-        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = ? AND created_at > datetime('now', '-7 days')) as checkins,
-        (SELECT COUNT(*) FROM activities WHERE relationship_id = ? AND created_at > datetime('now', '-7 days')) as activities,
-        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = ? AND created_at > datetime('now', '-7 days')) as goals
-    `).bind(relationshipId, relationshipId, relationshipId).first()
+        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as checkins,
+        (SELECT COUNT(*) FROM activities WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as activities,
+        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as goals
+    `, [relationshipId])
 
     // Monthly stats
-    const monthly = await db.prepare(`
+    const monthly = await db.first<{
+      checkins: number
+      activities: number
+      goals: number
+    }>(`
       SELECT
-        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = ? AND created_at > datetime('now', '-30 days')) as checkins,
-        (SELECT COUNT(*) FROM activities WHERE relationship_id = ? AND created_at > datetime('now', '-30 days')) as activities,
-        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = ? AND created_at > datetime('now', '-30 days')) as goals
-    `).bind(relationshipId, relationshipId, relationshipId).first()
+        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as checkins,
+        (SELECT COUNT(*) FROM activities WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as activities,
+        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as goals
+    `, [relationshipId])
 
     return c.json({
       weekly: {
@@ -150,47 +138,32 @@ analyticsApi.get('/trends/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
     const period = c.req.query('period') || '30d'
-    const db = (c.env as any)?.DB
+    const db = createDatabase(c.env as Env)
 
     const days = period === '7d' ? 7 : period === '90d' ? 90 : 30
 
-    if (!db) {
-      // Generate mock trend data
-      const mockData = Array.from({ length: days }, (_, i) => ({
-        date: new Date(Date.now() - (days - i - 1) * 86400000).toISOString().split('T')[0],
-        connectionScore: 60 + Math.random() * 30,
-        moodScore: 55 + Math.random() * 35,
-        activityCount: Math.floor(Math.random() * 3)
-      }))
-
-      return c.json({
-        period,
-        data: mockData,
-        summary: {
-          avgConnection: 75,
-          avgMood: 72,
-          totalActivities: mockData.reduce((sum, d) => sum + d.activityCount, 0)
-        }
-      })
-    }
-
-    const trends = await db.prepare(`
+    const trends = await db.all<{
+      date: string
+      avg_connection: number
+      avg_mood: number
+      checkin_count: number
+    }>(`
       SELECT
         DATE(created_at) as date,
         AVG(connection_score) as avg_connection,
         AVG(mood_score) as avg_mood,
         COUNT(*) as checkin_count
       FROM daily_checkins
-      WHERE relationship_id = ? AND created_at > datetime('now', '-${days} days')
+      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '${days} days'
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).bind(relationshipId).all()
+    `, [relationshipId])
 
     return c.json({
       period,
-      data: trends.results || [],
+      data: trends,
       summary: {
-        dataPoints: trends.results?.length || 0
+        dataPoints: trends.length
       }
     })
   } catch (error) {
@@ -204,7 +177,7 @@ analyticsApi.get('/trends/:relationshipId', async (c: Context) => {
 analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = (c.env as any)?.DB
+    const db = createDatabase(c.env as Env)
 
     // Base recommendations
     const recommendations = [
@@ -231,15 +204,11 @@ analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
       }
     ]
 
-    if (!db) {
-      return c.json({ recommendations })
-    }
-
     // Check recent activity to customize
-    const recentCheckins = await db.prepare(`
+    const recentCheckins = await db.first<{ count: number }>(`
       SELECT COUNT(*) as count FROM daily_checkins
-      WHERE relationship_id = ? AND created_at > datetime('now', '-7 days')
-    `).bind(relationshipId).first()
+      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days'
+    `, [relationshipId])
 
     if ((recentCheckins?.count || 0) < 3) {
       recommendations.unshift({
@@ -263,24 +232,14 @@ analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
 analyticsApi.get('/milestones/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = (c.env as any)?.DB
+    const db = createDatabase(c.env as Env)
 
-    if (!db) {
-      return c.json({
-        upcoming: [
-          { type: '1 Year Anniversary', date: '2025-02-14', daysUntil: 58 },
-          { type: 'Valentine\'s Day', date: '2025-02-14', daysUntil: 58 }
-        ],
-        achieved: [
-          { type: '6 Months Together', date: '2024-08-14', celebratedAt: null },
-          { type: '100 Days', date: '2024-05-23', celebratedAt: '2024-05-24' }
-        ]
-      })
-    }
-
-    const relationship = await db.prepare(`
-      SELECT start_date, anniversary_date FROM relationships WHERE id = ?
-    `).bind(relationshipId).first()
+    const relationship = await db.first<{
+      start_date: string
+      anniversary_date: string | null
+    }>(`
+      SELECT start_date, anniversary_date FROM relationships WHERE id = $1
+    `, [relationshipId])
 
     if (!relationship) {
       return c.json({ error: 'Relationship not found' }, 404)
