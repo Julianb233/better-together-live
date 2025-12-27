@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Better Together - Asset Preview</title>
+    <link rel="icon" href="./favicon.png" type="image/png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .color-palette {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 60px;
+        }
+
+        .color-swatch {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-width: 150px;
+        }
+
+        .swatch {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .color-info h3 {
+            font-size: 1em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .color-info p {
+            font-size: 0.9em;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .assets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .asset-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .asset-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+        }
+
+        .asset-card h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #FF6B9D;
+        }
+
+        .asset-preview {
+            background: #f5f5f5;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .asset-preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .asset-info {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .asset-info p {
+            margin-bottom: 8px;
+        }
+
+        .asset-info strong {
+            color: #333;
+        }
+
+        .icon-sizes {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: flex-end;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .icon-size-demo {
+            text-align: center;
+        }
+
+        .icon-size-demo img {
+            display: block;
+            margin: 0 auto 8px;
+            border-radius: 20%;
+        }
+
+        .icon-size-demo span {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .device-preview {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .device-preview img {
+            max-width: 200px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 60px;
+            opacity: 0.8;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+
+        .checklist {
+            background: #f0f9ff;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .checklist h3 {
+            color: #2196F3;
+            margin-bottom: 12px;
+        }
+
+        .checklist ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 6px 0;
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .checklist li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💕 Better Together</h1>
+            <p class="subtitle">Visual Assets for App Store Submission</p>
+        </header>
+
+        <section>
+            <h2 style="color: white; text-align: center; margin-bottom: 30px;">Brand Color Palette</h2>
+            <div class="color-palette">
+                <div class="color-swatch">
+                    <div class="swatch" style="background: #FF6B9D;"></div>
+                    <div class="color-info">
+                        <h3>Primary</h3>
+                        <p>#FF6B9D</p>
+                        <small style="color: #999;">Vibrant Pink</small>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch" style="background: #C44569;"></div>
+                    <div class="color-info">
+                        <h3>Secondary</h3>
+                        <p>#C44569</p>
+                        <small style="color: #999;">Deep Rose</small>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch" style="background: #FFA07A;"></div>
+                    <div class="color-info">
+                        <h3>Accent</h3>
+                        <p>#FFA07A</p>
+                        <small style="color: #999;">Coral/Salmon</small>
+                    </div>
+                </div>
+                <div class="color-swatch">
+                    <div class="swatch" style="background: #FFFFFF; border: 1px solid #ddd;"></div>
+                    <div class="color-info">
+                        <h3>Background</h3>
+                        <p>#FFFFFF</p>
+                        <small style="color: #999;">White</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="assets-grid">
+            <div class="asset-card">
+                <h2>📱 App Icon <span class="badge">Required</span></h2>
+                <div class="asset-preview">
+                    <img src="./icon.png" alt="App Icon" style="max-width: 200px;">
+                </div>
+                <div class="asset-info">
+                    <p><strong>Size:</strong> 1024 × 1024 px</p>
+                    <p><strong>Format:</strong> PNG (RGB, no alpha)</p>
+                    <p><strong>File:</strong> icon.png</p>
+                    <p><strong>Purpose:</strong> iOS App Store</p>
+                </div>
+                <div class="icon-sizes">
+                    <div class="icon-size-demo">
+                        <img src="./icon.png" width="128" height="128" alt="128px">
+                        <span>128px</span>
+                    </div>
+                    <div class="icon-size-demo">
+                        <img src="./icon.png" width="80" height="80" alt="80px">
+                        <span>80px</span>
+                    </div>
+                    <div class="icon-size-demo">
+                        <img src="./icon.png" width="48" height="48" alt="48px">
+                        <span>48px</span>
+                    </div>
+                    <div class="icon-size-demo">
+                        <img src="./icon.png" width="32" height="32" alt="32px">
+                        <span>32px</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="asset-card">
+                <h2>🚀 Splash Screen <span class="badge">Required</span></h2>
+                <div class="asset-preview">
+                    <img src="./splash.png" alt="Splash Screen" style="max-width: 250px;">
+                </div>
+                <div class="asset-info">
+                    <p><strong>Size:</strong> 2048 × 2732 px</p>
+                    <p><strong>Format:</strong> PNG (RGB)</p>
+                    <p><strong>File:</strong> splash.png</p>
+                    <p><strong>Purpose:</strong> Launch screen (all devices)</p>
+                    <p><strong>Note:</strong> Centered logo scales to fit all screen sizes</p>
+                </div>
+            </div>
+
+            <div class="asset-card">
+                <h2>🤖 Adaptive Icon <span class="badge">Android</span></h2>
+                <div class="asset-preview" style="background: #ddd;">
+                    <img src="./adaptive-icon.png" alt="Adaptive Icon" style="max-width: 200px;">
+                </div>
+                <div class="asset-info">
+                    <p><strong>Size:</strong> 1024 × 1024 px</p>
+                    <p><strong>Format:</strong> PNG (RGBA with transparency)</p>
+                    <p><strong>File:</strong> adaptive-icon.png</p>
+                    <p><strong>Purpose:</strong> Android adaptive icon foreground</p>
+                    <p><strong>Note:</strong> Android applies white background and various masks</p>
+                </div>
+            </div>
+
+            <div class="asset-card">
+                <h2>🌐 Favicon <span class="badge">Web</span></h2>
+                <div class="asset-preview">
+                    <img src="./favicon.png" alt="Favicon" style="max-width: 128px;">
+                </div>
+                <div class="asset-info">
+                    <p><strong>Size:</strong> 256 × 256 px</p>
+                    <p><strong>Format:</strong> PNG (RGB)</p>
+                    <p><strong>File:</strong> favicon.png</p>
+                    <p><strong>Purpose:</strong> Browser favicon, PWA icon</p>
+                </div>
+                <div class="icon-sizes">
+                    <div class="icon-size-demo">
+                        <img src="./favicon.png" width="48" height="48" alt="48px">
+                        <span>48px</span>
+                    </div>
+                    <div class="icon-size-demo">
+                        <img src="./favicon.png" width="32" height="32" alt="32px">
+                        <span>32px</span>
+                    </div>
+                    <div class="icon-size-demo">
+                        <img src="./favicon.png" width="16" height="16" alt="16px">
+                        <span>16px</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="asset-card">
+            <h2>✅ App Store Compliance</h2>
+            <div class="checklist">
+                <h3>iOS App Store Requirements</h3>
+                <ul>
+                    <li>App icon is exactly 1024×1024 pixels</li>
+                    <li>No alpha channel in app icon (RGB only)</li>
+                    <li>No rounded corners (iOS applies automatically)</li>
+                    <li>Splash screen supports all device sizes</li>
+                    <li>Colors are vibrant and recognizable at small sizes</li>
+                    <li>No offensive or copyrighted content</li>
+                </ul>
+            </div>
+            <div class="checklist" style="margin-top: 20px;">
+                <h3>Google Play Store Requirements</h3>
+                <ul>
+                    <li>Adaptive icon foreground is 1024×1024</li>
+                    <li>Adaptive icon uses transparency correctly</li>
+                    <li>Background color specified (#ffffff)</li>
+                    <li>Icon scales well to various masks (circle, squircle)</li>
+                    <li>Safe zone considered (inner 66% contains important content)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="asset-card">
+            <h2>📦 Asset Summary</h2>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                            <th style="padding: 12px; text-align: left;">Asset</th>
+                            <th style="padding: 12px; text-align: left;">Size</th>
+                            <th style="padding: 12px; text-align: left;">Format</th>
+                            <th style="padding: 12px; text-align: left;">File Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px;">icon.png</td>
+                            <td style="padding: 12px;">1024 × 1024</td>
+                            <td style="padding: 12px;">PNG (RGB)</td>
+                            <td style="padding: 12px;">~6.4 KB</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px;">splash.png</td>
+                            <td style="padding: 12px;">2048 × 2732</td>
+                            <td style="padding: 12px;">PNG (RGB)</td>
+                            <td style="padding: 12px;">~31 KB</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px;">adaptive-icon.png</td>
+                            <td style="padding: 12px;">1024 × 1024</td>
+                            <td style="padding: 12px;">PNG (RGBA)</td>
+                            <td style="padding: 12px;">~7.5 KB</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px;">favicon.png</td>
+                            <td style="padding: 12px;">256 × 256</td>
+                            <td style="padding: 12px;">PNG (RGB)</td>
+                            <td style="padding: 12px;">~1.1 KB</td>
+                        </tr>
+                        <tr style="background: #f0f9ff; font-weight: bold;">
+                            <td style="padding: 12px;" colspan="3">Total</td>
+                            <td style="padding: 12px;">~46 KB</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer>
+            <p>Generated: December 27, 2025</p>
+            <p>Better Together Mobile v1.0.0</p>
+            <p style="margin-top: 20px; font-size: 0.9em;">
+                To regenerate assets: <code style="background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 4px;">python3 generate-assets.py</code>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

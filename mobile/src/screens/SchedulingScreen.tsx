@@ -39,16 +39,18 @@ const SchedulingScreen: React.FC = () => {
         apiClient.getImportantDates(relationshipId),
       ])
 
-      if (activitiesRes.data?.activities) {
+      const activitiesData = activitiesRes.data as { activities?: Activity[] } | undefined
+      if (activitiesData?.activities) {
         setActivities(
-          activitiesRes.data.activities.filter(
+          activitiesData.activities.filter(
             (a: Activity) => a.status === 'planned'
           )
         )
       }
 
-      if (datesRes.data?.dates) {
-        setUpcomingDates(datesRes.data.dates)
+      const datesData = datesRes.data as { dates?: ImportantDate[] } | undefined
+      if (datesData?.dates) {
+        setUpcomingDates(datesData.dates)
       }
     }
 

@@ -17,9 +17,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bettertogether.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos for your relationship memories.",
-        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to save and share relationship moments."
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to save and share relationship moments.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

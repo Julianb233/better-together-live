@@ -27,8 +27,11 @@ export const Input: React.FC<InputProps> = ({
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
-        style={[styles.input, error && styles.inputError, style]}
+        style={[styles.input, error ? styles.inputError : undefined, style]}
         placeholderTextColor={COLORS.textLight}
+        accessible={true}
+        accessibilityLabel={label || props.placeholder}
+        accessibilityHint={error ? `Error: ${error}` : undefined}
         {...props}
       />
       {error && <Text style={styles.error}>{error}</Text>}

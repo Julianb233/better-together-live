@@ -40,10 +40,10 @@ class ApiClient {
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
+      (error: AxiosError<{ error?: string; message?: string }>) => {
         const apiError: ApiError = {
           error: error.message,
-          message: error.response?.data?.error || 'An unexpected error occurred',
+          message: (error.response?.data as { error?: string })?.error || 'An unexpected error occurred',
           statusCode: error.response?.status,
         }
         return Promise.reject(apiError)

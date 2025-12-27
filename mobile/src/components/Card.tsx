@@ -15,7 +15,11 @@ export const Card: React.FC<CardProps> = ({
   padding = 'medium',
 }) => {
   return (
-    <View style={[styles.card, styles[padding], style]}>
+    <View
+      style={[styles.card, styles[padding], style]}
+      accessible={false}
+      accessibilityRole="none"
+    >
       {children}
     </View>
   )
