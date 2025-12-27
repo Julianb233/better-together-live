@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Event Insurance - Design Review | iOS 2016 Style Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #14B8A6 0%, #0EA5E9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 60px;
+      font-size: 20px;
+    }
+
+    .section {
+      margin-bottom: 80px;
+    }
+
+    .section-title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid rgba(20, 184, 166, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title::before {
+      content: '';
+      width: 8px;
+      height: 32px;
+      background: linear-gradient(135deg, #14B8A6, #0EA5E9);
+      border-radius: 4px;
+    }
+
+    .element-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 32px;
+    }
+
+    .element-card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .element-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #14B8A6, #0EA5E9);
+    }
+
+    .element-label {
+      background: linear-gradient(135deg, #14B8A6, #0D9488);
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: inline-block;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .element-name {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .element-description {
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .element-preview {
+      background: rgba(0,0,0,0.3);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+    }
+
+    /* iOS 2016 Style Elements */
+
+    /* Glassmorphism Card */
+    .glass-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+      padding: 24px;
+    }
+
+    /* Skeuomorphic Button */
+    .skeu-button {
+      background: linear-gradient(180deg, #14B8A6 0%, #0D9488 100%);
+      border: none;
+      border-radius: 14px;
+      padding: 16px 32px;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow:
+        0 4px 0 #0A7C70,
+        0 8px 16px rgba(20, 184, 166, 0.3),
+        inset 0 2px 0 rgba(255,255,255,0.2);
+      transition: all 0.15s ease;
+    }
+
+    .skeu-button:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 6px 0 #0A7C70,
+        0 12px 24px rgba(20, 184, 166, 0.4),
+        inset 0 2px 0 rgba(255,255,255,0.2);
+    }
+
+    .skeu-button:active {
+      transform: translateY(2px);
+      box-shadow:
+        0 2px 0 #0A7C70,
+        0 4px 8px rgba(20, 184, 166, 0.2),
+        inset 0 2px 0 rgba(255,255,255,0.2);
+    }
+
+    /* Toggle Switch */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle {
+      width: 60px;
+      height: 34px;
+      background: linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%);
+      border-radius: 17px;
+      position: relative;
+      cursor: pointer;
+      box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.3),
+        0 1px 0 rgba(255,255,255,0.1);
+    }
+
+    .toggle.active {
+      background: linear-gradient(180deg, #14B8A6 0%, #0D9488 100%);
+    }
+
+    .toggle-knob {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(180deg, #fff 0%, #f0f0f0 100%);
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.2),
+        inset 0 -1px 2px rgba(0,0,0,0.1);
+      transition: left 0.2s ease;
+    }
+
+    .toggle.active .toggle-knob {
+      left: 29px;
+    }
+
+    /* Input Field */
+    .skeu-input {
+      background: linear-gradient(180deg, #1a1a2e 0%, #222244 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: white;
+      font-size: 16px;
+      width: 100%;
+      box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.3),
+        0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .skeu-input::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    .skeu-input:focus {
+      outline: none;
+      border-color: #14B8A6;
+      box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.3),
+        0 0 0 3px rgba(20, 184, 166, 0.2);
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(14, 165, 233, 0.2) 100%);
+      border: 1px solid rgba(20, 184, 166, 0.3);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .badge-icon {
+      width: 20px;
+      height: 20px;
+      background: #14B8A6;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      width: 100%;
+      height: 12px;
+      background: linear-gradient(180deg, #1a1a2e 0%, #222244 100%);
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #14B8A6, #0EA5E9);
+      border-radius: 6px;
+      width: 65%;
+      box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
+    }
+
+    /* Card with Depth */
+    .depth-card {
+      background: linear-gradient(145deg, #2a2a4a 0%, #1e1e3e 100%);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow:
+        8px 8px 24px rgba(0,0,0,0.4),
+        -8px -8px 24px rgba(255,255,255,0.02);
+    }
+
+    /* Notification Badge */
+    .notification {
+      position: relative;
+      display: inline-block;
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Slider */
+    .slider-container {
+      width: 100%;
+    }
+
+    .slider-track {
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(180deg, #1a1a2e 0%, #222244 100%);
+      border-radius: 4px;
+      position: relative;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .slider-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, #14B8A6, #0EA5E9);
+      border-radius: 4px;
+    }
+
+    .slider-thumb {
+      position: absolute;
+      top: 50%;
+      left: 40%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(180deg, #fff 0%, #e0e0e0 100%);
+      border-radius: 50%;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.3),
+        inset 0 -1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* Icon Button */
+    .icon-button {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(145deg, #3a3a5a 0%, #2a2a4a 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        4px 4px 12px rgba(0,0,0,0.3),
+        -4px -4px 12px rgba(255,255,255,0.03);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .icon-button:hover {
+      background: linear-gradient(145deg, #14B8A6 0%, #0D9488 100%);
+    }
+
+    .icon-button svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: white;
+      stroke-width: 2;
+    }
+
+    /* Segmented Control */
+    .segmented-control {
+      display: inline-flex;
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .segment {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.6);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .segment.active {
+      background: linear-gradient(135deg, #14B8A6, #0D9488);
+      color: white;
+      box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+    }
+
+    /* Color Palette */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+
+    .color-swatch {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* Typography Preview */
+    .type-sample {
+      margin-bottom: 16px;
+    }
+
+    .type-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 4px;
+    }
+
+    /* Feedback section */
+    .feedback-section {
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(14, 165, 233, 0.1) 100%);
+      border: 2px dashed rgba(20, 184, 166, 0.3);
+      border-radius: 24px;
+      padding: 40px;
+      text-align: center;
+      margin-top: 60px;
+    }
+
+    .feedback-title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .feedback-text {
+      color: rgba(255,255,255,0.7);
+      font-size: 16px;
+      max-width: 600px;
+      margin: 0 auto 24px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Daily Event Insurance</h1>
+    <p class="subtitle">Design Review - iOS 2016 Skeuomorphic Style Guide</p>
+
+    <!-- Color Palette -->
+    <section class="section">
+      <h2 class="section-title">Color Palette</h2>
+      <div class="element-card">
+        <span class="element-label">Brand Colors</span>
+        <div class="color-grid">
+          <div class="color-swatch" style="background: #14B8A6;">
+            Teal-500<br>#14B8A6
+          </div>
+          <div class="color-swatch" style="background: #0D9488;">
+            Teal-600<br>#0D9488
+          </div>
+          <div class="color-swatch" style="background: #0EA5E9;">
+            Sky-500<br>#0EA5E9
+          </div>
+          <div class="color-swatch" style="background: #1E293B; border: 1px solid rgba(255,255,255,0.2);">
+            Slate-800<br>#1E293B
+          </div>
+          <div class="color-swatch" style="background: #F8FAFC; color: #1E293B;">
+            Slate-50<br>#F8FAFC
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Buttons -->
+    <section class="section">
+      <h2 class="section-title">Buttons</h2>
+      <div class="element-grid">
+        <div class="element-card">
+          <span class="element-label">Primary Button</span>
+          <p class="element-name">Skeuomorphic CTA</p>
+          <p class="element-description">3D depth with gradient, inset highlight, and drop shadow. Press effect on click. Used for primary actions.</p>
+          <div class="element-preview">
+            <button class="skeu-button">Get Started</button>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Icon Button</span>
+          <p class="element-name">Neumorphic Icon</p>
+          <p class="element-description">Soft shadows creating depth illusion. Subtle color shift on hover. Used for secondary actions.</p>
+          <div class="element-preview">
+            <div style="display: flex; gap: 16px;">
+              <div class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-linecap="round"/></svg>
+              </div>
+              <div class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cards -->
+    <section class="section">
+      <h2 class="section-title">Cards</h2>
+      <div class="element-grid">
+        <div class="element-card">
+          <span class="element-label">Glass Card</span>
+          <p class="element-name">Glassmorphism Panel</p>
+          <p class="element-description">Frosted glass effect with backdrop blur. Semi-transparent with subtle border. iOS 7+ inspired.</p>
+          <div class="element-preview">
+            <div class="glass-card">
+              <h3 style="font-weight: 600; margin-bottom: 8px;">Coverage Active</h3>
+              <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Your daily event insurance is protecting 247 participants</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Depth Card</span>
+          <p class="element-name">Neumorphic Container</p>
+          <p class="element-description">Soft UI with extruded appearance. Dual shadows create embossed effect. Material-like depth.</p>
+          <div class="element-preview">
+            <div class="depth-card">
+              <h3 style="font-weight: 600; margin-bottom: 8px;">$12,450</h3>
+              <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Revenue this month</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form Elements -->
+    <section class="section">
+      <h2 class="section-title">Form Elements</h2>
+      <div class="element-grid">
+        <div class="element-card">
+          <span class="element-label">Toggle</span>
+          <p class="element-name">iOS-Style Switch</p>
+          <p class="element-description">Glossy knob with inset track. Smooth animation between states. Classic iOS control.</p>
+          <div class="element-preview">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="toggle-container">
+                <div class="toggle">
+                  <div class="toggle-knob"></div>
+                </div>
+                <span style="font-size: 14px;">Notifications Off</span>
+              </div>
+              <div class="toggle-container">
+                <div class="toggle active">
+                  <div class="toggle-knob"></div>
+                </div>
+                <span style="font-size: 14px;">Coverage Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Input</span>
+          <p class="element-name">Inset Text Field</p>
+          <p class="element-description">Recessed appearance with inner shadow. Teal glow on focus. Dark theme optimized.</p>
+          <div class="element-preview">
+            <input type="text" class="skeu-input" placeholder="Enter your email address">
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Slider</span>
+          <p class="element-name">Range Control</p>
+          <p class="element-description">Gradient fill with glossy thumb. Inset track for depth. Physical slider metaphor.</p>
+          <div class="element-preview">
+            <div class="slider-container">
+              <div class="slider-track">
+                <div class="slider-fill"></div>
+                <div class="slider-thumb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Segmented</span>
+          <p class="element-name">Segmented Control</p>
+          <p class="element-description">iOS native control pattern. Active segment with gradient. Tab-like navigation.</p>
+          <div class="element-preview">
+            <div class="segmented-control">
+              <div class="segment active">Daily</div>
+              <div class="segment">Weekly</div>
+              <div class="segment">Monthly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Indicators -->
+    <section class="section">
+      <h2 class="section-title">Indicators</h2>
+      <div class="element-grid">
+        <div class="element-card">
+          <span class="element-label">Progress</span>
+          <p class="element-name">Progress Bar</p>
+          <p class="element-description">Gradient fill with glow effect. Inset track creates depth. Shows completion state.</p>
+          <div class="element-preview">
+            <div style="width: 100%;">
+              <div class="progress-container">
+                <div class="progress-fill"></div>
+              </div>
+              <p style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.6);">65% of monthly goal</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Badge</span>
+          <p class="element-name">Status Badge</p>
+          <p class="element-description">Pill-shaped with icon. Gradient border for emphasis. Used for status indicators.</p>
+          <div class="element-preview">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <span class="badge">
+                <span class="badge-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                Fully Insured
+              </span>
+              <span class="badge">
+                <span class="badge-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M12 2v10l4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                Processing
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="element-card">
+          <span class="element-label">Notification</span>
+          <p class="element-name">Counter Badge</p>
+          <p class="element-description">Red alert badge for counts. Positioned on parent element. Draws immediate attention.</p>
+          <div class="element-preview">
+            <div class="notification">
+              <div class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <span class="notification-badge">3</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Typography -->
+    <section class="section">
+      <h2 class="section-title">Typography</h2>
+      <div class="element-card">
+        <span class="element-label">Type Scale</span>
+        <div style="padding: 20px 0;">
+          <div class="type-sample">
+            <p class="type-label">Heading 1 - 48px Bold</p>
+            <p style="font-size: 48px; font-weight: 700;">Daily Event Insurance</p>
+          </div>
+          <div class="type-sample">
+            <p class="type-label">Heading 2 - 32px Semibold</p>
+            <p style="font-size: 32px; font-weight: 600;">Protect Every Participant</p>
+          </div>
+          <div class="type-sample">
+            <p class="type-label">Heading 3 - 24px Semibold</p>
+            <p style="font-size: 24px; font-weight: 600;">Coverage That Works</p>
+          </div>
+          <div class="type-sample">
+            <p class="type-label">Body - 16px Regular</p>
+            <p style="font-size: 16px; color: rgba(255,255,255,0.8);">Our platform provides instant insurance coverage for daily events, protecting both organizers and participants with seamless integration.</p>
+          </div>
+          <div class="type-sample">
+            <p class="type-label">Caption - 14px Regular</p>
+            <p style="font-size: 14px; color: rgba(255,255,255,0.6);">Terms and conditions apply. Coverage varies by event type.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feedback Section -->
+    <div class="feedback-section">
+      <h3 class="feedback-title">Your Feedback</h3>
+      <p class="feedback-text">
+        Review each element above. Let me know which ones match your vision for the iOS 2016 aesthetic,
+        and which need adjustments. I can modify colors, shadows, gradients, or overall styling based on your input.
+      </p>
+      <button class="skeu-button">Send Feedback</button>
+    </div>
+
+    <footer style="text-align: center; margin-top: 60px; padding: 40px; color: rgba(255,255,255,0.4); font-size: 14px;">
+      <p>Daily Event Insurance - Design Review</p>
+      <p style="margin-top: 8px;">Created by Bubba | AI Acrobatics</p>
+    </footer>
+  </div>
+
+  <script>
+    // Toggle interaction
+    document.querySelectorAll('.toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('active');
+      });
+    });
+
+    // Segment interaction
+    document.querySelectorAll('.segment').forEach(segment => {
+      segment.addEventListener('click', () => {
+        document.querySelectorAll('.segment').forEach(s => s.classList.remove('active'));
+        segment.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
