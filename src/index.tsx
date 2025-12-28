@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { serveStatic } from 'hono/cloudflare-workers'
+// Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
 import { createDatabase } from './db'
@@ -67,8 +67,7 @@ const app = new Hono<{ Bindings: Env }>()
 // Enable CORS for API routes
 app.use('/api/*', cors())
 
-// Serve static files
-app.use('/static/*', serveStatic({ root: './public' }))
+// Static files served automatically by hosting platform from /public
 
 // Use JSX renderer for HTML pages
 app.use(renderer)
