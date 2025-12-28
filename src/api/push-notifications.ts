@@ -194,21 +194,26 @@ async function sendAPNsNotification(
 
 // Generate JWT for APNs authentication
 async function generateAPNsJWT(config: { teamId: string; keyId: string; privateKey: string }): Promise<string> {
-  // In production, use a proper JWT library with crypto
-  // This is a simplified version - you'll need to implement proper ES256 JWT signing
-  const header = {
-    alg: 'ES256',
-    kid: config.keyId
-  }
+  // Import jose library dynamically to avoid issues in edge environments
+  const jose = await import('jose')
 
-  const payload = {
-    iss: config.teamId,
-    iat: Math.floor(Date.now() / 1000)
-  }
+  try {
+    // Import the P8 private key for ES256 signing
+    const privateKey = await jose.importPKCS8(config.privateKey, 'ES256')
 
-  // Note: This needs proper implementation with crypto.subtle or a JWT library
-  // For now, returning a placeholder. In production, use proper ES256 signing with the private key
-  return 'JWT_TOKEN_PLACEHOLDER'
+    // Create JWT with APNs required claims
+    const jwt = await new jose.SignJWT({})
+      .setProtectedHeader({ alg: 'ES256', kid: config.keyId })
+      .setIssuer(config.teamId)
+      .setIssuedAt()
+      .setExpirationTime('1h') // APNs tokens are valid for up to 1 hour
+      .sign(privateKey)
+
+    return jwt
+  } catch (error) {
+    console.error('Error generating APNs JWT:', error)
+    throw new Error(`Failed to generate APNs JWT: ${error}`)
+  }
 }
 
 // Get device tokens for a user

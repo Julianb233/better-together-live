@@ -1,16 +1,154 @@
 {
   "projectName": "better-together-live",
   "version": "1.0.0",
-  "lastUpdated": "2025-12-28T16:43:03Z",
+  "lastUpdated": "2025-12-28T21:30:00Z",
   "availableTasks": [],
   "claimedTasks": [],
-  "completedTasks": [],
+  "completedTasks": [
+    {
+      "taskId": "push-001",
+      "title": "Firebase/APNs Setup for Push Notifications",
+      "description": "Complete Firebase and APNs configuration documentation and code improvements",
+      "assignedTo": "Fiona-Frontend",
+      "terminal": "T2",
+      "priority": "HIGH",
+      "status": "completed",
+      "claimedAt": "2025-12-28T19:30:00Z",
+      "completedAt": "2025-12-28T21:30:00Z",
+      "duration": "120min",
+      "dependencies": [],
+      "blockers": [
+        {
+          "type": "manual",
+          "description": "Firebase project setup required",
+          "estimatedTime": "15-20min",
+          "assignedTo": "Julian",
+          "status": "pending"
+        },
+        {
+          "type": "manual",
+          "description": "APNs certificate creation required",
+          "estimatedTime": "20-30min",
+          "assignedTo": "Julian",
+          "status": "pending"
+        }
+      ],
+      "filesModified": [
+        "src/api/push-notifications.ts"
+      ],
+      "filesCreated": [
+        "FIREBASE_SETUP_GUIDE.md",
+        "APNS_SETUP_GUIDE.md",
+        "PUSH_NOTIFICATION_INTEGRATION_CHECKLIST.md",
+        "PUSH_NOTIFICATION_TESTING_GUIDE.md",
+        "test-push-notifications.sh"
+      ],
+      "details": {
+        "codeChanges": [
+          "Implemented proper APNs JWT generation with jose library",
+          "Replaced placeholder JWT function with production ES256 signing"
+        ],
+        "documentation": [
+          "Firebase setup guide with step-by-step instructions",
+          "APNs setup guide with certificate creation",
+          "Mobile app integration checklist",
+          "Comprehensive testing guide with 13 automated tests",
+          "Test script with pass/fail tracking"
+        ],
+        "dependencies_added": [
+          "jose - JWT signing for APNs authentication"
+        ]
+      },
+      "nextSteps": [
+        "Julian: Complete Firebase setup (FIREBASE_SETUP_GUIDE.md)",
+        "Julian: Complete APNs setup (APNS_SETUP_GUIDE.md)",
+        "Julian: Run test script: ./test-push-notifications.sh",
+        "Julian: Test on physical iOS device",
+        "Julian: Test on physical Android device",
+        "Deploy to production when ready"
+      ]
+    }
+  ],
   "taskStatistics": {
-    "total": 0,
+    "total": 1,
     "available": 0,
     "claimed": 0,
-    "completed": 0,
-    "blocked": 3,
-    "avgCompletionTime": "45min"
-  }
+    "completed": 1,
+    "blocked": 0,
+    "avgCompletionTime": "120min"
+  },
+  "manualActions": [
+    {
+      "actionId": "manual-001",
+      "title": "Firebase Setup",
+      "description": "Create Firebase project, configure FCM, download google-services.json",
+      "assignedTo": "Julian",
+      "estimatedTime": "15-20min",
+      "priority": "HIGH",
+      "status": "pending",
+      "guide": "FIREBASE_SETUP_GUIDE.md",
+      "prerequisites": [
+        "Google account",
+        "Access to Firebase Console"
+      ],
+      "steps": [
+        "Create Firebase project",
+        "Add Android app with package: com.bettertogether.app",
+        "Download google-services.json",
+        "Place file in /mobile/ directory",
+        "Get FCM Server Key from Cloud Messaging tab",
+        "Get Firebase Project ID",
+        "Add secrets: npx wrangler secret put FCM_SERVER_KEY",
+        "Add secrets: npx wrangler secret put FCM_PROJECT_ID"
+      ]
+    },
+    {
+      "actionId": "manual-002",
+      "title": "APNs Certificate Setup",
+      "description": "Create APNs authentication key in Apple Developer Portal",
+      "assignedTo": "Julian",
+      "estimatedTime": "20-30min",
+      "priority": "HIGH",
+      "status": "pending",
+      "guide": "APNS_SETUP_GUIDE.md",
+      "prerequisites": [
+        "Apple Developer Program membership ($99/year)",
+        "Team Admin role",
+        "Access to Apple Developer Portal"
+      ],
+      "steps": [
+        "Navigate to Certificates, Identifiers & Profiles",
+        "Create new APNs key",
+        "Download .p8 file (ONE TIME ONLY)",
+        "Note Team ID from portal",
+        "Note Key ID from key creation",
+        "Add secrets: npx wrangler secret put APNS_TEAM_ID",
+        "Add secrets: npx wrangler secret put APNS_KEY_ID",
+        "Add secrets: npx wrangler secret put APNS_PRIVATE_KEY",
+        "Add secrets: npx wrangler secret put APNS_BUNDLE_ID",
+        "Add secrets: npx wrangler secret put APNS_PRODUCTION"
+      ]
+    },
+    {
+      "actionId": "manual-003",
+      "title": "Run Push Notification Tests",
+      "description": "Execute automated test script and manual device testing",
+      "assignedTo": "Julian",
+      "estimatedTime": "1-2hours",
+      "priority": "HIGH",
+      "status": "pending",
+      "dependsOn": ["manual-001", "manual-002"],
+      "guide": "PUSH_NOTIFICATION_TESTING_GUIDE.md",
+      "steps": [
+        "Run: ./test-push-notifications.sh",
+        "Verify all automated tests pass",
+        "Test on physical iOS device",
+        "Test on physical Android device",
+        "Verify all notification templates",
+        "Test navigation flows",
+        "Verify badge clearing",
+        "Test logout token cleanup"
+      ]
+    }
+  ]
 }
