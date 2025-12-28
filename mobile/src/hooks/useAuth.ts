@@ -102,11 +102,21 @@ export const useAuth = () => {
     }
   }
 
+  // Set user directly (used after onboarding)
+  const setUser = (user: User) => {
+    setAuthState({
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+    })
+  }
+
   return {
     ...authState,
     login,
     logout,
     updateUser,
+    setUser,
     refresh: loadUser,
   }
 }
