@@ -138,12 +138,30 @@
   ],
   "typeCheckStatus": "passed",
   "nextSteps": [
-    "Test on iPhone via Expo Go: npx expo start",
-    "Build with EAS: eas build --platform ios --profile production",
-    "Add real-time WebSocket support for live messaging",
-    "Implement push notifications for new messages",
-    "Add image upload support for posts and messages"
+    "Complete Firebase Console setup (get FCM Server Key, Project ID)",
+    "Complete APNs setup (create key, download .p8 file, get Key ID)",
+    "Run Cloudflare secret commands for FCM/APNs credentials",
+    "Run database migration: npx wrangler d1 execute --remote --file=./migrations/0004_push_notifications.sql",
+    "Download google-services.json from Firebase and add to mobile/",
+    "Create notification-icon.png asset (96x96px)",
+    "Build with EAS: eas build --platform ios --profile production"
   ],
+  "pushNotificationProgress": {
+    "codeComplete": true,
+    "mobileConfigUpdated": true,
+    "databaseMigration": "pending",
+    "firebaseSetup": "requires_manual",
+    "apnsSetup": "requires_manual",
+    "cloudflareSecrets": "requires_manual",
+    "filesImplemented": [
+      "src/api/push-notifications.ts",
+      "mobile/utils/pushNotifications.ts",
+      "mobile/hooks/usePushNotifications.ts",
+      "migrations/0004_push_notifications.sql",
+      "tests/push-notifications.test.sh"
+    ],
+    "appJsonUpdated": "2025-12-28T17:20:00Z"
+  },
   "appleCredentials": {
     "teamId": "5H49774YPG",
     "appleId": "julian@aiacrobatics.com",

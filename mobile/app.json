@@ -24,7 +24,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos for your relationship memories.",
         "NSPhotoLibraryUsageDescription": "This app accesses your photo library to save and share relationship moments.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -33,6 +34,8 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.bettertogether.app",
+      "googleServicesFile": "./google-services.json",
+      "useNextNotificationsApi": true,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -41,12 +44,25 @@
         "VIBRATE"
       ]
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#667eea",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Better Together"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "scheme": "bettertogether",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#667eea"
+        }
+      ]
     ],
     "extra": {
       "router": {

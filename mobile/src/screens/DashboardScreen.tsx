@@ -31,12 +31,20 @@ const DAILY_QUOTES = [
   { quote: "The greatest thing you'll ever learn is just to love and be loved in return.", author: "Nat King Cole" },
 ]
 
-// Quick action items
-const QUICK_ACTIONS = [
+// Quick action items - Row 1
+const QUICK_ACTIONS_ROW1 = [
   { id: 'checkin', icon: 'heart', label: 'Check-in', color: '#FF6B9D', route: 'Checkin' },
   { id: 'coach', icon: 'sparkles', label: 'AI Coach', color: '#9B6BFF', route: 'AICoach' },
+  { id: 'goals', icon: 'flag', label: 'Goals', color: '#22c55e', route: 'Goals' },
+  { id: 'analytics', icon: 'stats-chart', label: 'Insights', color: '#3b82f6', route: 'Analytics' },
+]
+
+// Quick action items - Row 2
+const QUICK_ACTIONS_ROW2 = [
   { id: 'schedule', icon: 'calendar', label: 'Schedule', color: '#6BB5FF', route: 'Scheduling' },
   { id: 'challenges', icon: 'trophy', label: 'Challenges', color: '#FFB86B', route: 'Challenges' },
+  { id: 'shop', icon: 'gift', label: 'Shop', color: '#ec4899', route: 'Shop' },
+  { id: 'community', icon: 'people', label: 'Community', color: '#8b5cf6', route: 'Community' },
 ]
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
@@ -162,7 +170,22 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           <View style={styles.quickActions}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.actionsGrid}>
-              {QUICK_ACTIONS.map((action) => (
+              {QUICK_ACTIONS_ROW1.map((action) => (
+                <TouchableOpacity
+                  key={action.id}
+                  style={[styles.actionCard, GLASSMORPHISM.light, SHADOWS.card]}
+                  onPress={() => navigation.navigate(action.route)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.actionIcon, { backgroundColor: `${action.color}20` }]}>
+                    <Ionicons name={action.icon as any} size={24} color={action.color} />
+                  </View>
+                  <Text style={styles.actionLabel}>{action.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={[styles.actionsGrid, { marginTop: SPACING.sm }]}>
+              {QUICK_ACTIONS_ROW2.map((action) => (
                 <TouchableOpacity
                   key={action.id}
                   style={[styles.actionCard, GLASSMORPHISM.light, SHADOWS.card]}
@@ -215,7 +238,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
                     <View style={styles.statDivider} />
 
-                    <View style={styles.statItem}>
+                    <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('Analytics')}>
                       <LinearGradient
                         colors={['#6BB5FF', '#6BFFB5']}
                         style={styles.statCircle}
@@ -226,7 +249,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         {dashboardData.analytics?.overall_health_score?.toFixed(0) || '—'}
                       </Text>
                       <Text style={styles.statLabel}>Health Score</Text>
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -236,7 +259,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Active Goals</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Challenges')}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Goals')}>
                       <Text style={styles.seeAllText}>See All</Text>
                     </TouchableOpacity>
                   </View>
