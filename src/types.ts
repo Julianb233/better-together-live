@@ -465,6 +465,305 @@ export interface TrackEventRequest {
   event_data?: Record<string, any>
 }
 
+// Communities & Social Types
+export interface Community {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  cover_image_url?: string
+  privacy_level: 'public' | 'private' | 'invite_only'
+  category: 'relationship_stage' | 'interests' | 'location' | 'support' | 'lifestyle' | 'other'
+  created_by: string
+  member_count: number
+  post_count: number
+  is_verified: boolean
+  is_featured: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CommunityMember {
+  id: string
+  community_id: string
+  user_id: string
+  relationship_id?: string
+  role: 'owner' | 'admin' | 'moderator' | 'member'
+  status: 'pending' | 'active' | 'banned' | 'left'
+  invited_by?: string
+  invited_at?: string
+  joined_at: string
+  last_active_at: string
+  notification_preferences?: string
+}
+
+export interface CommunityInvite {
+  id: string
+  community_id: string
+  invited_by: string
+  invited_email?: string
+  invite_code: string
+  status: 'pending' | 'accepted' | 'expired' | 'revoked'
+  expires_at: string
+  accepted_at?: string
+  accepted_by?: string
+  created_at: string
+}
+
+export interface Post {
+  id: string
+  author_id: string
+  relationship_id?: string
+  community_id?: string
+  content_type: 'text' | 'photo' | 'activity' | 'milestone' | 'challenge_complete' | 'achievement'
+  content?: string
+  media_urls?: string
+  linked_activity_id?: string
+  linked_challenge_id?: string
+  linked_achievement_id?: string
+  visibility: 'public' | 'community' | 'connections' | 'private'
+  is_pinned: boolean
+  is_featured: boolean
+  is_hidden: boolean
+  like_count: number
+  comment_count: number
+  share_count: number
+  created_at: string
+  updated_at: string
+  deleted_at?: string
+}
+
+export interface Comment {
+  id: string
+  post_id: string
+  author_id: string
+  parent_comment_id?: string
+  content: string
+  like_count: number
+  reply_count: number
+  created_at: string
+  updated_at: string
+  deleted_at?: string
+}
+
+export type ReactionType = 'like' | 'love' | 'celebrate' | 'support' | 'insightful'
+
+export interface Reaction {
+  id: string
+  user_id: string
+  target_type: 'post' | 'comment'
+  target_id: string
+  reaction_type: ReactionType
+  created_at: string
+}
+
+export type ConnectionType = 'follow' | 'friend'
+export type ConnectionStatus = 'pending' | 'accepted' | 'rejected' | 'blocked'
+
+export interface UserConnection {
+  id: string
+  follower_id: string
+  following_id: string
+  connection_type: ConnectionType
+  status: ConnectionStatus
+  created_at: string
+  updated_at: string
+}
+
+export type BlockReason = 'spam' | 'harassment' | 'inappropriate' | 'other'
+
+export interface UserBlock {
+  id: string
+  blocker_id: string
+  blocked_id: string
+  reason?: BlockReason
+  notes?: string
+  created_at: string
+}
+
+export type ConversationType = 'direct' | 'group'
+
+export interface Conversation {
+  id: string
+  type: ConversationType
+  name?: string
+  avatar_url?: string
+  created_by: string
+  last_message_at?: string
+  last_message_preview?: string
+  created_at: string
+  updated_at: string
+}
+
+export type ConversationRole = 'owner' | 'admin' | 'member'
+
+export interface ConversationParticipant {
+  id: string
+  conversation_id: string
+  user_id: string
+  role: ConversationRole
+  joined_at: string
+  left_at?: string
+  last_read_at?: string
+  is_muted: boolean
+}
+
+export type MessageType = 'text' | 'image' | 'activity_share' | 'post_share' | 'challenge_share'
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  message_type: MessageType
+  content?: string
+  media_url?: string
+  shared_activity_id?: string
+  shared_post_id?: string
+  shared_challenge_id?: string
+  is_edited: boolean
+  edited_at?: string
+  created_at: string
+  deleted_at?: string
+}
+
+export type ReportTargetType = 'post' | 'comment' | 'message' | 'user' | 'community'
+export type ReportReason = 'spam' | 'harassment' | 'hate_speech' | 'violence' | 'inappropriate' | 'misinformation' | 'copyright' | 'other'
+export type ReportStatus = 'pending' | 'under_review' | 'action_taken' | 'dismissed' | 'duplicate'
+
+export interface ContentReport {
+  id: string
+  reporter_id: string
+  target_type: ReportTargetType
+  target_id: string
+  reason: ReportReason
+  description?: string
+  status: ReportStatus
+  reviewed_by?: string
+  reviewed_at?: string
+  moderator_notes?: string
+  action_taken?: string
+  created_at: string
+  updated_at: string
+}
+
+// API Request Types for Communities
+export interface CreateCommunityRequest {
+  name: string
+  description: string
+  category: string
+  privacy_level?: 'public' | 'private' | 'invite_only'
+  cover_image_url?: string
+}
+
+export interface UpdateCommunityRequest {
+  name?: string
+  description?: string
+  cover_image_url?: string
+  privacy_level?: 'public' | 'private' | 'invite_only'
+  category?: string
+}
+
+export interface JoinCommunityRequest {
+  invite_code?: string
+}
+
+export interface UpdateMemberRoleRequest {
+  role: 'member' | 'moderator' | 'admin'
+}
+
+export interface RemoveMemberRequest {
+  ban?: boolean
+}
+
+export interface CreateInviteRequest {
+  invited_email?: string
+  expires_in_days?: number
+}
+
+// API Request Types for Posts & Comments
+export interface CreatePostRequest {
+  community_id?: string
+  content_type: 'text' | 'photo' | 'activity' | 'milestone' | 'challenge_complete' | 'achievement'
+  content?: string
+  media_urls?: string[]
+  linked_activity_id?: string
+  linked_challenge_id?: string
+  linked_achievement_id?: string
+  visibility?: 'public' | 'community' | 'connections' | 'private'
+}
+
+export interface UpdatePostRequest {
+  content?: string
+  visibility?: 'public' | 'community' | 'connections' | 'private'
+}
+
+export interface CreateCommentRequest {
+  post_id: string
+  content: string
+  parent_comment_id?: string
+}
+
+export interface UpdateCommentRequest {
+  content: string
+}
+
+export interface CreateReactionRequest {
+  target_type: 'post' | 'comment'
+  target_id: string
+  reaction_type: ReactionType
+}
+
+// API Request Types for Connections
+export interface CreateConnectionRequest {
+  following_id: string
+  connection_type?: ConnectionType
+}
+
+export interface UpdateConnectionRequest {
+  status: ConnectionStatus
+}
+
+export interface CreateBlockRequest {
+  blocked_id: string
+  reason?: BlockReason
+  notes?: string
+}
+
+// API Request Types for Messaging
+export interface CreateConversationRequest {
+  participant_ids: string[]
+  type?: ConversationType
+  name?: string
+}
+
+export interface SendMessageRequest {
+  conversation_id: string
+  message_type?: MessageType
+  content?: string
+  media_url?: string
+  shared_activity_id?: string
+  shared_post_id?: string
+  shared_challenge_id?: string
+}
+
+export interface UpdateMessageRequest {
+  content: string
+}
+
+// API Request Types for Content Moderation
+export interface CreateReportRequest {
+  target_type: ReportTargetType
+  target_id: string
+  reason: ReportReason
+  description?: string
+}
+
+export interface ReviewReportRequest {
+  status: ReportStatus
+  moderator_notes?: string
+  action_taken?: string
+}
+
 // Environment Variables
 export interface Env {
   DATABASE_URL: string

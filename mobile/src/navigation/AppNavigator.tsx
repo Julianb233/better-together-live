@@ -3,7 +3,7 @@ import React from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Text } from 'react-native'
+import { Feather } from '@expo/vector-icons'
 
 // Import screens
 import LoginScreen from '../screens/LoginScreen'
@@ -15,19 +15,18 @@ import ProfileScreen from '../screens/ProfileScreen'
 import CheckinScreen from '../screens/CheckinScreen'
 import ActivitiesScreen from '../screens/ActivitiesScreen'
 import ChallengesScreen from '../screens/ChallengesScreen'
+import ShopScreen from '../screens/ShopScreen'
+import CommunityFeedScreen from '../screens/CommunityFeedScreen'
+import MessagingScreen from '../screens/MessagingScreen'
+import PostDetailScreen from '../screens/PostDetailScreen'
+import UserProfileScreen from '../screens/UserProfileScreen'
+import CommunityDetailScreen from '../screens/CommunityDetailScreen'
 
 import { useAuth } from '../hooks/useAuth'
 
 // Stack and Tab navigators
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
-
-// Tab icon component (simple text for now, replace with icons)
-const TabIcon = ({ label, focused }: { label: string; focused: boolean }) => (
-  <Text style={{ color: focused ? '#FF6B9D' : '#666666', fontSize: 12 }}>
-    {label}
-  </Text>
-)
 
 // Main tab navigator (authenticated users)
 const MainTabs = () => {
@@ -48,35 +47,54 @@ const MainTabs = () => {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="🏠" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="home" size={24} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Checkin"
         component={CheckinScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="✅" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="check-circle" size={24} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Activities"
         component={ActivitiesScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="🎯" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="heart" size={24} color={color} />
+          ),
         }}
       />
       <Tab.Screen
-        name="AI Coach"
-        component={AICoachScreen}
+        name="Community"
+        component={CommunityFeedScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="🤖" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="users" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Messages"
+        component={MessagingScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="message-circle" size={24} color={color} />
+          ),
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon label="👤" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <Feather name="user" size={24} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -106,6 +124,11 @@ export const AppNavigator = () => {
             <Stack.Screen name="MainTabs" component={MainTabs} />
             <Stack.Screen name="Scheduling" component={SchedulingScreen} />
             <Stack.Screen name="Challenges" component={ChallengesScreen} />
+            <Stack.Screen name="AICoach" component={AICoachScreen} />
+            <Stack.Screen name="Shop" component={ShopScreen} />
+            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+            <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
           </>
         )}
       </Stack.Navigator>

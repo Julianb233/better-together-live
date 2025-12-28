@@ -240,3 +240,137 @@ export type ApiResponse<T> = {
   data?: T
   error?: ApiError
 }
+
+// Community Types
+export type ReactionType = 'like' | 'love' | 'celebrate' | 'support' | 'insightful'
+export type PostType = 'text' | 'image' | 'milestone' | 'activity_share' | 'challenge_share' | 'poll'
+export type PostVisibility = 'public' | 'community' | 'connections' | 'private'
+export type ConnectionType = 'follow' | 'friend' | 'close_friend'
+export type ConnectionStatus = 'pending' | 'accepted' | 'declined' | 'blocked'
+export type ConversationType = 'direct' | 'group' | 'community'
+export type MessageType = 'text' | 'image' | 'activity_share' | 'challenge_share' | 'post_share' | 'system'
+
+export interface Community {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  avatar_url?: string
+  banner_url?: string
+  community_type: string
+  privacy: 'public' | 'private' | 'invite_only'
+  member_count: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CommunityMember {
+  id: string
+  community_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'moderator' | 'member'
+  joined_at: string
+}
+
+export interface Post {
+  id: string
+  author_id: string
+  community_id?: string
+  post_type: PostType
+  content?: string
+  media_urls?: string[]
+  shared_activity_id?: string
+  shared_challenge_id?: string
+  visibility: PostVisibility
+  like_count: number
+  comment_count: number
+  share_count: number
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+  deleted_at?: string
+  // Joined fields
+  author?: User
+  community?: Community
+  user_reaction?: ReactionType
+}
+
+export interface Comment {
+  id: string
+  post_id: string
+  author_id: string
+  parent_comment_id?: string
+  content: string
+  like_count: number
+  reply_count: number
+  created_at: string
+  updated_at: string
+  deleted_at?: string
+  author?: User
+}
+
+export interface Reaction {
+  id: string
+  user_id: string
+  target_type: 'post' | 'comment'
+  target_id: string
+  reaction_type: ReactionType
+  created_at: string
+}
+
+export interface UserConnection {
+  id: string
+  follower_id: string
+  following_id: string
+  connection_type: ConnectionType
+  status: ConnectionStatus
+  created_at: string
+  updated_at: string
+  follower?: User
+  following?: User
+}
+
+export interface Conversation {
+  id: string
+  type: ConversationType
+  name?: string
+  avatar_url?: string
+  community_id?: string
+  created_by: string
+  last_message_at?: string
+  last_message_preview?: string
+  unread_count?: number
+  created_at: string
+  updated_at: string
+  participants?: ConversationParticipant[]
+}
+
+export interface ConversationParticipant {
+  id: string
+  conversation_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member'
+  nickname?: string
+  is_muted: boolean
+  last_read_at?: string
+  joined_at: string
+  user?: User
+}
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  message_type: MessageType
+  content?: string
+  media_url?: string
+  shared_activity_id?: string
+  shared_post_id?: string
+  shared_challenge_id?: string
+  is_edited: boolean
+  edited_at?: string
+  created_at: string
+  deleted_at?: string
+  sender?: User
+}

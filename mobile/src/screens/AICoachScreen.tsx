@@ -1,5 +1,5 @@
 // Better Together Mobile: AI Coach Screen
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -7,11 +7,13 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native'
 import { Card } from '../components/Card'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import { COLORS, SPACING, FONT_SIZES } from '../utils/constants'
+import { apiClient } from '../api/client'
 
 interface Message {
   id: string
@@ -30,6 +32,28 @@ const AICoachScreen: React.FC = () => {
     },
   ])
   const [inputText, setInputText] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [relationshipId, setRelationshipId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load relationship ID on mount
+  useEffect(() => {
+    const loadRelationshipId = async () => {
+      try {
+        const userId = await apiClient.getUserId()
+        if (userId) {
+          const response = await apiClient.getRelationship(userId)
+          if (response.data?.relationship?.id) {
+            setRelationshipId(response.data.relationship.id)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load relationship:', err)
+        setError('Unable to load your relationship data')
+      }
+    }
+    loadRelationshipId()
+  }, [])
 
   const suggestedTopics = [
     'Communication tips',
@@ -39,8 +63,14 @@ const AICoachScreen: React.FC = () => {
     'Love languages',
   ]
 
-  const handleSend = () => {
-    if (!inputText.trim()) return
+  const handleSend = async () => {
+    if (!inputText.trim() || isLoading) return
+
+    // Check if we have a relationship ID
+    if (!relationshipId) {
+      setError('Please set up your relationship first')
+      return
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -49,19 +79,46 @@ const AICoachScreen: React.FC = () => {
       timestamp: new Date(),
     }
 
-    setMessages([...messages, userMessage])
+    setMessages((prev) => [...prev, userMessage])
+    const messageToSend = inputText
     setInputText('')
+    setIsLoading(true)
+    setError(null)
 
-    // TODO: Integrate with AI API
-    setTimeout(() => {
+    try {
+      // Call the AI Coach API
+      const response = await apiClient.askAICoach({
+        message: messageToSend,
+        relationship_id: relationshipId,
+      })
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to get AI response')
+      }
+
+      // Add AI response to messages
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I understand you're asking about that. Let me help you with personalized advice based on your relationship journey.",
+        content: response.data?.response || 'Sorry, I could not process your request.',
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, assistantMessage])
-    }, 1000)
+    } catch (err) {
+      console.error('AI Coach error:', err)
+      setError('Failed to get response. Please try again.')
+
+      // Optionally add error message to chat
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSuggestedTopic = (topic: string) => {
@@ -81,6 +138,12 @@ const AICoachScreen: React.FC = () => {
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
       >
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         {messages.map((message) => (
           <View
             key={message.id}
@@ -103,6 +166,13 @@ const AICoachScreen: React.FC = () => {
             </Text>
           </View>
         ))}
+
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.loadingText}>AI is thinking...</Text>
+          </View>
+        )}
 
         {messages.length === 1 && (
           <View style={styles.suggestedTopicsContainer}>
@@ -230,6 +300,33 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     marginBottom: SPACING.md,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.surface,
+    padding: SPACING.md,
+    borderRadius: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  loadingText: {
+    marginLeft: SPACING.sm,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    backgroundColor: '#fee',
+    padding: SPACING.md,
+    borderRadius: SPACING.sm,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#fcc',
+  },
+  errorText: {
+    color: '#c00',
+    fontSize: FONT_SIZES.sm,
   },
 })
 

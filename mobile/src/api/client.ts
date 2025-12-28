@@ -163,6 +163,135 @@ class ApiClient {
     return this.request('put', `/notifications/${notificationId}/read`)
   }
 
+  // Community Feed endpoints
+  async getFeed(limit?: number, offset?: number): Promise<ApiResponse<{ posts: any[]; hasMore: boolean }>> {
+    const params = new URLSearchParams()
+    if (limit) params.append('limit', limit.toString())
+    if (offset) params.append('offset', offset.toString())
+    return this.request('get', `/feed?${params.toString()}`)
+  }
+
+  async getTrendingPosts(limit?: number): Promise<ApiResponse<{ posts: any[] }>> {
+    return this.request('get', `/feed/trending${limit ? `?limit=${limit}` : ''}`)
+  }
+
+  async getCommunityFeed(communityId: string, limit?: number, offset?: number): Promise<ApiResponse<{ posts: any[] }>> {
+    const params = new URLSearchParams()
+    if (limit) params.append('limit', limit.toString())
+    if (offset) params.append('offset', offset.toString())
+    return this.request('get', `/feed/community/${communityId}?${params.toString()}`)
+  }
+
+  // Posts endpoints
+  async createPost(postData: any): Promise<ApiResponse<{ post: any }>> {
+    return this.request('post', '/posts', postData)
+  }
+
+  async getPost(postId: string): Promise<ApiResponse<{ post: any }>> {
+    return this.request('get', `/posts/${postId}`)
+  }
+
+  async updatePost(postId: string, postData: any): Promise<ApiResponse<{ post: any }>> {
+    return this.request('put', `/posts/${postId}`, postData)
+  }
+
+  async deletePost(postId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('delete', `/posts/${postId}`)
+  }
+
+  // Reactions endpoints
+  async addReaction(targetType: string, targetId: string, reactionType: string): Promise<ApiResponse<{ reaction: any }>> {
+    return this.request('post', '/social/reactions', { target_type: targetType, target_id: targetId, reaction_type: reactionType })
+  }
+
+  async removeReaction(targetType: string, targetId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('delete', `/social/reactions/${targetType}/${targetId}`)
+  }
+
+  // Comments endpoints
+  async getComments(postId: string): Promise<ApiResponse<{ comments: any[] }>> {
+    return this.request('get', `/social/comments/post/${postId}`)
+  }
+
+  async createComment(postId: string, content: string, parentCommentId?: string): Promise<ApiResponse<{ comment: any }>> {
+    return this.request('post', '/social/comments', { post_id: postId, content, parent_comment_id: parentCommentId })
+  }
+
+  async deleteComment(commentId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('delete', `/social/comments/${commentId}`)
+  }
+
+  // Connections endpoints
+  async followUser(userId: string): Promise<ApiResponse<{ connection: any }>> {
+    return this.request('post', '/social/connections/follow', { following_id: userId })
+  }
+
+  async unfollowUser(userId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('delete', `/social/connections/unfollow/${userId}`)
+  }
+
+  async getFollowers(userId: string): Promise<ApiResponse<{ followers: any[] }>> {
+    return this.request('get', `/social/connections/followers/${userId}`)
+  }
+
+  async getFollowing(userId: string): Promise<ApiResponse<{ following: any[] }>> {
+    return this.request('get', `/social/connections/following/${userId}`)
+  }
+
+  // Communities endpoints
+  async getCommunities(): Promise<ApiResponse<{ communities: any[] }>> {
+    return this.request('get', '/communities')
+  }
+
+  async getCommunity(communityId: string): Promise<ApiResponse<{ community: any }>> {
+    return this.request('get', `/communities/${communityId}`)
+  }
+
+  async joinCommunity(communityId: string): Promise<ApiResponse<{ membership: any }>> {
+    return this.request('post', `/communities/${communityId}/join`)
+  }
+
+  async leaveCommunity(communityId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('delete', `/communities/${communityId}/leave`)
+  }
+
+  // Messaging endpoints
+  async getConversations(): Promise<ApiResponse<{ conversations: any[] }>> {
+    return this.request('get', '/messaging/conversations')
+  }
+
+  async getConversation(conversationId: string): Promise<ApiResponse<{ conversation: any }>> {
+    return this.request('get', `/messaging/conversations/${conversationId}`)
+  }
+
+  async createConversation(participantIds: string[], name?: string): Promise<ApiResponse<{ conversation: any }>> {
+    return this.request('post', '/messaging/conversations', { participant_ids: participantIds, name })
+  }
+
+  async getMessages(conversationId: string, limit?: number, before?: string): Promise<ApiResponse<{ messages: any[] }>> {
+    const params = new URLSearchParams()
+    if (limit) params.append('limit', limit.toString())
+    if (before) params.append('before', before)
+    return this.request('get', `/messaging/conversations/${conversationId}/messages?${params.toString()}`)
+  }
+
+  async sendMessage(conversationId: string, content: string, messageType?: string): Promise<ApiResponse<{ message: any }>> {
+    return this.request('post', `/messaging/conversations/${conversationId}/messages`, { content, message_type: messageType || 'text' })
+  }
+
+  async markMessagesRead(conversationId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request('put', `/messaging/conversations/${conversationId}/read`)
+  }
+
+  // AI Coach endpoints
+  async askAICoach(data: { message: string; relationship_id: string }): Promise<ApiResponse<{ response: string; timestamp: string }>> {
+    return this.request('post', '/ai-coach/ask', data)
+  }
+
+  async getAICoachHistory(relationshipId: string): Promise<ApiResponse<{ messages: any[] }>> {
+    return this.request('get', `/ai-coach/history/${relationshipId}`)
+  }
+
   // Storage helpers
   async storeUserId(userId: string) {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userId)

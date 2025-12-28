@@ -23,6 +23,7 @@ import { challengesProgressHtml } from './pages/challenges-progress'
 import { giftSubscriptionHtml } from './pages/gift-subscription'
 import { subscriptionManagementHtml } from './pages/subscription-management'
 import { emailPreferencesHtml } from './pages/email-preferences'
+import { bundlesHtml } from './pages/bundles'
 import analyticsApi from './api/analytics'
 import emailApi from './api/email'
 import pushApi from './api/push-notifications'
@@ -37,6 +38,13 @@ import authRoutes from './api/auth-routes'
 import sponsorsApi from './api/sponsors'
 import usersApi from './api/users'
 import paymentsApi from './api/payments'
+import aiCoachApi from './api/ai-coach'
+import communitiesApi from './api/communities'
+import messagingApi from './api/messaging'
+import feedApi from './api/feed'
+import postsApi from './api/posts'
+import socialApi from './api/social'
+import discoveryApi from './api/discovery'
 import {
   generateId,
   getCurrentDate,
@@ -387,6 +395,9 @@ app.route('/api/important-dates', datesApi)
 // Challenges API Routes
 app.route('/api/challenges', challengesApi)
 
+// AI Coach API Routes
+app.route('/api/ai-coach', aiCoachApi)
+
 // Dashboard API Routes
 app.route('/api/dashboard', dashboardApi)
 
@@ -404,6 +415,24 @@ app.route('/api/users', usersApi)
 
 // Payments API Routes
 app.route('/api/payments', paymentsApi)
+
+// Communities API Routes
+app.route('/api/communities', communitiesApi)
+
+// Messaging API Routes
+app.route('/api/conversations', messagingApi)
+
+// Feed API Routes
+app.route('/api/feed', feedApi)
+
+// Posts API Routes
+app.route('/api/posts', postsApi)
+
+// Discovery and Search API Routes
+app.route('/api', discoveryApi)
+
+// Social Interactions API Routes (reactions, comments, connections, blocks, reports)
+app.route('/api', socialApi)
 
 // =============================================================================
 // AUTHENTICATION & USER PORTAL
@@ -487,6 +516,15 @@ app.get('/subscription', (c) => {
 // Email Preferences
 app.get('/email-preferences', (c) => {
   return c.html(emailPreferencesHtml)
+})
+
+// Bundles Shop
+app.get('/bundles', (c) => {
+  return c.html(bundlesHtml)
+})
+
+app.get('/shop', (c) => {
+  return c.html(bundlesHtml)
 })
 
 // =============================================================================
