@@ -78,6 +78,10 @@ class ApiClient {
     return this.request('put', `/users/${userId}`, userData)
   }
 
+  async updateProfile(userId: string, profileData: any): Promise<ApiResponse<{ user: any }>> {
+    return this.request('put', `/users/${userId}`, profileData)
+  }
+
   // Relationship endpoints
   async invitePartner(inviteData: any): Promise<ApiResponse<{ relationship: any }>> {
     return this.request('post', '/invite-partner', inviteData)

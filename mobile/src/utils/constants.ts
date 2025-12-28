@@ -1,5 +1,13 @@
 // Better Together Mobile: Constants
 
+export const API_URL = __DEV__
+  ? 'http://localhost:3000'
+  : 'https://better-together.live'
+
+export const WS_URL = __DEV__
+  ? 'ws://localhost:3000/ws'
+  : 'wss://better-together.live/ws'
+
 export const COLORS = {
   // Primary palette (matching web app)
   primary: '#ec4899',

@@ -18,12 +18,13 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import { useAuth } from '../hooks/useAuth'
+import type { LoveLanguage } from '../types'
 import { apiClient } from '../api/client'
 import { COLORS, SPACING, FONT_SIZES, GRADIENTS, GLASSMORPHISM, SHADOWS } from '../utils/constants'
 
 const { width } = Dimensions.get('window')
 
-const LOVE_LANGUAGES = [
+const LOVE_LANGUAGES: { id: LoveLanguage; label: string; icon: string; color: string }[] = [
   { id: 'words_of_affirmation', label: 'Words of Affirmation', icon: 'chatbubble-ellipses', color: '#FF6B9D' },
   { id: 'quality_time', label: 'Quality Time', icon: 'time', color: '#9B6BFF' },
   { id: 'receiving_gifts', label: 'Receiving Gifts', icon: 'gift', color: '#FFB86B' },
@@ -105,11 +106,11 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     setSaving(false)
   }
 
-  const handleSelectLoveLanguage = async (languageId: string, isPrimary: boolean) => {
+  const handleSelectLoveLanguage = async (languageId: LoveLanguage, isPrimary: boolean) => {
     try {
       const updates = isPrimary
-        ? { primary_love_language: languageId }
-        : { secondary_love_language: languageId }
+        ? { love_language_primary: languageId }
+        : { love_language_secondary: languageId }
 
       const { data, error } = await apiClient.updateProfile(user?.id || '', updates)
 
@@ -117,8 +118,8 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         updateUser?.({
           ...user,
           ...(isPrimary
-            ? { primaryLoveLanguage: languageId }
-            : { secondaryLoveLanguage: languageId }),
+            ? { love_language_primary: languageId }
+            : { love_language_secondary: languageId }),
         })
       }
     } catch (err) {
@@ -191,8 +192,8 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
 
             <View style={styles.profileCard}>
               <TouchableOpacity style={styles.avatarContainer} activeOpacity={0.8}>
-                {user?.profilePhotoUrl ? (
-                  <Image source={{ uri: user.profilePhotoUrl }} style={styles.avatar} />
+                {user?.profile_photo_url ? (
+                  <Image source={{ uri: user.profile_photo_url }} style={styles.avatar} />
                 ) : (
                   <LinearGradient
                     colors={['#FFB6C1', '#FF69B4']}
@@ -239,7 +240,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                   <View style={styles.loveLanguageValue}>
                     <Ionicons name="heart" size={16} color="#FF6B9D" />
                     <Text style={styles.loveLanguageText}>
-                      {getLoveLanguageLabel(user?.primaryLoveLanguage)}
+                      {getLoveLanguageLabel(user?.love_language_primary)}
                     </Text>
                   </View>
                 </View>
@@ -249,7 +250,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                   <View style={styles.loveLanguageValue}>
                     <Ionicons name="heart-outline" size={16} color="#9B6BFF" />
                     <Text style={styles.loveLanguageText}>
-                      {getLoveLanguageLabel(user?.secondaryLoveLanguage)}
+                      {getLoveLanguageLabel(user?.love_language_secondary)}
                     </Text>
                   </View>
                 </View>
@@ -372,7 +373,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                 key={`primary-${lang.id}`}
                 style={[
                   styles.languageOption,
-                  user?.primaryLoveLanguage === lang.id && styles.languageOptionSelected
+                  user?.love_language_primary === lang.id && styles.languageOptionSelected
                 ]}
                 onPress={() => handleSelectLoveLanguage(lang.id, true)}
                 activeOpacity={0.7}
@@ -381,7 +382,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                   <Ionicons name={lang.icon as any} size={20} color={lang.color} />
                 </View>
                 <Text style={styles.languageLabel}>{lang.label}</Text>
-                {user?.primaryLoveLanguage === lang.id && (
+                {user?.love_language_primary === lang.id && (
                   <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                 )}
               </TouchableOpacity>
@@ -395,7 +396,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                 key={`secondary-${lang.id}`}
                 style={[
                   styles.languageOption,
-                  user?.secondaryLoveLanguage === lang.id && styles.languageOptionSelected
+                  user?.love_language_secondary === lang.id && styles.languageOptionSelected
                 ]}
                 onPress={() => handleSelectLoveLanguage(lang.id, false)}
                 activeOpacity={0.7}
@@ -404,7 +405,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
                   <Ionicons name={lang.icon as any} size={20} color={lang.color} />
                 </View>
                 <Text style={styles.languageLabel}>{lang.label}</Text>
-                {user?.secondaryLoveLanguage === lang.id && (
+                {user?.love_language_secondary === lang.id && (
                   <Ionicons name="checkmark-circle" size={24} color="#9B6BFF" />
                 )}
               </TouchableOpacity>

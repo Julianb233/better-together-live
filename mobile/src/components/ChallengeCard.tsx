@@ -31,7 +31,7 @@ interface ChallengeCardProps {
   onPress?: () => void
 }
 
-export const ChallengeCard = ({ challenge, onPress }) => {
+export const ChallengeCard = ({ challenge, onPress }: ChallengeCardProps) => {
   const categoryInfo = CHALLENGE_CATEGORIES.find(c => c.value === challenge.category)
   const difficultyInfo = DIFFICULTY_LEVELS.find(d => d.value === challenge.difficulty)
 
