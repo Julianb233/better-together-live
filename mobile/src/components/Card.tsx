@@ -9,11 +9,11 @@ interface CardProps {
   padding?: 'none' | 'small' | 'medium' | 'large'
 }
 
-export const Card: React.FC<CardProps> = ({
+export const Card = ({
   children,
   style,
   padding = 'medium',
-}) => {
+}: CardProps) => {
   return (
     <View
       style={[styles.card, styles[padding], style]}

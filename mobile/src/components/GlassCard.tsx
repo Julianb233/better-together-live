@@ -12,13 +12,13 @@ interface GlassCardProps {
   padding?: 'none' | 'small' | 'medium' | 'large'
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({
+export const GlassCard = ({
   children,
   variant = 'light',
   style,
   intensity = 80,
   padding = 'medium',
-}) => {
+}: GlassCardProps) => {
   const glassStyle = GLASSMORPHISM[variant]
 
   // For Android or when BlurView isn't available, use a fallback with opacity

@@ -14,14 +14,14 @@ interface EmptyStateProps {
   gradient?: keyof typeof GRADIENTS
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({
+export const EmptyState = ({
   icon,
   title,
   description,
   actionLabel,
   onAction,
   gradient = 'warm',
-}) => {
+}: EmptyStateProps) => {
   return (
     <View style={styles.container}>
       <LinearGradient

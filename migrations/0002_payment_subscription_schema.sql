@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   features TEXT, -- JSON array of features included
   is_active BOOLEAN DEFAULT TRUE,
   sort_order INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Subscription Purchases table - Track user subscriptions
@@ -31,16 +31,16 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   billing_period TEXT NOT NULL CHECK(billing_period IN ('monthly', 'annual')),
   price_cents INTEGER NOT NULL,
   currency TEXT DEFAULT 'USD',
-  trial_end_date DATETIME,
-  current_period_start DATETIME NOT NULL,
-  current_period_end DATETIME NOT NULL,
-  canceled_at DATETIME,
+  trial_end_date TIMESTAMPTZ,
+  current_period_start TIMESTAMPTZ NOT NULL,
+  current_period_end TIMESTAMPTZ NOT NULL,
+  canceled_at TIMESTAMPTZ,
   cancel_reason TEXT,
   is_gift BOOLEAN DEFAULT FALSE, -- True if gifted to partner
   gift_from_user_id TEXT, -- If gift, who gave it
   gift_message TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (plan_id) REFERENCES subscription_plans(id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -64,9 +64,9 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   metadata TEXT, -- JSON for additional data
   failure_reason TEXT,
   refund_amount_cents INTEGER,
-  refunded_at DATETIME,
-  processed_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  refunded_at TIMESTAMPTZ,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
@@ -83,8 +83,8 @@ CREATE TABLE IF NOT EXISTS ai_credits (
   purchase_price_cents INTEGER, -- For purchases only
   usage_description TEXT, -- What the credits were used for
   stripe_payment_id TEXT, -- Link to payment if purchased
-  expires_at DATETIME, -- Credits may expire
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ, -- Credits may expire
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS subscription_addons (
   stripe_product_id TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   features TEXT, -- JSON array
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- User Add-on Purchases table - Track add-on subscriptions
@@ -115,11 +115,11 @@ CREATE TABLE IF NOT EXISTS user_addons (
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'canceled', 'paused')),
   price_cents INTEGER NOT NULL,
   billing_period TEXT,
-  purchase_date DATETIME NOT NULL,
-  expiration_date DATETIME,
-  canceled_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  purchase_date TIMESTAMPTZ NOT NULL,
+  expiration_date TIMESTAMPTZ,
+  canceled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (addon_id) REFERENCES subscription_addons(id)
@@ -132,10 +132,10 @@ CREATE TABLE IF NOT EXISTS stripe_webhooks (
   event_type TEXT NOT NULL,
   event_data TEXT NOT NULL, -- Full JSON payload
   processed BOOLEAN DEFAULT FALSE,
-  processed_at DATETIME,
+  processed_at TIMESTAMPTZ,
   error_message TEXT,
   retry_count INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Refunds table - Track refund requests and processing
@@ -148,8 +148,8 @@ CREATE TABLE IF NOT EXISTS refunds (
   refund_reason TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'processed')),
   stripe_refund_id TEXT,
-  requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  processed_at DATETIME,
+  requested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  processed_at TIMESTAMPTZ,
   processed_by TEXT, -- Admin user who processed
   notes TEXT,
   FOREIGN KEY (transaction_id) REFERENCES payment_transactions(id),
@@ -166,12 +166,12 @@ CREATE TABLE IF NOT EXISTS discount_codes (
   applies_to TEXT CHECK(applies_to IN ('all', 'subscription', 'credits', 'addons')),
   max_uses INTEGER,
   current_uses INTEGER DEFAULT 0,
-  valid_from DATETIME NOT NULL,
-  valid_until DATETIME NOT NULL,
+  valid_from TIMESTAMPTZ NOT NULL,
+  valid_until TIMESTAMPTZ NOT NULL,
   stripe_coupon_id TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   created_by TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Discount Usage table - Track who used discount codes
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS discount_usage (
   relationship_id TEXT,
   transaction_id TEXT,
   discount_amount_cents INTEGER NOT NULL,
-  used_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  used_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (discount_id) REFERENCES discount_codes(id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL,

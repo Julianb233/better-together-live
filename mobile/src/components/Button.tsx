@@ -21,7 +21,7 @@ interface ButtonProps {
   textStyle?: TextStyle
 }
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button = ({
   title,
   onPress,
   variant = 'primary',
@@ -30,7 +30,7 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   style,
   textStyle,
-}) => {
+}: ButtonProps) => {
   const buttonStyles = [
     styles.button,
     styles[variant],

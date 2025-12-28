@@ -30,13 +30,13 @@ const ONLINE_INDICATOR_SIZES = {
   large: 18,
 }
 
-export const Avatar: React.FC<AvatarProps> = ({
+export const Avatar = ({
   imageUri,
   name,
   size = 'medium',
   showOnlineIndicator = false,
   gradient = 'primary',
-}) => {
+}: AvatarProps) => {
   const avatarSize = SIZES[size]
   const borderWidth = BORDER_WIDTHS[size]
   const innerSize = avatarSize - borderWidth * 2

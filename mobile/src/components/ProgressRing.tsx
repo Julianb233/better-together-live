@@ -15,14 +15,14 @@ interface ProgressRingProps {
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
-export const ProgressRing: React.FC<ProgressRingProps> = ({
+export const ProgressRing = ({
   progress,
   size = 100,
   color = COLORS.primary,
   strokeWidth = 8,
   showPercentage = true,
   animated = true,
-}) => {
+}: ProgressRingProps) => {
   const animatedValue = useRef(new Animated.Value(0)).current
 
   const radius = (size - strokeWidth) / 2

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   os TEXT,
   ip_address TEXT,
   user_agent TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
 );
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS page_views (
   duration_seconds INTEGER,
   bounce BOOLEAN DEFAULT FALSE,
   device_type TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
 );
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   id TEXT PRIMARY KEY,
   user_id TEXT,
   relationship_id TEXT,
-  session_start DATETIME NOT NULL,
-  session_end DATETIME,
+  session_start TIMESTAMPTZ NOT NULL,
+  session_end TIMESTAMPTZ,
   duration_seconds INTEGER,
   pages_viewed INTEGER DEFAULT 0,
   events_count INTEGER DEFAULT 0,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS feature_usage_metrics (
   average_time_spent_seconds DECIMAL(10,2),
   completion_rate DECIMAL(5,2), -- Percentage
   satisfaction_score DECIMAL(3,2), -- 1-5 rating
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(feature_name, metric_date)
 );
 
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS conversion_funnels (
   completed BOOLEAN DEFAULT FALSE,
   dropped_off BOOLEAN DEFAULT FALSE,
   time_to_complete_seconds INTEGER,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
 );
@@ -102,9 +102,9 @@ CREATE TABLE IF NOT EXISTS ab_test_variants (
   description TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   traffic_percentage INTEGER DEFAULT 50 CHECK(traffic_percentage BETWEEN 0 AND 100),
-  start_date DATETIME NOT NULL,
-  end_date DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  start_date TIMESTAMPTZ NOT NULL,
+  end_date TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(test_name, variant_name)
 );
 
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS ab_test_assignments (
   user_id TEXT,
   relationship_id TEXT,
   session_id TEXT,
-  assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   converted BOOLEAN DEFAULT FALSE,
   conversion_value_cents INTEGER,
   FOREIGN KEY (variant_id) REFERENCES ab_test_variants(id),
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS revenue_analytics (
   refunds_cents INTEGER DEFAULT 0,
   mrr_cents INTEGER DEFAULT 0, -- Monthly Recurring Revenue
   arr_cents INTEGER DEFAULT 0, -- Annual Recurring Revenue
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- User Cohorts table - Track user cohorts for retention analysis
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS user_cohorts (
   first_subscription_date DATE,
   total_revenue_cents INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
 );
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS engagement_scores (
   messages_sent INTEGER DEFAULT 0,
   features_used INTEGER DEFAULT 0,
   session_duration_seconds INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   UNIQUE(user_id, score_date)
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS partner_analytics (
   average_rating DECIMAL(3,2),
   repeat_bookings INTEGER DEFAULT 0,
   cancellations INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(partner_name, analytics_date)
 );
 
@@ -204,8 +204,8 @@ CREATE TABLE IF NOT EXISTS error_logs (
   user_agent TEXT,
   severity TEXT CHECK(severity IN ('low', 'medium', 'high', 'critical')),
   resolved BOOLEAN DEFAULT FALSE,
-  resolved_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE SET NULL
 );
@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS email_campaign_analytics (
   click_rate DECIMAL(5,2),
   conversion_count INTEGER DEFAULT 0,
   conversion_value_cents INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for analytics tables

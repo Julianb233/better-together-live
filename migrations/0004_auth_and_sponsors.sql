@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS password_resets (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL UNIQUE,
   token_hash TEXT NOT NULL,
-  expires_at DATETIME NOT NULL,
-  used_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -48,12 +48,12 @@ CREATE TABLE IF NOT EXISTS sponsor_applications (
   -- Application Status
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'under_review', 'approved', 'rejected')),
   review_notes TEXT,
-  reviewed_at DATETIME,
+  reviewed_at TIMESTAMPTZ,
   reviewed_by TEXT,
 
   -- Timestamps
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Approved Sponsors table - Active sponsor accounts
@@ -95,9 +95,9 @@ CREATE TABLE IF NOT EXISTS sponsors (
   average_rating DECIMAL(3, 2) DEFAULT 0.00,
 
   -- Timestamps
-  approved_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (application_id) REFERENCES sponsor_applications(id) ON DELETE SET NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -122,8 +122,8 @@ CREATE TABLE IF NOT EXISTS sponsor_offers (
   -- Availability
   quantity_available INTEGER,
   quantity_used INTEGER DEFAULT 0,
-  starts_at DATETIME,
-  ends_at DATETIME,
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
 
   -- Restrictions
   minimum_purchase_cents INTEGER,
@@ -138,8 +138,8 @@ CREATE TABLE IF NOT EXISTS sponsor_offers (
   redemption_count INTEGER DEFAULT 0,
 
   -- Timestamps
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (sponsor_id) REFERENCES sponsors(id) ON DELETE CASCADE
 );

@@ -37,7 +37,7 @@
       "ios": {
         "appleId": "julian@aiacrobatics.com",
         "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "appleTeamId": "5H49774YPG"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",

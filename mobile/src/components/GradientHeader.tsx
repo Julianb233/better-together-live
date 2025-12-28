@@ -14,14 +14,14 @@ interface GradientHeaderProps {
   gradient?: keyof typeof GRADIENTS
 }
 
-export const GradientHeader: React.FC<GradientHeaderProps> = ({
+export const GradientHeader = ({
   title,
   subtitle,
   leftIcon = '←',
   onBackPress,
   rightAction,
   gradient = 'primary',
-}) => {
+}: GradientHeaderProps) => {
   const insets = useSafeAreaInsets()
 
   return (

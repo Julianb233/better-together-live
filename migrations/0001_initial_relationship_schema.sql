@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS users (
   love_language_primary TEXT CHECK(love_language_primary IN ('words_of_affirmation', 'quality_time', 'physical_touch', 'acts_of_service', 'receiving_gifts')),
   love_language_secondary TEXT CHECK(love_language_secondary IN ('words_of_affirmation', 'quality_time', 'physical_touch', 'acts_of_service', 'receiving_gifts')),
   relationship_preferences TEXT, -- JSON for preferences
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  last_active_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Relationships table - Links two users as partners
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS relationships (
   anniversary_date DATE, -- Primary anniversary (engagement, marriage, etc.)
   status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paused', 'ended')),
   privacy_level TEXT DEFAULT 'private' CHECK(privacy_level IN ('private', 'friends', 'public')),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_1_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (user_2_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(user_1_id, user_2_id)
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS important_dates (
   recurrence_pattern TEXT, -- 'yearly', 'monthly', etc.
   reminder_days_before INTEGER DEFAULT 7,
   created_by_user_id TEXT NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -66,8 +66,8 @@ CREATE TABLE IF NOT EXISTS shared_goals (
   target_date DATE,
   completion_date DATE,
   created_by_user_id TEXT NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
   gratitude_note TEXT, -- What they're grateful for about their partner
   support_needed TEXT, -- What support they need
   highlight_of_day TEXT, -- Best part of their day with partner
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(relationship_id, user_id, checkin_date)
@@ -98,8 +98,8 @@ CREATE TABLE IF NOT EXISTS activities (
   activity_type TEXT CHECK(activity_type IN ('date_night', 'quality_time', 'adventure', 'relaxation', 'learning', 'exercise', 'social', 'custom')),
   description TEXT,
   location TEXT,
-  planned_date DATETIME,
-  completed_date DATETIME,
+  planned_date TIMESTAMPTZ,
+  completed_date TIMESTAMPTZ,
   duration_minutes INTEGER,
   cost_amount DECIMAL(10,2),
   satisfaction_rating_user1 INTEGER CHECK(satisfaction_rating_user1 BETWEEN 1 AND 10),
@@ -108,8 +108,8 @@ CREATE TABLE IF NOT EXISTS activities (
   photos TEXT, -- JSON array of photo URLs
   status TEXT DEFAULT 'planned' CHECK(status IN ('planned', 'completed', 'cancelled')),
   created_by_user_id TEXT NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -124,10 +124,10 @@ CREATE TABLE IF NOT EXISTS communication_log (
   outcome TEXT CHECK(outcome IN ('positive', 'neutral', 'needs_follow_up')),
   duration_minutes INTEGER,
   initiated_by_user_id TEXT NOT NULL,
-  communication_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+  communication_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   follow_up_needed BOOLEAN DEFAULT FALSE,
   follow_up_date DATE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (initiated_by_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS challenges (
   category TEXT CHECK(category IN ('communication', 'intimacy', 'adventure', 'gratitude', 'quality_time', 'support')),
   instructions TEXT,
   is_template BOOLEAN DEFAULT TRUE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Challenge Participation table - Track couples participating in challenges
@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS challenge_participation (
   status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'paused', 'abandoned')),
   progress_percentage INTEGER DEFAULT 0 CHECK(progress_percentage BETWEEN 0 AND 100),
   completion_notes TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE CASCADE,
   UNIQUE(relationship_id, challenge_id, start_date)
@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS challenge_entries (
   entry_content TEXT,
   reflection TEXT,
   completion_status BOOLEAN DEFAULT FALSE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (participation_id) REFERENCES challenge_participation(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(participation_id, user_id, entry_date)
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS achievements (
   requirements TEXT, -- JSON describing requirements
   point_value INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- User Achievements table - Track earned achievements
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   id TEXT PRIMARY KEY,
   relationship_id TEXT NOT NULL,
   achievement_id TEXT NOT NULL,
-  earned_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+  earned_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   earned_by_user_id TEXT, -- NULL if earned by both partners
   notes TEXT,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
@@ -218,9 +218,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   action_url TEXT,
   is_read BOOLEAN DEFAULT FALSE,
   priority TEXT DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
-  scheduled_for DATETIME,
-  sent_at DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  scheduled_for TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE
 );
@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS relationship_analytics (
   communication_frequency_score DECIMAL(3,1),
   overall_health_score DECIMAL(3,1),
   trends TEXT, -- JSON with trend analysis
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (relationship_id) REFERENCES relationships(id) ON DELETE CASCADE,
   UNIQUE(relationship_id, analytics_date)
 );

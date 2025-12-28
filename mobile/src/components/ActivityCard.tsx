@@ -28,7 +28,7 @@ interface ActivityCardProps {
   onPress?: () => void
 }
 
-export const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onPress }) => {
+export const ActivityCard = ({ activity, onPress }: ActivityCardProps) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current
 
   const activityType = ACTIVITY_TYPES.find(t => t.value === activity.type)
