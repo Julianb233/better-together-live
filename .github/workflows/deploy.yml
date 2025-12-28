@@ -198,7 +198,7 @@ jobs:
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [deploy-staging, deploy-production]
+    needs: [lint-and-test]
     if: failure() && github.event_name == 'push'
     steps:
       - name: Create failure issue
