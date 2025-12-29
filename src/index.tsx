@@ -45,6 +45,12 @@ import feedApi from './api/feed'
 import postsApi from './api/posts'
 import socialApi from './api/social'
 import discoveryApi from './api/discovery'
+import quizApi from './api/quiz'
+import experiencesApi from './api/experiences'
+import gamificationApi from './api/gamification'
+import recommendationsApi from './api/recommendations'
+import intimacyApi from './api/intimacy'
+import relationshipsApi from './api/relationships'
 import {
   generateId,
   getCurrentDate,
@@ -432,6 +438,24 @@ app.route('/api', discoveryApi)
 
 // Social Interactions API Routes (reactions, comments, connections, blocks, reports)
 app.route('/api', socialApi)
+
+// Quiz API Routes
+app.route('/api/quiz', quizApi)
+
+// Experiences API Routes
+app.route('/api/experiences', experiencesApi)
+
+// Gamification API Routes (rewards, badges, achievements, points)
+app.route('/api', gamificationApi)
+
+// Recommendations API Routes
+app.route('/api', recommendationsApi)
+
+// Intimacy API Routes
+app.route('/api/intimacy', intimacyApi)
+
+// Relationships API Routes (includes /api/partner/comparison)
+app.route('/api', relationshipsApi)
 
 // =============================================================================
 // AUTHENTICATION & USER PORTAL

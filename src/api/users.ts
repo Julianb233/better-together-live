@@ -5,8 +5,62 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { extractToken, verifyToken } from './auth'
 
 const usersApi = new Hono()
+
+// GET /api/users/me - Get current user (mobile compatibility alias for /api/auth/me)
+usersApi.get('/me', async (c: Context) => {
+  try {
+    const db = createDatabase(c.env as Env)
+    const accessToken = extractToken(c, 'access')
+
+    if (!accessToken) {
+      return c.json({ error: 'Not authenticated' }, 401)
+    }
+
+    const payload = await verifyToken(accessToken, c.env, 'access')
+    if (!payload) {
+      return c.json({ error: 'Invalid or expired token' }, 401)
+    }
+
+    const user = await db.first<{
+      id: string
+      email: string
+      name: string
+      nickname: string | null
+      profile_photo_url: string | null
+      timezone: string
+      primary_love_language: string | null
+      secondary_love_language: string | null
+    }>(
+      `SELECT id, email, name, nickname, profile_photo_url, timezone,
+              primary_love_language, secondary_love_language
+       FROM users WHERE id = $1`,
+      [payload.userId]
+    )
+
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404)
+    }
+
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        nickname: user.nickname,
+        profilePhotoUrl: user.profile_photo_url,
+        timezone: user.timezone,
+        primaryLoveLanguage: user.primary_love_language,
+        secondaryLoveLanguage: user.secondary_love_language
+      }
+    })
+  } catch (error) {
+    console.error('Get current user error:', error)
+    return c.json({ error: 'Failed to get user info' }, 500)
+  }
+})
 
 // GET /api/users/:userId/preferences
 usersApi.get('/:userId/preferences', async (c: Context) => {

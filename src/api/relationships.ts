@@ -295,4 +295,139 @@ relationshipsApi.post('/accept-invite', async (c: Context) => {
   }
 })
 
+// GET /api/partner/comparison - Get quiz comparison data
+relationshipsApi.get('/partner/comparison', async (c: Context) => {
+  try {
+    const db = createDatabase(c.env as Env)
+    const relationshipId = c.req.query('relationshipId')
+    const userId = c.req.query('userId')
+
+    if (!relationshipId || !userId) {
+      return c.json({ error: 'relationshipId and userId are required' }, 400)
+    }
+
+    // Get relationship to find partner
+    const relationship = await db.first<any>(`
+      SELECT * FROM relationships WHERE id = $1
+    `, [relationshipId])
+
+    if (!relationship) {
+      return c.json({ error: 'Relationship not found' }, 404)
+    }
+
+    const partnerId = relationship.user_1_id === userId
+      ? relationship.user_2_id
+      : relationship.user_1_id
+
+    // Get both users' data
+    const [user, partner] = await Promise.all([
+      db.first<any>(`
+        SELECT id, name, primary_love_language, secondary_love_language
+        FROM users WHERE id = $1
+      `, [userId]),
+      db.first<any>(`
+        SELECT id, name, primary_love_language, secondary_love_language
+        FROM users WHERE id = $1
+      `, [partnerId])
+    ])
+
+    // In production, this would query quiz responses and calculate detailed compatibility
+    // For now, return mock comparison data
+    const comparison = {
+      relationshipId,
+      users: {
+        user: {
+          id: user.id,
+          name: user.name,
+          primaryLoveLanguage: user.primary_love_language,
+          secondaryLoveLanguage: user.secondary_love_language
+        },
+        partner: {
+          id: partner.id,
+          name: partner.name,
+          primaryLoveLanguage: partner.primary_love_language,
+          secondaryLoveLanguage: partner.secondary_love_language
+        }
+      },
+      compatibility: {
+        overallScore: 82,
+        categories: {
+          communication: {
+            score: 85,
+            userScore: 4.2,
+            partnerScore: 4.3,
+            alignment: 'high',
+            insights: [
+              'Both prefer open communication',
+              'Similar conflict resolution styles'
+            ]
+          },
+          quality_time: {
+            score: 78,
+            userScore: 4.5,
+            partnerScore: 3.9,
+            alignment: 'medium',
+            insights: [
+              'Both value quality time but with different intensities',
+              'Consider finding balance in activity planning'
+            ]
+          },
+          intimacy: {
+            score: 88,
+            userScore: 4.4,
+            partnerScore: 4.4,
+            alignment: 'high',
+            insights: [
+              'Very aligned on physical affection needs',
+              'Strong emotional connection'
+            ]
+          },
+          future_planning: {
+            score: 75,
+            userScore: 4.0,
+            partnerScore: 3.5,
+            alignment: 'medium',
+            insights: [
+              'Some differences in planning approaches',
+              'Good opportunity for compromise'
+            ]
+          },
+          family: {
+            score: 80,
+            userScore: 4.1,
+            partnerScore: 4.0,
+            alignment: 'high',
+            insights: [
+              'Similar family values',
+              'Aligned on family importance'
+            ]
+          }
+        }
+      },
+      strengths: [
+        'Strong emotional and physical connection',
+        'Excellent communication alignment',
+        'Shared family values'
+      ],
+      growthAreas: [
+        'Balancing quality time preferences',
+        'Aligning on future planning approaches'
+      ],
+      recommendations: [
+        'Schedule regular date nights to satisfy quality time needs',
+        'Have a deep conversation about 5-year goals',
+        'Continue your open communication practices'
+      ]
+    }
+
+    return c.json({
+      success: true,
+      comparison
+    })
+  } catch (error) {
+    console.error('Get partner comparison error:', error)
+    return c.json({ error: 'Failed to get comparison data' }, 500)
+  }
+})
+
 export default relationshipsApi

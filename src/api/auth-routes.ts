@@ -99,12 +99,23 @@ authRoutes.post('/register', async (c: Context) => {
         name
       },
       accessToken,
-      refreshToken
+      refreshToken,
+      token: accessToken // Mobile compatibility alias
     }, 201)
   } catch (error) {
     console.error('Registration error:', error)
     return c.json({ error: 'Failed to create account' }, 500)
   }
+})
+
+// POST /api/auth/signup - Alias for register (mobile compatibility)
+authRoutes.post('/signup', async (c: Context) => {
+  // Reuse the register handler
+  return authRoutes.fetch(new Request(c.req.url.replace('/signup', '/register'), {
+    method: 'POST',
+    headers: c.req.raw.headers,
+    body: c.req.raw.body
+  }), c.env)
 })
 
 // POST /api/auth/login
@@ -171,7 +182,8 @@ authRoutes.post('/login', async (c: Context) => {
         profilePhotoUrl: user.profile_photo_url
       },
       accessToken,
-      refreshToken
+      refreshToken,
+      token: accessToken // Mobile compatibility alias
     })
   } catch (error) {
     console.error('Login error:', error)
