@@ -8,7 +8,6 @@ import { Feather } from '@expo/vector-icons'
 // Import screens
 import LoginScreen from '../screens/LoginScreen'
 import RegisterScreen from '../screens/RegisterScreen'
-import OnboardingScreen from '../screens/OnboardingScreen'
 import DashboardScreen from '../screens/DashboardScreen'
 import AICoachScreen from '../screens/AICoachScreen'
 import SchedulingScreen from '../screens/SchedulingScreen'
@@ -22,8 +21,7 @@ import MessagingScreen from '../screens/MessagingScreen'
 import PostDetailScreen from '../screens/PostDetailScreen'
 import UserProfileScreen from '../screens/UserProfileScreen'
 import CommunityDetailScreen from '../screens/CommunityDetailScreen'
-import GoalsScreen from '../screens/GoalsScreen'
-import AnalyticsScreen from '../screens/AnalyticsScreen'
+import VideoCallScreen from '../screens/VideoCallScreen'
 
 import { useAuth } from '../hooks/useAuth'
 
@@ -116,9 +114,8 @@ export const AppNavigator = () => {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
-          // Auth stack - Onboarding first for new users
+          // Auth stack
           <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
           </>
@@ -130,17 +127,15 @@ export const AppNavigator = () => {
             <Stack.Screen name="Challenges" component={ChallengesScreen} />
             <Stack.Screen name="AICoach" component={AICoachScreen} />
             <Stack.Screen name="Shop" component={ShopScreen} />
-            <Stack.Screen name="Goals" component={GoalsScreen} />
-            <Stack.Screen name="Analytics" component={AnalyticsScreen} />
             <Stack.Screen name="PostDetail" component={PostDetailScreen} />
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
             <Stack.Screen name="CommunityDetail" component={CommunityDetailScreen} />
             <Stack.Screen
-              name="CheckinModal"
-              component={CheckinScreen}
+              name="VideoCall"
+              component={VideoCallScreen}
               options={{
-                presentation: 'modal',
-                animation: 'slide_from_bottom',
+                presentation: 'fullScreenModal',
+                animation: 'slide_from_bottom'
               }}
             />
           </>

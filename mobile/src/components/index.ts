@@ -14,5 +14,5 @@ export { ActivityCard } from './ActivityCard'
 export { ChallengeCard } from './ChallengeCard'
 export { Avatar } from './Avatar'
 
-// Chat/Messaging components
-export { ChatList, ChatRoom, MessageBubble, ChatInput } from './chat'
+// Video calling
+export { default as VideoCallButton, FloatingVideoButton } from './VideoCallButton'

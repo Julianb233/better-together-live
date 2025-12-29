@@ -771,4 +771,8 @@ export interface Env {
   STRIPE_WEBHOOK_SECRET: string
   STRIPE_PUBLISHABLE_KEY: string
   RESEND_API_KEY?: string
+  // LiveKit Video Calling
+  LIVEKIT_URL?: string
+  LIVEKIT_API_KEY?: string
+  LIVEKIT_API_SECRET?: string
 }
