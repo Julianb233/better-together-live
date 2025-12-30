@@ -45,16 +45,13 @@ import feedApi from './api/feed'
 import postsApi from './api/posts'
 import socialApi from './api/social'
 import discoveryApi from './api/discovery'
-<<<<<<< Updated upstream
 import quizApi from './api/quiz'
 import experiencesApi from './api/experiences'
 import gamificationApi from './api/gamification'
 import recommendationsApi from './api/recommendations'
 import intimacyApi from './api/intimacy'
 import relationshipsApi from './api/relationships'
-=======
 import videoApi from './api/video'
->>>>>>> Stashed changes
 import {
   generateId,
   getCurrentDate,
@@ -443,7 +440,6 @@ app.route('/api', discoveryApi)
 // Social Interactions API Routes (reactions, comments, connections, blocks, reports)
 app.route('/api', socialApi)
 
-<<<<<<< Updated upstream
 // Quiz API Routes
 app.route('/api/quiz', quizApi)
 
@@ -461,10 +457,9 @@ app.route('/api/intimacy', intimacyApi)
 
 // Relationships API Routes (includes /api/partner/comparison)
 app.route('/api', relationshipsApi)
-=======
+
 // Video calling routes
 app.route('/api/video', videoApi)
->>>>>>> Stashed changes
 
 // =============================================================================
 // AUTHENTICATION & USER PORTAL
