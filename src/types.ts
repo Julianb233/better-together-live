@@ -766,13 +766,23 @@ export interface ReviewReportRequest {
 
 // Environment Variables
 export interface Env {
-  DATABASE_URL: string
+  // Supabase (Primary)
+  SUPABASE_URL: string
+  SUPABASE_ANON_KEY: string
+  SUPABASE_SERVICE_ROLE_KEY?: string
+  // Legacy Neon (Optional Fallback)
+  DATABASE_URL?: string
+  // Stripe
   STRIPE_SECRET_KEY: string
   STRIPE_WEBHOOK_SECRET: string
   STRIPE_PUBLISHABLE_KEY: string
+  // Email
   RESEND_API_KEY?: string
   // LiveKit Video Calling
   LIVEKIT_URL?: string
   LIVEKIT_API_KEY?: string
   LIVEKIT_API_SECRET?: string
+  // Auth
+  JWT_SECRET?: string
+  ENVIRONMENT?: string
 }

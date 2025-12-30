@@ -35,6 +35,7 @@ import challengesApi from './api/challenges'
 import dashboardApi from './api/dashboard'
 import notificationsApi from './api/notifications'
 import authRoutes from './api/auth-routes'
+import supabaseAuth from './api/supabase-auth'
 import sponsorsApi from './api/sponsors'
 import usersApi from './api/users'
 import paymentsApi from './api/payments'
@@ -85,11 +86,12 @@ app.use(renderer)
 
 // Database availability check helper
 const checkDatabase = (c: any) => {
-  if (!c.env?.DATABASE_URL) {
+  // Check for Supabase first, then fallback to Neon
+  if (!c.env?.SUPABASE_URL && !c.env?.DATABASE_URL) {
     return c.json({
       message: 'Database functionality is currently unavailable in this demo deployment.',
       demo: true,
-      note: 'Full functionality available in development environment with DATABASE_URL'
+      note: 'Full functionality available with SUPABASE_URL or DATABASE_URL configured'
     }, 503)
   }
   return null
@@ -410,8 +412,11 @@ app.route('/api/dashboard', dashboardApi)
 // Notifications API Routes
 app.route('/api/notifications', notificationsApi)
 
-// Auth Routes
+// Auth Routes (Legacy JWT-based)
 app.route('/api/auth', authRoutes)
+
+// Supabase Auth Routes (Primary - use /api/auth/supabase/*)
+app.route('/api/auth/supabase', supabaseAuth)
 
 // Sponsors API Routes
 app.route('/api/sponsors', sponsorsApi)
