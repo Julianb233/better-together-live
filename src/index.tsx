@@ -580,6 +580,12 @@ app.get('/', (c) => {
               <a href="/iphone-examples.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Live Examples</a>
               <a href="/member-rewards.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Rewards</a>
               <a href="/premium-pricing.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Premium</a>
+              <a href="/login" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">
+                <i className="fas fa-sign-in-alt mr-1"></i>Login
+              </a>
+              <a href="/login" className="bg-white text-pink-600 px-5 py-2.5 rounded-full font-semibold border-2 border-pink-300 hover:border-pink-500 hover:bg-pink-50 transform hover:scale-105 hover:shadow-md transition-all duration-300 text-sm lg:text-base">
+                <i className="fas fa-user-plus mr-1"></i>Sign Up
+              </a>
               <button className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-3 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-lg transition-all duration-300 text-sm lg:text-base">
                 <span className="flex items-center">
                   <i className="fas fa-crown mr-2 animate-pulse"></i>
@@ -610,6 +616,13 @@ app.get('/', (c) => {
               </a>
               <a href="/premium-pricing.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
                 <i className="fas fa-crown mr-3 text-yellow-500"></i>Premium
+              </a>
+              <div className="border-t border-pink-200 my-2"></div>
+              <a href="/login" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
+                <i className="fas fa-sign-in-alt mr-3 text-pink-500"></i>Login
+              </a>
+              <a href="/login" className="text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-300 py-3 px-4 rounded-lg font-medium">
+                <i className="fas fa-user-plus mr-3"></i>Sign Up Free
               </a>
               <button className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-xl transition-all duration-300 w-full mt-4">
                 <span className="flex items-center justify-center">
