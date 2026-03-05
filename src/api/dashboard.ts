@@ -3,8 +3,7 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 import {
   getUserById,
@@ -21,7 +20,7 @@ const dashboardApi = new Hono()
 // Get dashboard data for user
 dashboardApi.get('/:userId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
@@ -39,57 +38,91 @@ dashboardApi.get('/:userId', async (c: Context) => {
     const partner = await getUserById(c.env, partnerId)
 
     // Get recent checkins
-    const recentCheckins = await db.all(`
-      SELECT c.*, u.name as user_name
-      FROM daily_checkins c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.relationship_id = $1
-      ORDER BY c.checkin_date DESC
-      LIMIT 10
-    `, [relationship.id])
+    const { data: recentCheckins, error: checkinsErr } = await supabase
+      .from('daily_checkins')
+      .select('*, users!daily_checkins_user_id_fkey(name)')
+      .eq('relationship_id', relationship.id)
+      .order('checkin_date', { ascending: false })
+      .limit(10)
+
+    if (checkinsErr) throw checkinsErr
+
+    // Flatten user_name from join
+    const checkins = (recentCheckins || []).map((row: any) => ({
+      ...row,
+      user_name: row.users?.name ?? null,
+      users: undefined,
+    }))
 
     // Get upcoming dates
     const upcomingDates = await getUpcomingDates(c.env, relationship.id)
 
     // Get active goals
-    const activeGoals = await db.all(`
-      SELECT g.*, u.name as created_by_name
-      FROM shared_goals g
-      JOIN users u ON g.created_by_user_id = u.id
-      WHERE g.relationship_id = $1 AND g.status = 'active'
-      ORDER BY g.created_at DESC
-      LIMIT 5
-    `, [relationship.id])
+    const { data: activeGoals, error: goalsErr } = await supabase
+      .from('shared_goals')
+      .select('*')
+      .eq('relationship_id', relationship.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (goalsErr) throw goalsErr
+
+    // Map goal columns to frontend shape
+    const goals = (activeGoals || []).map((row: any) => ({
+      ...row,
+      goal_name: row.title,
+      goal_description: row.description,
+      current_progress: row.progress_percentage,
+    }))
 
     // Get recent activities
-    const recentActivities = await db.all(`
-      SELECT a.*, u.name as created_by_name
-      FROM activities a
-      JOIN users u ON a.created_by_user_id = u.id
-      WHERE a.relationship_id = $1
-      ORDER BY COALESCE(a.completed_date, a.planned_date) DESC
-      LIMIT 5
-    `, [relationship.id])
+    const { data: recentActivities, error: activitiesErr } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('relationship_id', relationship.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
 
-    // Get current challenges
-    const currentChallenges = await db.all(`
-      SELECT cp.*, c.challenge_name, c.challenge_description, c.category
-      FROM challenge_participation cp
-      JOIN challenges c ON cp.challenge_id = c.id
-      WHERE cp.relationship_id = $1 AND cp.status = 'active'
-      ORDER BY cp.created_at DESC
-      LIMIT 3
-    `, [relationship.id])
+    if (activitiesErr) throw activitiesErr
+
+    // Map activity columns to frontend shape
+    const activities = (recentActivities || []).map((row: any) => ({
+      ...row,
+      activity_name: row.title,
+      planned_date: row.date,
+      cost_amount: row.cost,
+    }))
+
+    // Get current challenges (these tables may not exist in Supabase types yet;
+    // use raw query to avoid type errors -- will be typed when challenge tables are added)
+    let currentChallenges: any[] = []
+    try {
+      const { data: challenges } = await supabase
+        .from('challenge_participation' as any)
+        .select('*, challenges!inner(challenge_name, challenge_description, category)')
+        .eq('relationship_id', relationship.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(3)
+      currentChallenges = challenges || []
+    } catch {
+      // Table may not exist yet -- return empty array
+    }
 
     // Get earned achievements
-    const achievements = await db.all(`
-      SELECT ua.*, a.achievement_name, a.achievement_description, a.icon_url, a.point_value
-      FROM user_achievements ua
-      JOIN achievements a ON ua.achievement_id = a.id
-      WHERE ua.relationship_id = $1
-      ORDER BY ua.earned_date DESC
-      LIMIT 10
-    `, [relationship.id])
+    let achievements: any[] = []
+    try {
+      const { data: achData } = await supabase
+        .from('user_achievements' as any)
+        .select('*, achievements!inner(achievement_name, achievement_description, icon_url, point_value)')
+        .eq('relationship_id', relationship.id)
+        .order('earned_date', { ascending: false })
+        .limit(10)
+      achievements = achData || []
+    } catch {
+      // Table may not exist yet -- return empty array
+    }
 
     // Calculate analytics
     const analytics = await calculateAnalytics(c.env, relationship.id)
@@ -103,13 +136,13 @@ dashboardApi.get('/:userId', async (c: Context) => {
         partner,
         days_together: analytics.days_together
       },
-      recent_checkins: recentCheckins || [],
+      recent_checkins: checkins,
       upcoming_dates: upcomingDates,
-      active_goals: activeGoals || [],
-      recent_activities: recentActivities || [],
-      current_challenges: currentChallenges || [],
+      active_goals: goals,
+      recent_activities: activities,
+      current_challenges: currentChallenges,
       analytics,
-      achievements_earned: achievements || [],
+      achievements_earned: achievements,
       checkin_streak: checkinStreak
     })
   } catch (error) {

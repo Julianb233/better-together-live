@@ -3,8 +3,14 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import {
+  createGoalSchema,
+  updateGoalProgressSchema,
+  goalQuerySchema,
+} from '../lib/validation/schemas/goals'
 import {
   generateId,
   getCurrentDate,
@@ -15,9 +21,9 @@ const goalsApi = new Hono()
 
 // POST /api/goals
 // Create shared goal
-goalsApi.post('/', async (c: Context) => {
+goalsApi.post('/', zValidator('json', createGoalSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const {
       relationship_id,
       goal_name,
@@ -26,28 +32,25 @@ goalsApi.post('/', async (c: Context) => {
       target_count,
       target_date,
       created_by_user_id
-    } = await c.req.json()
-
-    if (!relationship_id || !goal_name || !created_by_user_id) {
-      return c.json({ error: 'Relationship ID, goal name, and creator ID are required' }, 400)
-    }
+    } = c.req.valid('json' as never)
 
     const goalId = generateId()
     const now = getCurrentDateTime()
-    const today = getCurrentDate()
 
-    await db.run(`
-      INSERT INTO shared_goals (
-        id, relationship_id, goal_name, goal_description, goal_type,
-        target_count, current_progress, status, start_date, target_date,
-        created_by_user_id, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7, $8, $9, $10, $11)
-    `, [
-      goalId, relationship_id, goal_name, goal_description || null,
-      goal_type || 'custom', target_count || null, today,
-      target_date || null, created_by_user_id, now, now
-    ])
+    const { error } = await supabase.from('shared_goals').insert({
+      id: goalId,
+      relationship_id,
+      title: goal_name,
+      description: goal_description ?? null,
+      goal_type: goal_type || 'custom',
+      target_date: target_date ?? null,
+      progress_percentage: 0,
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    } as any)
+
+    if (error) throw error
 
     return c.json({
       message: 'Goal created successfully',
@@ -61,31 +64,34 @@ goalsApi.post('/', async (c: Context) => {
 
 // GET /api/goals/:relationshipId
 // Get shared goals for relationship
-goalsApi.get('/:relationshipId', async (c: Context) => {
+goalsApi.get('/:relationshipId', zValidator('query', goalQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const relationshipId = c.req.param('relationshipId')
-    const status = c.req.query('status') || 'all'
+    const { status } = c.req.valid('query' as never)
 
-    let query = `
-      SELECT g.*, u.name as created_by_name
-      FROM shared_goals g
-      JOIN users u ON g.created_by_user_id = u.id
-      WHERE g.relationship_id = $1
-    `
-
-    const params: any[] = [relationshipId]
+    let query = supabase
+      .from('shared_goals')
+      .select('*')
+      .eq('relationship_id', relationshipId)
 
     if (status !== 'all') {
-      query += ' AND g.status = $2'
-      params.push(status)
+      query = query.eq('status', status)
     }
 
-    query += ' ORDER BY g.created_at DESC'
+    const { data: results, error } = await query.order('created_at', { ascending: false })
 
-    const results = await db.all(query, params)
+    if (error) throw error
 
-    return c.json({ goals: results || [] })
+    // Map Supabase column names to frontend-expected shape
+    const goals = (results || []).map((row: any) => ({
+      ...row,
+      goal_name: row.title,
+      goal_description: row.description,
+      current_progress: row.progress_percentage,
+    }))
+
+    return c.json({ goals })
   } catch (error) {
     console.error('Get goals error:', error)
     return c.json({ error: 'Failed to get goals' }, 500)
@@ -94,41 +100,48 @@ goalsApi.get('/:relationshipId', async (c: Context) => {
 
 // PUT /api/goals/:goalId/progress
 // Update goal progress
-goalsApi.put('/:goalId/progress', async (c: Context) => {
+goalsApi.put('/:goalId/progress', zValidator('json', updateGoalProgressSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const goalId = c.req.param('goalId')
-    const { progress_increment } = await c.req.json()
+    const { progress_increment } = c.req.valid('json' as never)
 
-    if (progress_increment === undefined) {
-      return c.json({ error: 'Progress increment is required' }, 400)
-    }
+    // Fetch current goal
+    const { data: goal, error: fetchError } = await supabase
+      .from('shared_goals')
+      .select('*')
+      .eq('id', goalId)
+      .maybeSingle() as { data: any; error: any }
 
-    const goal = await db.first<any>(
-      'SELECT * FROM shared_goals WHERE id = $1',
-      [goalId]
-    )
-
+    if (fetchError) throw fetchError
     if (!goal) {
       return c.json({ error: 'Goal not found' }, 404)
     }
 
-    const newProgress = (goal.current_progress || 0) + progress_increment
+    const currentProgress = Number(goal.progress_percentage) || 0
+    const increment = Number(progress_increment)
+    const newProgress = currentProgress + increment
     const now = getCurrentDateTime()
     let status = goal.status
-    let completionDate = null
+    let completedAt: string | null = null
 
-    // Check if goal is completed
-    if (goal.target_count && newProgress >= goal.target_count) {
+    // Check if goal is completed (progress_percentage >= 100)
+    if (newProgress >= 100) {
       status = 'completed'
-      completionDate = now
+      completedAt = now
     }
 
-    await db.run(`
-      UPDATE shared_goals
-      SET current_progress = $1, status = $2, completion_date = $3, updated_at = $4
-      WHERE id = $5
-    `, [newProgress, status, completionDate, now, goalId])
+    const { error: updateError } = await (supabase
+      .from('shared_goals') as any)
+      .update({
+        progress_percentage: Math.min(newProgress, 100),
+        status,
+        completed_at: completedAt,
+        updated_at: now,
+      })
+      .eq('id', goalId)
+
+    if (updateError) throw updateError
 
     return c.json({
       message: 'Goal progress updated',

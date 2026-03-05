@@ -3,9 +3,28 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { zodErrorHandler } from '../lib/validation'
+import { uuidParam } from '../lib/validation/schemas/common'
 import { generateId, getCurrentDateTime } from '../utils'
+
+/** POST /api/rewards/:id/redeem - Redeem reward */
+const redeemRewardSchema = z.object({
+  userId: uuidParam,
+  relationshipId: uuidParam.optional(),
+})
+
+/** GET /api/rewards - query params */
+const rewardsQuerySchema = z.object({
+  category: z.enum(['content', 'wellness', 'coaching', 'gifts', 'experiences']).optional(),
+})
+
+/** GET /api/badges or /api/achievements or /api/points - query params */
+const userQuerySchema = z.object({
+  userId: z.string().uuid().optional(),
+})
 
 const gamificationApi = new Hono()
 
@@ -118,9 +137,9 @@ const SAMPLE_ACHIEVEMENTS = [
 ]
 
 // GET /api/rewards - List rewards
-gamificationApi.get('/rewards', async (c: Context) => {
+gamificationApi.get('/rewards', zValidator('query', rewardsQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const category = c.req.query('category')
+    const { category } = c.req.valid('query' as never)
     let rewards = [...SAMPLE_REWARDS]
 
     if (category) {
@@ -139,15 +158,10 @@ gamificationApi.get('/rewards', async (c: Context) => {
 })
 
 // POST /api/rewards/:id/redeem - Redeem reward
-gamificationApi.post('/rewards/:id/redeem', async (c: Context) => {
+gamificationApi.post('/rewards/:id/redeem', zValidator('json', redeemRewardSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const rewardId = c.req.param('id')
-    const { userId, relationshipId } = await c.req.json()
-
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400)
-    }
+    const { userId } = c.req.valid('json' as never)
 
     const reward = SAMPLE_REWARDS.find(r => r.id === rewardId)
     if (!reward) {
@@ -181,9 +195,9 @@ gamificationApi.post('/rewards/:id/redeem', async (c: Context) => {
 })
 
 // GET /api/badges - Get badges
-gamificationApi.get('/badges', async (c: Context) => {
+gamificationApi.get('/badges', zValidator('query', userQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const userId = c.req.query('userId')
+    const { userId } = c.req.valid('query' as never)
 
     // In production, query earned badges for the user
     const earnedBadges = [
@@ -210,10 +224,8 @@ gamificationApi.get('/badges', async (c: Context) => {
 })
 
 // GET /api/achievements - Get achievements
-gamificationApi.get('/achievements', async (c: Context) => {
+gamificationApi.get('/achievements', zValidator('query', userQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const userId = c.req.query('userId')
-
     return c.json({
       success: true,
       achievements: SAMPLE_ACHIEVEMENTS,
@@ -233,13 +245,9 @@ gamificationApi.get('/achievements', async (c: Context) => {
 })
 
 // GET /api/points - Get user points
-gamificationApi.get('/points', async (c: Context) => {
+gamificationApi.get('/points', zValidator('query', z.object({ userId: z.string().uuid() }), zodErrorHandler), async (c: Context) => {
   try {
-    const userId = c.req.query('userId')
-
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400)
-    }
+    const { userId } = c.req.valid('query' as never)
 
     // In production, query from database
     const mockPointsData = {
