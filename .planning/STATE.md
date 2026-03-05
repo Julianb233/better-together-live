@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 3 of 10 (Database Consolidation)
-Plan: 0 of 5 in current phase
-Status: Phases 1-2 verified and complete, Phase 3 executing
-Last activity: 2026-03-05 -- Phase 2 verified (5/5 must-haves passed), proceeding to Phase 3
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-03-05 -- Completed 03-01-PLAN.md (Zod Validation Infrastructure)
 
-Progress: [████████░░] 23% (8/35)
+Progress: [████████░░] 26% (9/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~3.4 minutes
-- Total execution time: ~27.5 minutes
+- Total execution time: ~30.3 minutes
 
 **By Phase:**
 
@@ -29,6 +29,7 @@ Progress: [████████░░] 23% (8/35)
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
+| 3 - Database Consolidation | 1/5 | ~2.8m | ~2.8m |
 
 ## Accumulated Context
 
@@ -60,6 +61,10 @@ Recent decisions affecting current work:
 - [02-02] Set auth cookies after password reset so user stays logged in
 - [02-03] Keep jose in package.json (push-notifications.ts uses it for APNS)
 - [02-03] Async checkAuth in intimacy-challenges (cookie validation requires server roundtrip)
+- [03-01] Zod v4 with @hono/zod-validator for middleware-level validation
+- [03-01] z.coerce for query param schemas (strings auto-convert to numbers)
+- [03-01] One schema file per API domain, matching src/api/ structure
+- [03-01] Schemas match actual API field usage (camelCase vs snake_case preserved per route)
 
 ### Pending Todos
 
@@ -77,5 +82,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 02-03-PLAN.md (Remove Custom JWT Auth & Consolidate Pages) -- Phase 2 complete
+Stopped at: Completed 03-01-PLAN.md (Zod Validation Infrastructure)
 Resume file: None
