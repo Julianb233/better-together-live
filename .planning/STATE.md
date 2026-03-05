@@ -10,25 +10,25 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 2 of 10 (Auth Consolidation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-03-05 — Completed 02-01-PLAN.md (SSR Client Migration)
+Last activity: 2026-03-05 — Completed 02-02-PLAN.md (Password Reset Email Flow)
 
-Progress: [██████░░░░] 17% (6/35)
+Progress: [███████░░░] 20% (7/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: ~3.3 minutes
-- Total execution time: ~19.5 minutes
+- Total plans completed: 7
+- Average duration: ~3.2 minutes
+- Total execution time: ~23.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
-| 2 - Auth Consolidation | 1/3 | ~2m | ~2m |
+| 2 - Auth Consolidation | 2/3 | ~6m | ~3m |
 
 ## Accumulated Context
 
@@ -55,11 +55,15 @@ Recent decisions affecting current work:
 - [01-05] Sanitize-on-input for all UGC (defense-in-depth with Hono TSX auto-escape)
 - [02-01] Store @supabase/ssr response headers on Hono context for cookie relay
 - [02-01] Rename createServerClient to createAnonClient to avoid @supabase/ssr name collision
+- [02-02] PKCE code exchange via /callback endpoint for password reset flow
+- [02-02] Pass tokens as query params from callback to reset page (server-rendered pages can't read hash)
+- [02-02] Set auth cookies after password reset so user stays logged in
 
 ### Pending Todos
 
 - Consolidate custom JWT requireAuth (auth.ts) with Supabase requireAuth (middleware.ts) — noted for Phase 2
 - Configure Upstash Redis credentials in Vercel (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN)
+- Configure Resend SMTP in Supabase dashboard (host: smtp.resend.com, port: 465, user: resend, password: RESEND_API_KEY)
 
 ### Blockers/Concerns
 
@@ -67,9 +71,10 @@ Recent decisions affecting current work:
 - Zero existing tests means refactoring has high regression risk
 - Phase 1 (security) complete — all 5 plans executed
 - Two separate requireAuth implementations exist (auth.ts JWT vs middleware.ts Supabase) — social.ts and messaging.ts still use the JWT version
+- Supabase SMTP not yet configured — password reset emails won't deliver until manual dashboard setup is done
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 02-01-PLAN.md (SSR Client Migration)
+Stopped at: Completed 02-02-PLAN.md (Password Reset Email Flow)
 Resume file: None
