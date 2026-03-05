@@ -5,11 +5,14 @@ import { requireAuth } from '../lib/supabase/middleware'
 import { COACH_SYSTEM_PROMPT } from '../lib/ai/prompts'
 import { getConversationHistory, saveMessages } from '../lib/ai/conversation'
 import { generateCoachResponse } from '../lib/ai/coach-router'
+import { aiCoachRateLimit } from '../lib/ai/rate-limiter'
+import { getCachedResponse, cacheResponse } from '../lib/ai/response-cache'
 
 const aiCoachApi = new Hono()
 
-// Apply auth middleware to all routes
+// Apply auth middleware to all routes, rate limiting to /ask
 aiCoachApi.use('/*', requireAuth())
+aiCoachApi.use('/ask', aiCoachRateLimit(20, 60 * 60 * 1000)) // 20 requests per hour
 
 // Request validation schema
 const askCoachSchema = z.object({
@@ -27,6 +30,22 @@ aiCoachApi.post('/ask', async (c) => {
     const supabase = c.get('supabase')
     const { message, relationship_id } = validated
 
+    // Check cache first -- skip LLM call for repeated identical questions
+    const cached = getCachedResponse(message)
+    if (cached) {
+      // Still save the user message to history for completeness
+      await saveMessages(supabase, [
+        { user_id: userId, relationship_id, role: 'user', content: message, model_used: null },
+      ])
+      return c.json({
+        response: cached.response,
+        tier: cached.tier,
+        model: cached.model,
+        cached: true,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
     // Load conversation history for context
     const history = await getConversationHistory(supabase, userId, relationship_id)
 
@@ -39,6 +58,9 @@ aiCoachApi.post('/ask', async (c) => {
       })),
       COACH_SYSTEM_PROMPT
     )
+
+    // Cache the response for future identical questions
+    cacheResponse(message, text, tier, model)
 
     // Save both user and assistant messages to database
     await saveMessages(supabase, [
@@ -62,6 +84,7 @@ aiCoachApi.post('/ask', async (c) => {
       response: text,
       tier,
       model,
+      cached: false,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
