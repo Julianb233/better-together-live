@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 4 (Product Integrity) -- COMPLETE
+**Current focus:** Phase 6 (AI Coach) -- COMPLETE
 
 ## Current Position
 
-Phase: 4 of 10 (Product Integrity)
+Phase: 6 of 10 (AI Coach)
 Plan: 3 of 3 in current phase
 Status: Phase complete
-Last activity: 2026-03-05 -- Completed 04-03-PLAN.md (Unify Pricing & Mark Unimplemented Features)
+Last activity: 2026-03-05 -- Completed 06-03-PLAN.md (Rate Limiting & Response Caching)
 
-Progress: [████████████████░] 46% (16/35)
+Progress: [███████████████████░] 54% (19/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: ~4.1 minutes
-- Total execution time: ~70.6 minutes
+- Total plans completed: 19
+- Average duration: ~4.0 minutes
+- Total execution time: ~77.6 minutes
 
 **By Phase:**
 
@@ -31,6 +31,7 @@ Progress: [████████████████░] 46% (16/35)
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
 | 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
 | 4 - Product Integrity | 3/3 | ~13.6m | ~4.5m |
+| 6 - AI Coach | 3/3 | ~7m | ~2.3m |
 
 ## Accumulated Context
 
@@ -82,6 +83,11 @@ Recent decisions affecting current work:
 - [04-03] Paywall ($39/$69) is canonical pricing source of truth for all pages
 - [04-03] Subscription box prices kept as aspirational (Coming Soon), not removed
 - [04-03] Annual tier updated to $390/year (~17% savings vs $39/mo)
+- [06-01] claude-haiku-4-5 as primary AI coach model via Vercel AI SDK
+- [06-01] Fetch newest-first then reverse for chronological conversation history
+- [06-02] Heuristic question classification (word count + keywords, no LLM call)
+- [06-02] Static fallback message when both AI providers fail
+- [06-03] In-memory rate limiting and caching (not Redis) -- acceptable for serverless cold starts
 
 ### Pending Todos
 
@@ -89,6 +95,8 @@ Recent decisions affecting current work:
 - Configure Resend SMTP in Supabase dashboard (host: smtp.resend.com, port: 465, user: resend, password: RESEND_API_KEY)
 - Regenerate Supabase Database types from live schema (to eliminate `as any` casts in API files)
 - Reconcile TypeScript type column names (user_1_id) with actual DB schema (user1_id)
+- Run migration 0006_ai_coach_messages.sql against Supabase (creates ai_coach_messages + ai_coach_rate_limits tables)
+- Set ANTHROPIC_API_KEY and OPENAI_API_KEY in Vercel dashboard
 
 ### Blockers/Concerns
 
@@ -100,11 +108,12 @@ Recent decisions affecting current work:
 - Phase 4 plan 1 complete -- all homepage CTA buttons fixed, fake spinner removed, dead links cleaned up
 - Phase 4 plan 2 complete -- all fake social proof, false encryption claims, and exposed business metrics removed from every page
 - Phase 4 COMPLETE -- all 3 plans executed: CTA fixes, fake content removal, pricing unification
+- Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 04-03-PLAN.md (Unify Pricing & Mark Unimplemented Features) -- Phase 4 complete
+Stopped at: Completed 06-03-PLAN.md (Rate Limiting & Response Caching) -- Phase 6 complete
 Resume file: None
