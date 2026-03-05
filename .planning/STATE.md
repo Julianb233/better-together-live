@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 1 of 10 (Security Hardening)
-Plan: 4 of 5 in current phase
-Status: In progress
-Last activity: 2026-03-05 — Completed 01-02-PLAN.md (IDOR Protection)
+Plan: 5 of 5 in current phase
+Status: Phase complete
+Last activity: 2026-03-05 — Completed 01-05-PLAN.md (XSS, Pagination, Rate Limiting)
 
-Progress: [████░░░░░░] 11% (4/35)
+Progress: [█████░░░░░] 14% (5/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~2 minutes
-- Total execution time: ~9.5 minutes
+- Total plans completed: 5
+- Average duration: ~3.5 minutes
+- Total execution time: ~17.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 - Security | 4/5 | ~9.5m | ~2m |
+| 1 - Security | 5/5 | ~17.5m | ~3.5m |
 
 ## Accumulated Context
 
@@ -49,20 +49,24 @@ Recent decisions affecting current work:
 - [01-02] Excluded social/communities/feed from IDOR (target-action, not identity)
 - [01-02] Deferred verifyRelationshipMembership to Phase 3
 - [01-04] Admin analytics page route protected with inline requireAuth + requireAdmin
+- [01-05] Rate limiting gracefully skips when Upstash not configured (dev mode passthrough)
+- [01-05] Kept auth-specific in-memory rate limiting separate from global API rate limiting
+- [01-05] Sanitize-on-input for all UGC (defense-in-depth with Hono TSX auto-escape)
 
 ### Pending Todos
 
 - Consolidate custom JWT requireAuth (auth.ts) with Supabase requireAuth (middleware.ts) — noted for Phase 2
+- Configure Upstash Redis credentials in Vercel (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN)
 
 ### Blockers/Concerns
 
 - 58 v1 requirements across 10 phases — aggressive scope for ASAP timeline
 - Zero existing tests means refactoring has high regression risk
-- Phase 1 (security) should be done before any public traffic
+- Phase 1 (security) complete — all 5 plans executed
 - Two separate requireAuth implementations exist (auth.ts JWT vs middleware.ts Supabase) — social.ts and messaging.ts still use the JWT version
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 01-02-PLAN.md (IDOR Protection)
+Stopped at: Completed 01-05-PLAN.md (XSS, Pagination, Rate Limiting) — Phase 1 complete
 Resume file: None
