@@ -2,9 +2,13 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
+import { requireAdmin } from '../lib/supabase/middleware'
 import type { Env } from '../types'
 
 const analyticsApi = new Hono()
+
+// All analytics routes require admin role
+analyticsApi.use('/*', requireAdmin())
 
 // Helper function to check if database is available
 function isDatabaseAvailable(c: Context): boolean {

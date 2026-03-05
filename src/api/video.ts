@@ -20,15 +20,21 @@ video.post('/token', async (c) => {
       return c.json({ error: 'roomName and participantName are required' }, 400)
     }
 
+    // Validate participant identity matches authenticated user
+    const authUserId = c.get('userId') as string
+    if (participantId && participantId !== authUserId) {
+      return c.json({ error: 'Forbidden: participant ID mismatch' }, 403)
+    }
+
     const config = getLiveKitConfig(c.env as Env)
 
     if (!config.apiKey || !config.apiSecret) {
       return c.json({ error: 'LiveKit not configured' }, 500)
     }
 
-    // Create access token
+    // Create access token - use authenticated userId as identity
     const at = new AccessToken(config.apiKey, config.apiSecret, {
-      identity: participantId || participantName,
+      identity: authUserId,
       name: participantName,
       ttl: '2h' // Token valid for 2 hours
     })

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { except } from 'hono/combine'
-import { requireAuth } from './lib/supabase/middleware'
+import { requireAuth, requireAdmin } from './lib/supabase/middleware'
+import { rateLimitMiddleware } from './lib/rate-limit'
 // Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
@@ -382,8 +383,8 @@ app.get('/dashboard.html', (c) => {
   return c.html(dashboardHtml)
 })
 
-// Admin Analytics Dashboard
-app.get('/admin/analytics', (c) => {
+// Admin Analytics Dashboard (requires auth + admin role)
+app.get('/admin/analytics', requireAuth(), requireAdmin(), (c) => {
   return c.html(analyticsDashboardHtml)
 })
 
