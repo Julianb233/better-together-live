@@ -733,10 +733,9 @@ app.get('/', (c) => {
           <div className="text-center">
             {/* Social Proof Badge - Authority Bias */}
             <div className="mb-6 sm:mb-8 animate-fade-in-up">
-              <div className="inline-flex items-center px-4 sm:px-6 py-3 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full text-pink-800 text-xs sm:text-sm font-bold mb-4 sm:mb-6 animate-pulse shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                <i className="fas fa-crown mr-2 text-yellow-500 animate-pulse"></i>
-                #1 AI Relationship Platform • Trusted by 50,000+ Couples
-                <div className="ml-3 w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+              <div className="inline-flex items-center px-4 sm:px-6 py-3 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full text-pink-800 text-xs sm:text-sm font-bold mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                <i className="fas fa-crown mr-2 text-yellow-500"></i>
+                AI-Powered Relationship Platform for Couples
               </div>
             </div>
             
@@ -797,9 +796,8 @@ app.get('/', (c) => {
                   <div className="w-8 h-8 rounded-full bg-pink-100 border-2 border-white flex items-center justify-center text-xs">👩</div>
                   <div className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs">👨</div>
                   <div className="w-8 h-8 rounded-full bg-purple-100 border-2 border-white flex items-center justify-center text-xs">👩</div>
-                  <div className="w-8 h-8 rounded-full bg-green-100 border-2 border-white flex items-center justify-center text-xs font-bold">+50k</div>
                 </div>
-                <span className="text-xs sm:text-sm">Happy couples already joined</span>
+                <span className="text-xs sm:text-sm">Couples growing stronger together</span>
               </div>
               <div className="flex items-center">
                 <div className="flex text-yellow-400 mr-2">
@@ -816,25 +814,25 @@ app.get('/', (c) => {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Platform Highlights */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="space-y-2">
-              <div className="text-3xl font-bold text-pink-600">87%</div>
-              <div className="text-gray-600">Improved Communication</div>
+              <div className="text-3xl font-bold text-pink-600"><i className="fas fa-robot"></i></div>
+              <div className="text-gray-600">AI Coaching</div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl font-bold text-purple-600">94%</div>
-              <div className="text-gray-600">Relationship Satisfaction</div>
+              <div className="text-3xl font-bold text-purple-600"><i className="fas fa-calendar-check"></i></div>
+              <div className="text-gray-600">Daily Check-ins</div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl font-bold text-blue-600">15+</div>
-              <div className="text-gray-600">Days Average Streak</div>
+              <div className="text-3xl font-bold text-blue-600"><i className="fas fa-bullseye"></i></div>
+              <div className="text-gray-600">Shared Goals</div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl font-bold text-green-600">98%</div>
-              <div className="text-gray-600">Would Recommend</div>
+              <div className="text-3xl font-bold text-green-600"><i className="fas fa-heart"></i></div>
+              <div className="text-gray-600">Date Activities</div>
             </div>
           </div>
         </div>
@@ -1355,7 +1353,7 @@ app.get('/', (c) => {
                 <h3 className="text-lg font-semibold text-gray-900">Privacy & Security</h3>
               </div>
               <ul className="text-gray-600 space-y-2 text-sm">
-                <li>• End-to-end data encryption</li>
+                <li>• Data encrypted in transit and at rest</li>
                 <li>• Private AI conversations</li>
                 <li>• Secure calendar integration</li>
                 <li>• GDPR compliant</li>
@@ -1468,7 +1466,7 @@ app.get('/', (c) => {
           <div className="text-center mb-16">
             <div className="inline-flex items-center px-6 py-3 bg-pink-100 text-pink-800 rounded-full text-sm font-semibold mb-6">
               <i className="fas fa-heart mr-2"></i>
-              Join 50,000+ Couples Growing Stronger
+              Choose Your Plan
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Choose Your Relationship Journey

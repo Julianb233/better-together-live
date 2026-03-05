@@ -404,56 +404,40 @@ export const paywallHtml = `<!DOCTYPE html>
                         </div>
                     </div>
 
-                    <!-- Right: Social Proof & Urgency -->
+                    <!-- Right: Why Choose Better Together -->
                     <div>
                         <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                            <i class="fas fa-users text-blue-500 mr-3"></i>
-                            Join 50,000+ Happy Couples
+                            <i class="fas fa-heart text-pink-500 mr-3"></i>
+                            Why Couples Choose Better Together
                         </h2>
-                        
-                        <!-- Stats -->
+
+                        <!-- Real Feature Highlights -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
                             <div class="text-center p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl">
-                                <div class="text-2xl font-bold text-pink-600">87%</div>
-                                <div class="text-sm text-pink-700">Improved Communication</div>
+                                <div class="text-2xl font-bold text-pink-600"><i class="fas fa-robot"></i></div>
+                                <div class="text-sm text-pink-700">AI Coaching</div>
                             </div>
                             <div class="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
-                                <div class="text-2xl font-bold text-blue-600">94%</div>
-                                <div class="text-sm text-blue-700">Relationship Satisfaction</div>
+                                <div class="text-2xl font-bold text-blue-600"><i class="fas fa-calendar-check"></i></div>
+                                <div class="text-sm text-blue-700">Daily Check-ins</div>
                             </div>
                             <div class="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl">
-                                <div class="text-2xl font-bold text-green-600">15+</div>
-                                <div class="text-sm text-green-700">Days Average Streak</div>
+                                <div class="text-2xl font-bold text-green-600"><i class="fas fa-bullseye"></i></div>
+                                <div class="text-sm text-green-700">Shared Goals</div>
                             </div>
                             <div class="text-center p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl">
-                                <div class="text-2xl font-bold text-purple-600">98%</div>
-                                <div class="text-sm text-purple-700">Would Recommend</div>
+                                <div class="text-2xl font-bold text-purple-600"><i class="fas fa-heart"></i></div>
+                                <div class="text-sm text-purple-700">Date Activities</div>
                             </div>
                         </div>
 
-                        <!-- Testimonial -->
-                        <div class="bg-gradient-to-r from-gray-50 to-white p-4 rounded-xl border-l-4 border-pink-500 mb-4">
+                        <!-- Guarantee -->
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
                             <div class="flex items-center mb-2">
-                                <div class="flex text-yellow-400 text-sm">
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                </div>
-                                <span class="text-xs text-gray-600 ml-2">Verified User</span>
+                                <i class="fas fa-shield-alt text-green-600 mr-2"></i>
+                                <span class="font-semibold text-green-800">30-Day Money-Back Guarantee</span>
                             </div>
-                            <p class="text-sm text-gray-700 italic">"We went from barely talking to having deep conversations every night. The 7-day trial convinced us this actually works!"</p>
-                            <div class="text-xs text-gray-500 mt-2">— Sarah & Mike, married 8 years</div>
-                        </div>
-
-                        <!-- Limited Time Offer -->
-                        <div class="bg-gradient-to-r from-orange-100 to-red-100 p-4 rounded-xl border border-orange-200">
-                            <div class="flex items-center mb-2">
-                                <i class="fas fa-clock text-orange-600 mr-2"></i>
-                                <span class="font-semibold text-orange-800">Limited Time Offer</span>
-                            </div>
-                            <p class="text-sm text-orange-700">Start your free trial today and get your first month at 50% off!</p>
+                            <p class="text-sm text-green-700">Try Better Together risk-free. If it's not right for you, get a full refund.</p>
                         </div>
                     </div>
                 </div>
