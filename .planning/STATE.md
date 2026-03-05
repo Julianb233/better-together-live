@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 3 of 10 (Database Consolidation)
-Plan: 1 of 5 in current phase
+Plan: 2 of 5 in current phase
 Status: In progress
-Last activity: 2026-03-05 -- Completed 03-01-PLAN.md (Zod Validation Infrastructure)
+Last activity: 2026-03-05 -- Completed 03-02-PLAN.md (Tier 1 API Migration)
 
-Progress: [████████░░] 26% (9/35)
+Progress: [████████░░] 29% (10/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: ~3.4 minutes
-- Total execution time: ~30.3 minutes
+- Total plans completed: 10
+- Average duration: ~3.7 minutes
+- Total execution time: ~36.7 minutes
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [████████░░] 26% (9/35)
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
-| 3 - Database Consolidation | 1/5 | ~2.8m | ~2.8m |
+| 3 - Database Consolidation | 2/5 | ~9.2m | ~4.6m |
 
 ## Accumulated Context
 
@@ -65,11 +65,16 @@ Recent decisions affecting current work:
 - [03-01] z.coerce for query param schemas (strings auto-convert to numbers)
 - [03-01] One schema file per API domain, matching src/api/ structure
 - [03-01] Schemas match actual API field usage (camelCase vs snake_case preserved per route)
+- [03-02] Use `as any` casts on Supabase insert/update where DB types diverge from actual schema
+- [03-02] Map Supabase column names to frontend-expected response shapes in GET handlers
+- [03-02] Fixed zodErrorHandler to use `any` type for Zod v4 compatibility
+- [03-02] Inline Zod schemas for files without pre-existing schema files
 
 ### Pending Todos
 
 - Configure Upstash Redis credentials in Vercel (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN)
 - Configure Resend SMTP in Supabase dashboard (host: smtp.resend.com, port: 465, user: resend, password: RESEND_API_KEY)
+- Regenerate Supabase Database types from live schema (to eliminate `as any` casts in API files)
 
 ### Blockers/Concerns
 
@@ -78,9 +83,10 @@ Recent decisions affecting current work:
 - Phase 1 (security) complete -- all 5 plans executed
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
+- Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 03-01-PLAN.md (Zod Validation Infrastructure)
+Stopped at: Completed 03-02-PLAN.md (Tier 1 API Migration)
 Resume file: None
