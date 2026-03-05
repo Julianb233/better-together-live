@@ -4,6 +4,9 @@ import { except } from 'hono/combine'
 import { requireAuth } from './lib/supabase/middleware'
 import { rateLimitMiddleware } from './lib/rate-limit'
 import { supabaseCookieRelay, clearLegacyCookies } from './lib/supabase/middleware'
+import { sentryMiddleware } from './middleware/sentry'
+import { loggingMiddleware } from './middleware/logging'
+import { createAdminClient, type SupabaseEnv } from './lib/supabase/server'
 // Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
@@ -44,7 +47,13 @@ import videoApi from './api/video'
 
 const app = new Hono<{ Bindings: Env }>()
 
-// Rate limiting (must be first middleware)
+// Sentry error tracking (must be first to catch all errors)
+app.use('*', sentryMiddleware())
+
+// Structured logging (logs all requests as JSON)
+app.use('*', loggingMiddleware())
+
+// Rate limiting
 app.use('/api/*', rateLimitMiddleware())
 
 // Enable CORS for API routes (restricted to production domains + localhost in dev)
@@ -89,6 +98,33 @@ app.use('/api/*', except(
 
 // Use JSX renderer for HTML pages
 app.use(renderer)
+
+// Global error handler -- Sentry middleware already captured the exception
+app.onError((err, c) => {
+  return c.json({ error: 'Internal server error' }, 500)
+})
+
+// =============================================================================
+// HEALTH CHECK
+// =============================================================================
+app.get('/health', async (c) => {
+  const health: Record<string, unknown> = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || 'dev',
+    environment: process.env.VERCEL_ENV || 'development',
+  }
+  try {
+    const supabase = createAdminClient(c.env as unknown as SupabaseEnv)
+    const { error } = await supabase.from('users').select('id').limit(1)
+    health.database = error ? 'error' : 'connected'
+    if (error) health.status = 'degraded'
+  } catch {
+    health.database = 'disconnected'
+    health.status = 'degraded'
+  }
+  return c.json(health, health.status === 'ok' ? 200 : 503)
+})
 
 // =============================================================================
 // INLINE API ROUTES (user CRUD, invite-partner, relationships)
