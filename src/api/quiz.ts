@@ -3,6 +3,9 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import { quizResponseSchema, quizBulkResponseSchema } from '../lib/validation/schemas/quiz'
 import { generateId, getCurrentDateTime } from '../utils'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 
@@ -83,13 +86,9 @@ quizApi.get('/questions', async (c: Context) => {
 })
 
 // POST /api/quiz/responses - Submit single response
-quizApi.post('/responses', async (c: Context) => {
+quizApi.post('/responses', zValidator('json', quizResponseSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { userId, questionId, answerId, answerValue } = await c.req.json()
-
-    if (!userId || !questionId || !answerId) {
-      return c.json({ error: 'userId, questionId, and answerId are required' }, 400)
-    }
+    const { userId, questionId, answerId, answerValue } = c.req.valid('json' as never)
 
     const responseId = generateId()
     const now = getCurrentDateTime()
@@ -112,13 +111,9 @@ quizApi.post('/responses', async (c: Context) => {
 })
 
 // POST /api/quiz/responses/bulk - Submit all responses
-quizApi.post('/responses/bulk', async (c: Context) => {
+quizApi.post('/responses/bulk', zValidator('json', quizBulkResponseSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { userId, responses } = await c.req.json()
-
-    if (!userId || !responses || !Array.isArray(responses)) {
-      return c.json({ error: 'userId and responses array are required' }, 400)
-    }
+    const { userId, responses } = c.req.valid('json' as never)
 
     const now = getCurrentDateTime()
     const quizSessionId = generateId()

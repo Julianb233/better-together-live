@@ -7,6 +7,16 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import {
+  signupSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  refreshTokenSchema,
+  updateProfileSchema,
+} from '../lib/validation/schemas/auth'
 import {
   createAnonClient,
   createAdminClient,
@@ -30,17 +40,9 @@ function getSupabaseEnv(c: Context): SupabaseEnv {
  * POST /api/auth/signup
  * Register a new user with Supabase Auth
  */
-supabaseAuth.post('/signup', async (c: Context) => {
+supabaseAuth.post('/signup', zValidator('json', signupSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email, password, name, phone, metadata } = await c.req.json()
-
-    if (!email || !password) {
-      return c.json({ error: 'Email and password are required' }, 400)
-    }
-
-    if (!name) {
-      return c.json({ error: 'Name is required' }, 400)
-    }
+    const { email, password, name, phone, metadata } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
@@ -115,13 +117,9 @@ supabaseAuth.post('/signup', async (c: Context) => {
  * POST /api/auth/login
  * Login with email and password
  */
-supabaseAuth.post('/login', async (c: Context) => {
+supabaseAuth.post('/login', zValidator('json', loginSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email, password } = await c.req.json()
-
-    if (!email || !password) {
-      return c.json({ error: 'Email and password are required' }, 400)
-    }
+    const { email, password } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
@@ -196,13 +194,9 @@ supabaseAuth.post('/logout', async (c: Context) => {
  * POST /api/auth/forgot-password
  * Send password reset email
  */
-supabaseAuth.post('/forgot-password', async (c: Context) => {
+supabaseAuth.post('/forgot-password', zValidator('json', forgotPasswordSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email } = await c.req.json()
-
-    if (!email) {
-      return c.json({ error: 'Email is required' }, 400)
-    }
+    const { email } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
@@ -290,21 +284,9 @@ supabaseAuth.get('/callback', async (c: Context) => {
  * /callback route (which exchanged the PKCE code). We establish the
  * recovery session first, then update the password.
  */
-supabaseAuth.post('/reset-password', async (c: Context) => {
+supabaseAuth.post('/reset-password', zValidator('json', resetPasswordSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { newPassword, accessToken, refreshToken } = await c.req.json()
-
-    if (!newPassword) {
-      return c.json({ error: 'New password is required' }, 400)
-    }
-
-    if (newPassword.length < 8) {
-      return c.json({ error: 'Password must be at least 8 characters' }, 400)
-    }
-
-    if (!accessToken || !refreshToken) {
-      return c.json({ error: 'Recovery session tokens are required' }, 400)
-    }
+    const { newPassword, accessToken, refreshToken } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
@@ -355,9 +337,9 @@ supabaseAuth.post('/reset-password', async (c: Context) => {
  * POST /api/auth/refresh
  * Refresh the access token
  */
-supabaseAuth.post('/refresh', async (c: Context) => {
+supabaseAuth.post('/refresh', zValidator('json', refreshTokenSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { refreshToken } = await c.req.json()
+    const { refreshToken } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
@@ -500,9 +482,9 @@ supabaseAuth.post('/oauth/facebook', async (c: Context) => {
  * POST /api/auth/update-profile
  * Update user profile
  */
-supabaseAuth.post('/update-profile', async (c: Context) => {
+supabaseAuth.post('/update-profile', zValidator('json', updateProfileSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { name, phone, avatar_url, metadata } = await c.req.json()
+    const { name, phone, avatar_url, metadata } = c.req.valid('json' as never)
 
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)

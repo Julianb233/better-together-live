@@ -3,6 +3,15 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import {
+  invitePartnerEmailSchema,
+  subscriptionConfirmationEmailSchema,
+  passwordResetEmailSchema,
+  notifyGiftEmailSchema,
+  milestoneReminderEmailSchema,
+} from '../lib/validation/schemas/email'
 
 const emailApi = new Hono()
 
@@ -172,9 +181,9 @@ const templates = {
 }
 
 // POST /api/email/invite-partner
-emailApi.post('/invite-partner', async (c: Context) => {
+emailApi.post('/invite-partner', zValidator('json', invitePartnerEmailSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { inviterName, partnerEmail, inviteToken } = await c.req.json()
+    const { inviterName, partnerEmail, inviteToken } = c.req.valid('json' as never)
     const apiKey = (c.env as any)?.RESEND_API_KEY
     const devMode = isDevelopmentMode(c.env)
 
@@ -192,9 +201,9 @@ emailApi.post('/invite-partner', async (c: Context) => {
 })
 
 // POST /api/email/subscription-confirmation
-emailApi.post('/subscription-confirmation', async (c: Context) => {
+emailApi.post('/subscription-confirmation', zValidator('json', subscriptionConfirmationEmailSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email, userName, planName, price } = await c.req.json()
+    const { email, userName, planName, price } = c.req.valid('json' as never)
     const apiKey = (c.env as any)?.RESEND_API_KEY
     const devMode = isDevelopmentMode(c.env)
 
@@ -211,9 +220,9 @@ emailApi.post('/subscription-confirmation', async (c: Context) => {
 })
 
 // POST /api/email/password-reset
-emailApi.post('/password-reset', async (c: Context) => {
+emailApi.post('/password-reset', zValidator('json', passwordResetEmailSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email, userName, resetToken } = await c.req.json()
+    const { email, userName, resetToken } = c.req.valid('json' as never)
     const apiKey = (c.env as any)?.RESEND_API_KEY
     const devMode = isDevelopmentMode(c.env)
 
@@ -231,9 +240,9 @@ emailApi.post('/password-reset', async (c: Context) => {
 })
 
 // POST /api/email/notify-gift
-emailApi.post('/notify-gift', async (c: Context) => {
+emailApi.post('/notify-gift', zValidator('json', notifyGiftEmailSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { recipientEmail, recipientName, senderName, giftType } = await c.req.json()
+    const { recipientEmail, recipientName, senderName, giftType } = c.req.valid('json' as never)
     const apiKey = (c.env as any)?.RESEND_API_KEY
     const devMode = isDevelopmentMode(c.env)
 
@@ -250,9 +259,9 @@ emailApi.post('/notify-gift', async (c: Context) => {
 })
 
 // POST /api/email/milestone-reminder
-emailApi.post('/milestone-reminder', async (c: Context) => {
+emailApi.post('/milestone-reminder', zValidator('json', milestoneReminderEmailSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const { email, userName, partnerName, milestone, daysUntil } = await c.req.json()
+    const { email, userName, partnerName, milestone, daysUntil } = c.req.valid('json' as never)
     const apiKey = (c.env as any)?.RESEND_API_KEY
     const devMode = isDevelopmentMode(c.env)
 

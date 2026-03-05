@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import { videoTokenSchema, createRoomSchema, createDateRoomSchema } from '../lib/validation/schemas/video'
 import type { Env } from '../types'
 
 const video = new Hono<{ Bindings: Env }>()
@@ -12,13 +15,9 @@ const getLiveKitConfig = (env: Env) => ({
 })
 
 // Generate access token for a user to join a room
-video.post('/token', async (c) => {
+video.post('/token', zValidator('json', videoTokenSchema, zodErrorHandler), async (c) => {
   try {
-    const { roomName, participantName, participantId } = await c.req.json()
-
-    if (!roomName || !participantName) {
-      return c.json({ error: 'roomName and participantName are required' }, 400)
-    }
+    const { roomName, participantName, participantId } = c.req.valid('json' as never)
 
     // Validate participant identity matches authenticated user
     const authUserId = c.get('userId') as string
@@ -63,13 +62,9 @@ video.post('/token', async (c) => {
 })
 
 // Create a new room (for scheduled video dates)
-video.post('/rooms', async (c) => {
+video.post('/rooms', zValidator('json', createRoomSchema, zodErrorHandler), async (c) => {
   try {
-    const { roomName, metadata, maxParticipants = 2 } = await c.req.json()
-
-    if (!roomName) {
-      return c.json({ error: 'roomName is required' }, 400)
-    }
+    const { roomName, metadata, maxParticipants } = c.req.valid('json' as never)
 
     const config = getLiveKitConfig(c.env as Env)
 
@@ -195,13 +190,9 @@ video.delete('/rooms/:roomName', async (c) => {
 })
 
 // Create a video date room for a couple
-video.post('/date-room', async (c) => {
+video.post('/date-room', zValidator('json', createDateRoomSchema, zodErrorHandler), async (c) => {
   try {
-    const { coupleId, user1Name, user2Name, scheduledTime } = await c.req.json()
-
-    if (!coupleId) {
-      return c.json({ error: 'coupleId is required' }, 400)
-    }
+    const { coupleId, user1Name, user2Name, scheduledTime } = c.req.valid('json' as never)
 
     const config = getLiveKitConfig(c.env as Env)
 
