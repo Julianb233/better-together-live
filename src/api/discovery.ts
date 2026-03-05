@@ -635,43 +635,50 @@ discoveryApi.get('/explore/topics', async (c: Context) => {
     const supabase = createAdminClient(getSupabaseEnv(c))
     const { limit } = getPaginationParams(c)
 
-    // Get recent public posts with hashtags
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // Primary: use database-level hashtag extraction via RPC
+    const { data: topics, error } = await supabase.rpc('extract_trending_topics', {
+      p_days: 7,
+      p_limit: limit
+    })
 
-    const { data: recentPosts, error } = await supabase
-      .from('posts')
-      .select('content')
-      .is('deleted_at', null)
-      .eq('is_hidden', false)
-      .eq('visibility', 'public')
-      .gte('created_at', weekAgo)
-      .like('content', '%#%')
-      .order('created_at', { ascending: false })
-      .limit(1000)
+    if (error) {
+      // Fallback: if RPC doesn't exist yet, use JS extraction with reduced limit
+      console.warn('extract_trending_topics RPC not available, using JS fallback:', error.message)
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    if (error) throw error
+      const { data: recentPosts, error: postsErr } = await supabase
+        .from('posts')
+        .select('content')
+        .is('deleted_at', null)
+        .eq('is_hidden', false)
+        .eq('visibility', 'public')
+        .gte('created_at', weekAgo)
+        .like('content', '%#%')
+        .order('created_at', { ascending: false })
+        .limit(500)
 
-    // Extract and count hashtags
-    const hashtagCounts = new Map<string, number>()
-    const hashtagRegex = /#(\w+)/g
+      if (postsErr) throw postsErr
 
-    for (const post of (recentPosts || [])) {
-      if (!post.content) continue
-      let match
-      while ((match = hashtagRegex.exec(post.content)) !== null) {
-        const tag = match[1].toLowerCase()
-        hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + 1)
+      const hashtagCounts = new Map<string, number>()
+      const hashtagRegex = /#(\w+)/g
+      for (const post of (recentPosts || [])) {
+        if (!post.content) continue
+        let match
+        while ((match = hashtagRegex.exec(post.content)) !== null) {
+          hashtagCounts.set(match[1].toLowerCase(), (hashtagCounts.get(match[1].toLowerCase()) || 0) + 1)
+        }
+        hashtagRegex.lastIndex = 0
       }
-      hashtagRegex.lastIndex = 0
+
+      return c.json({
+        topics: Array.from(hashtagCounts.entries())
+          .map(([topic, count]) => ({ topic, post_count: count }))
+          .sort((a, b) => b.post_count - a.post_count)
+          .slice(0, limit)
+      })
     }
 
-    // Convert to array and sort by count
-    const topics = Array.from(hashtagCounts.entries())
-      .map(([topic, count]) => ({ topic, postCount: count }))
-      .sort((a, b) => b.postCount - a.postCount)
-      .slice(0, limit)
-
-    return c.json({ topics })
+    return c.json({ topics: topics || [] })
   } catch (error) {
     console.error('Topics error:', error)
     return c.json({ error: 'Failed to get topics' }, 500)
