@@ -5,30 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 2 — Auth Consolidation
+**Current focus:** Phase 2 -- Auth Consolidation (COMPLETE)
 
 ## Current Position
 
 Phase: 2 of 10 (Auth Consolidation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-03-05 — Completed 02-02-PLAN.md (Password Reset Email Flow)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-03-05 -- Completed 02-03-PLAN.md (Remove Custom JWT Auth & Consolidate Pages)
 
-Progress: [███████░░░] 20% (7/35)
+Progress: [████████░░] 23% (8/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: ~3.2 minutes
-- Total execution time: ~23.5 minutes
+- Total plans completed: 8
+- Average duration: ~3.4 minutes
+- Total execution time: ~27.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
-| 2 - Auth Consolidation | 2/3 | ~6m | ~3m |
+| 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
 
 ## Accumulated Context
 
@@ -58,23 +58,24 @@ Recent decisions affecting current work:
 - [02-02] PKCE code exchange via /callback endpoint for password reset flow
 - [02-02] Pass tokens as query params from callback to reset page (server-rendered pages can't read hash)
 - [02-02] Set auth cookies after password reset so user stays logged in
+- [02-03] Keep jose in package.json (push-notifications.ts uses it for APNS)
+- [02-03] Async checkAuth in intimacy-challenges (cookie validation requires server roundtrip)
 
 ### Pending Todos
 
-- Consolidate custom JWT requireAuth (auth.ts) with Supabase requireAuth (middleware.ts) — noted for Phase 2
 - Configure Upstash Redis credentials in Vercel (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN)
 - Configure Resend SMTP in Supabase dashboard (host: smtp.resend.com, port: 465, user: resend, password: RESEND_API_KEY)
 
 ### Blockers/Concerns
 
-- 58 v1 requirements across 10 phases — aggressive scope for ASAP timeline
+- 58 v1 requirements across 10 phases -- aggressive scope for ASAP timeline
 - Zero existing tests means refactoring has high regression risk
-- Phase 1 (security) complete — all 5 plans executed
-- Two separate requireAuth implementations exist (auth.ts JWT vs middleware.ts Supabase) — social.ts and messaging.ts still use the JWT version
-- Supabase SMTP not yet configured — password reset emails won't deliver until manual dashboard setup is done
+- Phase 1 (security) complete -- all 5 plans executed
+- Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
+- Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 02-02-PLAN.md (Password Reset Email Flow)
+Stopped at: Completed 02-03-PLAN.md (Remove Custom JWT Auth & Consolidate Pages) -- Phase 2 complete
 Resume file: None
