@@ -48,31 +48,6 @@ async function isParticipant(supabase: any, conversationId: string, userId: stri
   return !!data
 }
 
-// Helper: Get unread count for a conversation
-async function getUnreadCount(supabase: any, conversationId: string, userId: string): Promise<number> {
-  const { data: participant } = await supabase
-    .from('conversation_participants')
-    .select('last_read_at')
-    .eq('conversation_id', conversationId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (!participant) return 0
-
-  let query = supabase
-    .from('messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('conversation_id', conversationId)
-    .neq('sender_id', userId)
-    .is('deleted_at', null)
-
-  if (participant.last_read_at) {
-    query = query.gt('created_at', participant.last_read_at)
-  }
-
-  const { count } = await query
-  return count || 0
-}
 
 // ============================================================================
 // 1. GET /api/conversations - List user's conversations
@@ -107,47 +82,81 @@ messagingApi.get('/', async (c: Context) => {
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1)
 
-    // Enrich with participant info and unread counts
-    const enriched = await Promise.all((conversations || []).map(async (conv: any) => {
-      const participation = participationMap.get(conv.id)
+    const convIds = (conversations || []).map((c: any) => c.id)
+    if (convIds.length === 0) {
+      return c.json({ conversations: [], page: Math.floor(offset / limit) + 1, limit, hasMore: false })
+    }
 
-      // Get other participants
-      const { data: participants } = await supabase
-        .from('conversation_participants')
-        .select('user_id, role')
-        .eq('conversation_id', conv.id)
-        .is('left_at', null)
-        .neq('user_id', userId)
+    // Query 3: Batch-fetch all other participants for all conversations
+    const { data: allParticipants } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, user_id, role')
+      .in('conversation_id', convIds)
+      .is('left_at', null)
+      .neq('user_id', userId)
 
-      const participantUserIds = (participants || []).map((p: any) => p.user_id)
-      let participantUsers: any[] = []
-      if (participantUserIds.length > 0) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, name, nickname, profile_photo_url')
-          .in('id', participantUserIds)
-        participantUsers = (users || []).map((u: any) => {
-          const p = participants?.find((p: any) => p.user_id === u.id)
-          return { ...u, role: p?.role }
-        })
+    // Query 4: Batch-fetch user details for all participants
+    const participantUserIds = [...new Set((allParticipants || []).map((p: any) => p.user_id))]
+    let userMap = new Map<string, any>()
+    if (participantUserIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, name, nickname, profile_photo_url')
+        .in('id', participantUserIds)
+      for (const u of (users || [])) userMap.set(u.id, u)
+    }
+
+    // Build participant lists per conversation
+    const partByConv = new Map<string, any[]>()
+    for (const p of (allParticipants || [])) {
+      const user = userMap.get(p.user_id)
+      if (!user) continue
+      if (!partByConv.has(p.conversation_id)) partByConv.set(p.conversation_id, [])
+      partByConv.get(p.conversation_id)!.push({ ...user, role: p.role })
+    }
+
+    // Query 5: Batch unread counts -- get all unread messages for user across all conversations
+    // Since last_read_at varies per conversation, fetch all candidate messages
+    // after the oldest last_read_at and filter in memory (1 query vs N*2 queries).
+    const oldestReadAt = Array.from(participationMap.values())
+      .map((p: any) => p.last_read_at)
+      .filter(Boolean)
+      .sort()[0] || '1970-01-01T00:00:00Z'
+
+    const { data: candidateUnreads } = await supabase
+      .from('messages')
+      .select('conversation_id, created_at')
+      .in('conversation_id', convIds)
+      .neq('sender_id', userId)
+      .is('deleted_at', null)
+      .gte('created_at', oldestReadAt)
+
+    // Count per conversation, filtering by each conversation's actual last_read_at
+    const unreadMap = new Map<string, number>()
+    for (const msg of (candidateUnreads || [])) {
+      const participation = participationMap.get(msg.conversation_id)
+      const lastRead = participation?.last_read_at || '1970-01-01T00:00:00Z'
+      if (msg.created_at > lastRead) {
+        unreadMap.set(msg.conversation_id, (unreadMap.get(msg.conversation_id) || 0) + 1)
       }
+    }
 
-      // Get unread count
-      const unreadCount = await getUnreadCount(supabase, conv.id, userId)
-
+    // Assemble enriched conversations (no async, pure in-memory join)
+    const enriched = (conversations || []).map((conv: any) => {
+      const participation = participationMap.get(conv.id)
       return {
         id: conv.id,
         type: conv.type,
         name: conv.name,
         avatar_url: conv.avatar_url,
-        participants: participantUsers,
+        participants: partByConv.get(conv.id) || [],
         last_message_at: conv.last_message_at,
         last_message_preview: conv.last_message_preview,
-        unread_count: unreadCount,
+        unread_count: unreadMap.get(conv.id) || 0,
         is_muted: participation?.is_muted,
         created_at: conv.created_at
       }
-    }))
+    })
 
     return c.json({
       conversations: enriched,
