@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { except } from 'hono/combine'
 import { requireAuth, requireAdmin } from './lib/supabase/middleware'
 import { rateLimitMiddleware } from './lib/rate-limit'
+import { checkOwnership, forbiddenResponse } from './lib/security'
 // Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
@@ -74,6 +75,9 @@ import {
 } from './utils'
 
 const app = new Hono<{ Bindings: Env }>()
+
+// Rate limiting (must be first middleware)
+app.use('/api/*', rateLimitMiddleware())
 
 // Enable CORS for API routes (restricted to production domains + localhost in dev)
 app.use('/api/*', cors({
@@ -173,6 +177,11 @@ app.post('/api/users', async (c) => {
 app.get('/api/users/:userId', async (c) => {
   try {
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const user = await getUserById(c.env, userId)
     
     if (!user) {
@@ -191,6 +200,11 @@ app.put('/api/users/:userId', async (c) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const updates = await c.req.json()
 
     const user = await getUserById(c.env, userId)
@@ -299,6 +313,11 @@ app.post('/api/invite-partner', async (c) => {
 app.get('/api/relationships/:userId', async (c) => {
   try {
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const relationship = await getRelationshipByUserId(c.env, userId)
     
     if (!relationship) {

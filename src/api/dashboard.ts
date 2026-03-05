@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 import {
   getUserById,
   getRelationshipByUserId,
@@ -22,6 +23,10 @@ dashboardApi.get('/:userId', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
 
     // Get user's relationship
     const relationship = await getRelationshipByUserId(c.env, userId)

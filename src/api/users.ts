@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { extractToken, verifyToken } from './auth'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const usersApi = new Hono()
 
@@ -68,6 +69,10 @@ usersApi.get('/:userId/preferences', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
 
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const user = await db.first<any>(`
       SELECT id, name, email, primary_love_language, secondary_love_language,
              communication_style, date_preferences, budget_range, interests
@@ -102,6 +107,11 @@ usersApi.put('/:userId/preferences', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const body = await c.req.json()
 
     const { communicationStyle, datePreferences, budgetRange, interests } = body
@@ -134,6 +144,10 @@ usersApi.get('/:userId/love-languages', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
 
     const user = await db.first<{
       primary_love_language: string | null
@@ -170,6 +184,11 @@ usersApi.put('/:userId/love-languages', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const { primary, secondary } = await c.req.json()
 
     const validLanguages = ['words_of_affirmation', 'quality_time', 'receiving_gifts', 'acts_of_service', 'physical_touch']
@@ -202,6 +221,10 @@ usersApi.get('/:userId/notification-settings', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
 
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const settings = await db.first<{ notification_settings: string | null }>(`
       SELECT notification_settings FROM users WHERE id = $1
     `, [userId])
@@ -228,6 +251,11 @@ usersApi.put('/:userId/notification-settings', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const settings = await c.req.json()
 
     await db.run(`

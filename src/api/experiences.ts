@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { generateId, getCurrentDateTime } from '../utils'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const experiencesApi = new Hono()
 
@@ -188,6 +189,10 @@ experiencesApi.post('/:id/complete', async (c: Context) => {
 experiencesApi.get('/user/:userId', async (c: Context) => {
   try {
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
 
     // In production, query saved and completed experiences
     return c.json({

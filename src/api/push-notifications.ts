@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const pushApi = new Hono()
 
@@ -591,6 +592,10 @@ pushApi.delete('/unregister', async (c: Context) => {
 pushApi.get('/tokens/:userId', async (c: Context) => {
   try {
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
     const tokens = await getUserDeviceTokens(c.env, userId)
 
     return c.json({

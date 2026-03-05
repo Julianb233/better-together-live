@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const notificationsApi = new Hono()
 
@@ -14,6 +15,11 @@ notificationsApi.get('/:userId', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     const limit = c.req.query('limit') || '20'
     const unread_only = c.req.query('unread_only') === 'true'
 
@@ -62,6 +68,10 @@ notificationsApi.put('/:userId/read-all', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
 
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
+
     await db.run(
       'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
       [userId]
@@ -80,6 +90,10 @@ notificationsApi.get('/:userId/unread-count', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
 
     const result = await db.first<{ count: number }>(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false',

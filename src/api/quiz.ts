@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { generateId, getCurrentDateTime } from '../utils'
+import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const quizApi = new Hono()
 
@@ -169,6 +170,10 @@ quizApi.post('/responses/bulk', async (c: Context) => {
 quizApi.get('/history/:userId', async (c: Context) => {
   try {
     const userId = c.req.param('userId')
+
+    if (!checkOwnership(c, userId)) {
+      return forbiddenResponse(c)
+    }
 
     // In production, this would query the database
     // For now, return mock data
