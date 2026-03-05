@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 5 (Payment System) -- COMPLETE
+**Current focus:** Phase 8 (Infrastructure & Monitoring) -- COMPLETE
 
 ## Current Position
 
-Phase: 7 of 10 (multiple phases complete)
-Plan: Phase 5 complete (3/3), Phase 6 complete (3/3), Phase 7 complete (2/2)
-Status: Phases 1-7 complete
-Last activity: 2026-03-05 -- Completed 05-01, 05-02, 05-03 (Payment System)
+Phase: 8 of 10 (Infrastructure & Monitoring)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-03-05 -- Completed 08-03-PLAN.md (ESLint & CI/CD Pipeline)
 
-Progress: [████████████████████████░] 69% (24/35)
+Progress: [█████████████████████████████░] 77% (27/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
-- Average duration: ~3.6 minutes
-- Total execution time: ~87.4 minutes
+- Total plans completed: 27
+- Average duration: ~3.5 minutes
+- Total execution time: ~98.5 minutes
 
 **By Phase:**
 
@@ -34,6 +34,7 @@ Progress: [███████████████████████
 | 5 - Payment System | 3/3 | ~6m | ~2m |
 | 6 - AI Coach | 3/3 | ~7m | ~2.3m |
 | 7 - Analytics & Performance | 2/2 | ~3.8m | ~1.9m |
+| 8 - Infrastructure & Monitoring | 3/3 | ~11m | ~3.7m |
 
 ## Accumulated Context
 
@@ -101,6 +102,10 @@ Recent decisions affecting current work:
 - [07-02] Batch unread counts using oldest last_read_at as floor + in-memory filtering
 - [07-02] JS fallback for trending topics RPC with reduced 500-row limit
 - [07-02] Response field renamed from postCount to post_count for RPC consistency
+- [08-01] pages.ts renamed to pages.tsx for JSX support (HomePage component rendering)
+- [08-02] Standalone logger for code outside request context (email.ts simulateEmail utility)
+- [08-03] no-unused-vars set to warn (51 pre-existing violations)
+- [08-03] typecheck CI step uses continue-on-error (1121 pre-existing type errors)
 
 ### Pending Todos
 
@@ -113,6 +118,10 @@ Recent decisions affecting current work:
 - Run migration `migrations/0010_extract_trending_topics.sql` on Supabase to enable trending topics RPC
 - Configure Stripe env vars in Vercel: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_TRY_IT_OUT, STRIPE_PRICE_BETTER_TOGETHER
 - Create Stripe Products/Prices in dashboard and enable Customer Portal
+- Configure Sentry DSN in Vercel (SENTRY_DSN)
+- Configure Vercel CI secrets in GitHub: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+- Fix 1121 TypeScript type errors to make typecheck CI step strict
+- Fix 51 unused variable warnings to promote no-unused-vars to error
 
 ### Blockers/Concerns
 
@@ -125,12 +134,14 @@ Recent decisions affecting current work:
 - Phase 5 COMPLETE -- all 3 plans executed: Stripe SDK, subscription gating, pricing unification
 - Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
 - Phase 7 COMPLETE -- all 2 plans executed: mock analytics removed, N+1 fixed, trending topics RPC created
+- Phase 8 COMPLETE -- all 3 plans executed: index.tsx refactored 1890->191 lines, Sentry + pino logging, Vercel CI pipeline
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 - Trending topics RPC function needs migration run on Supabase (JS fallback active until then)
+- 1121 TypeScript type errors prevent strict typecheck in CI
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 05-01, 05-02, 05-03 -- Phase 5 (Payment System) complete
+Stopped at: Completed 08-03-PLAN.md (ESLint & CI/CD Pipeline) -- Phase 8 complete
 Resume file: None
