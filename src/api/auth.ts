@@ -26,7 +26,10 @@ export interface AuthTokenPayload extends JWTPayload {
 }
 
 function getJwtSecret(env: any): Uint8Array {
-  const secret = env?.JWT_SECRET || 'better-together-secret-key-change-in-production'
+  const secret = env?.JWT_SECRET
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required')
+  }
   return new TextEncoder().encode(secret)
 }
 

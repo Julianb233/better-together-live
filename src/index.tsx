@@ -74,8 +74,27 @@ import {
 
 const app = new Hono<{ Bindings: Env }>()
 
-// Enable CORS for API routes
-app.use('/api/*', cors())
+// Enable CORS for API routes (restricted to production domains + localhost in dev)
+app.use('/api/*', cors({
+  origin: (origin, c) => {
+    const allowed = [
+      'https://bettertogether.app',
+      'https://www.bettertogether.app',
+    ]
+    // Allow localhost in non-production
+    if (c.env?.NODE_ENV !== 'production' || !c.env?.NODE_ENV) {
+      allowed.push('http://localhost:3000', 'http://localhost:5173')
+    }
+    // Allow additional origins from CORS_ORIGINS env var
+    const extraOrigins = c.env?.CORS_ORIGINS?.split(',') || []
+    allowed.push(...extraOrigins)
+    return allowed.includes(origin) ? origin : ''
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400
+}))
 
 // Global auth -- all /api/* routes require auth EXCEPT these public routes
 app.use('/api/*', except(
