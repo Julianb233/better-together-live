@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { getPaginationParams } from '../lib/pagination'
 
 const feedApi = new Hono()
 
@@ -13,15 +14,12 @@ feedApi.get('/', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.req.query('userId')
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
+    const { limit, offset } = getPaginationParams(c)
     const filter = c.req.query('filter') || 'all' // all, communities, connections
 
     if (!userId) {
       return c.json({ error: 'User ID required' }, 400)
     }
-
-    const offset = (page - 1) * limit
 
     // Get user's blocked users to filter out
     const blockedUsers = await db.all<{ blocked_id: string }>(`
@@ -155,11 +153,8 @@ feedApi.get('/trending', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const timeframe = c.req.query('timeframe') || '24h' // 24h, week, month
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
+    const { limit, offset } = getPaginationParams(c)
     const userId = c.req.query('userId') // Optional for user reactions
-
-    const offset = (page - 1) * limit
 
     // Calculate time threshold
     let timeThreshold = 'CURRENT_TIMESTAMP - INTERVAL \'24 hours\''
@@ -262,11 +257,8 @@ feedApi.get('/community/:communityId', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const communityId = c.req.param('communityId')
     const userId = c.req.query('userId')
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
+    const { limit, offset } = getPaginationParams(c)
     const pinnedFirst = c.req.query('pinnedFirst') === 'true'
-
-    const offset = (page - 1) * limit
 
     // Check if community exists
     const community = await db.first<{ id: string; privacy_level: string }>(`
@@ -373,10 +365,7 @@ feedApi.get('/user/:targetUserId', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const targetUserId = c.req.param('targetUserId')
     const viewerUserId = c.req.query('viewerId') // User viewing the feed
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     // Check if target user exists
     const targetUser = await db.first<{ id: string; name: string }>(`

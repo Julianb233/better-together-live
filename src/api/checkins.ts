@@ -12,6 +12,7 @@ import {
   hasTodayCheckin,
   checkAchievements
 } from '../utils'
+import { getPaginationParams } from '../lib/pagination'
 
 const checkinsApi = new Hono()
 
@@ -77,7 +78,7 @@ checkinsApi.get('/:relationshipId', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const relationshipId = c.req.param('relationshipId')
-    const limit = c.req.query('limit') || '30'
+    const { limit } = getPaginationParams(c)
 
     const results = await db.all(`
       SELECT c.*, u.name as user_name
@@ -86,7 +87,7 @@ checkinsApi.get('/:relationshipId', async (c: Context) => {
       WHERE c.relationship_id = $1
       ORDER BY c.checkin_date DESC, c.created_at DESC
       LIMIT $2
-    `, [relationshipId, parseInt(limit)])
+    `, [relationshipId, limit])
 
     return c.json({ checkins: results || [] })
   } catch (error) {

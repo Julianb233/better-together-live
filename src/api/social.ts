@@ -7,6 +7,8 @@ import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { generateId, getCurrentDateTime } from '../utils'
 import { requireAuth } from './auth'
+import { getPaginationParams } from '../lib/pagination'
+import { sanitizeTextInput } from '../lib/sanitize'
 
 const socialApi = new Hono()
 
@@ -266,12 +268,9 @@ socialApi.get('/posts/:postId/comments', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const postId = c.req.param('postId')
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
+    const { limit, offset } = getPaginationParams(c)
     const sort = c.req.query('sort') || 'newest' // newest, oldest, popular
     const userId = c.get('userId') // May be null if not authenticated
-
-    const offset = (page - 1) * limit
 
     // Build sort clause
     let sortClause = 'c.created_at DESC'
@@ -392,7 +391,7 @@ socialApi.post('/posts/:postId/comments', requireAuth, async (c: Context) => {
     await db.run(`
       INSERT INTO comments (id, post_id, author_id, parent_comment_id, content, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [commentId, postId, userId, parent_comment_id || null, content.trim(), now, now])
+    `, [commentId, postId, userId, parent_comment_id || null, sanitizeTextInput(content), now, now])
 
     // Get comment with author info
     const comment = await db.first<any>(`
@@ -450,13 +449,13 @@ socialApi.put('/comments/:id', requireAuth, async (c: Context) => {
     const now = getCurrentDateTime()
     await db.run(
       'UPDATE comments SET content = $1, updated_at = $2 WHERE id = $3',
-      [content.trim(), now, commentId]
+      [sanitizeTextInput(content), now, commentId]
     )
 
     return c.json({
       success: true,
       message: 'Comment updated',
-      comment: { id: commentId, content: content.trim(), updated_at: now }
+      comment: { id: commentId, content: sanitizeTextInput(content), updated_at: now }
     })
   } catch (error) {
     console.error('Update comment error:', error)
@@ -527,9 +526,7 @@ socialApi.get('/connections', requireAuth, async (c: Context) => {
     const userId = c.get('userId')
     const type = c.req.query('type') // followers, following, friends
     const status = c.req.query('status') || 'accepted'
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     let query = ''
     let params: any[] = []
@@ -814,7 +811,7 @@ socialApi.get('/connections/suggestions', requireAuth, async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.get('userId')
-    const limit = parseInt(c.req.query('limit') || '10')
+    const { limit } = getPaginationParams(c)
 
     // Get users with mutual connections, excluding already connected and blocked users
     const suggestions = await db.all<any>(`
@@ -1014,7 +1011,7 @@ socialApi.post('/reports', requireAuth, async (c: Context) => {
         status, created_at, updated_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [reportId, userId, target_type, target_id, reason, description || null, 'pending', now, now])
+    `, [reportId, userId, target_type, target_id, reason, description ? sanitizeTextInput(description) : null, 'pending', now, now])
 
     return c.json({
       success: true,

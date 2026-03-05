@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { verifyToken, extractToken } from './auth'
+import { getPaginationParams } from '../lib/pagination'
 
 const discoveryApi = new Hono()
 
@@ -47,9 +48,7 @@ discoveryApi.get('/search', async (c: Context) => {
 
     const q = c.req.query('q') || ''
     const type = c.req.query('type') || 'all'
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '10')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     if (!q || q.length < 2) {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
@@ -270,9 +269,7 @@ discoveryApi.get('/search/users', async (c: Context) => {
     const userId = await getAuthUserId(c)
 
     const q = c.req.query('q') || ''
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     if (!q || q.length < 2) {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
@@ -367,9 +364,7 @@ discoveryApi.get('/search/communities', async (c: Context) => {
     const q = c.req.query('q') || ''
     const category = c.req.query('category')
     const privacyLevel = c.req.query('privacy_level')
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     if (!q || q.length < 2) {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
@@ -474,9 +469,7 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
     const userId = await getAuthUserId(c)
 
     const category = c.req.query('category') || 'featured'
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     let communities: any[] = []
 
@@ -631,9 +624,7 @@ discoveryApi.get('/discover/users', async (c: Context) => {
       return c.json({ error: 'Authentication required' }, 401)
     }
 
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     const blockedIds = await getBlockedUserIds(db, userId)
     const blockedFilter = blockedIds.length > 0
@@ -683,9 +674,9 @@ discoveryApi.get('/discover/users', async (c: Context) => {
            AND cm2.status = 'active'
           ) +
           -- Same relationship stage (weight: 2)
-          ${relationshipType ? `
-            CASE WHEN r.relationship_type = '${relationshipType}' THEN 2 ELSE 0 END
-          ` : '0'}
+          ${relationshipType
+            ? `CASE WHEN r.relationship_type = $4 THEN 2 ELSE 0 END`
+            : '0'}
         ) as similarity_score,
         (SELECT COUNT(*) FROM user_connections WHERE following_id = u.id AND status = 'accepted') as follower_count
       FROM users u
@@ -714,7 +705,7 @@ discoveryApi.get('/discover/users', async (c: Context) => {
       )
       ORDER BY similarity_score DESC, follower_count DESC
       LIMIT $2 OFFSET $3
-    `, [userId, limit, offset, ...blockedIds])
+    `, [userId, limit, offset, ...(relationshipType ? [relationshipType] : []), ...blockedIds])
 
     return c.json({
       users: users.map(u => ({
@@ -748,7 +739,7 @@ discoveryApi.get('/discover/trending', async (c: Context) => {
     const userId = await getAuthUserId(c)
 
     const timeframe = c.req.query('timeframe') || '24h'
-    const limit = parseInt(c.req.query('limit') || '10')
+    const { limit } = getPaginationParams(c)
 
     // Calculate time threshold
     const now = new Date()
@@ -911,7 +902,7 @@ discoveryApi.get('/explore/categories', async (c: Context) => {
 discoveryApi.get('/explore/topics', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const limit = parseInt(c.req.query('limit') || '20')
+    const { limit } = getPaginationParams(c)
 
     // Extract hashtags from recent posts
     // This is a simplified version - in production, you'd want a dedicated hashtags table

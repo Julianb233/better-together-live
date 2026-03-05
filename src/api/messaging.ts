@@ -5,7 +5,8 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
-import { requireAuth, checkRateLimit } from './auth'
+import { getPaginationParams } from '../lib/pagination'
+import { sanitizeTextInput } from '../lib/sanitize'
 
 const messagingApi = new Hono()
 
@@ -56,9 +57,7 @@ messagingApi.get('/', async (c: Context) => {
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     // Get conversations where user is a participant
     const conversations = await db.all<any>(`
@@ -356,7 +355,7 @@ messagingApi.get('/:id/messages', async (c: Context) => {
       return c.json({ error: 'Not authorized to view messages' }, 403)
     }
 
-    const limit = parseInt(c.req.query('limit') || '50')
+    const { limit } = getPaginationParams(c)
     const beforeId = c.req.query('before_id')
     const afterId = c.req.query('after_id')
 
@@ -441,10 +440,7 @@ messagingApi.post('/:id/messages', async (c: Context) => {
 
     const conversationId = c.req.param('id')
 
-    // Rate limiting - max 60 messages per minute
-    if (checkRateLimit(`msg:${userId}`, 60, 1)) {
-      return c.json({ error: 'Rate limit exceeded. Please slow down.' }, 429)
-    }
+    // Rate limiting handled globally by Upstash Redis middleware in index.tsx
 
     // Verify user is participant
     if (!await isParticipant(db, conversationId, userId)) {
@@ -465,8 +461,8 @@ messagingApi.post('/:id/messages', async (c: Context) => {
       return c.json({ error: 'Message content, media, or shared content required' }, 400)
     }
 
-    // Sanitize content
-    const sanitizedContent = content?.trim().substring(0, 5000) // Max 5000 chars
+    // Sanitize content (XSS prevention + length cap)
+    const sanitizedContent = content ? sanitizeTextInput(content).substring(0, 5000) : null // Max 5000 chars
 
     // Create message
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`
@@ -583,8 +579,8 @@ messagingApi.put('/:id/messages/:messageId', async (c: Context) => {
       return c.json({ error: 'Messages can only be edited within 15 minutes' }, 403)
     }
 
-    // Sanitize content
-    const sanitizedContent = content.trim().substring(0, 5000)
+    // Sanitize content (XSS prevention + length cap)
+    const sanitizedContent = sanitizeTextInput(content).substring(0, 5000)
 
     // Update message
     await db.run(`

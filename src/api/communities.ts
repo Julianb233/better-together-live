@@ -9,6 +9,8 @@ import {
   generateId,
   getCurrentDateTime
 } from '../utils'
+import { getPaginationParams } from '../lib/pagination'
+import { sanitizeTextInput } from '../lib/sanitize'
 
 const communitiesApi = new Hono()
 
@@ -70,9 +72,7 @@ communitiesApi.get('/', async (c: Context) => {
     const category = c.req.query('category')
     const search = c.req.query('search')
     const sort = c.req.query('sort') || 'recent'
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     // Build base query
     let query = 'SELECT * FROM communities WHERE 1=1'
@@ -253,9 +253,9 @@ communitiesApi.post('/', async (c: Context) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, 0, $9, $10)
     `, [
       communityId,
-      name,
+      sanitizeTextInput(name),
       slug,
-      description,
+      sanitizeTextInput(description),
       cover_image_url || null,
       finalPrivacyLevel,
       category,
@@ -322,12 +322,12 @@ communitiesApi.put('/:id', async (c: Context) => {
 
     if (name !== undefined) {
       updates.push(`name = $${paramIndex++}`)
-      params.push(name)
+      params.push(sanitizeTextInput(name))
     }
 
     if (description !== undefined) {
       updates.push(`description = $${paramIndex++}`)
-      params.push(description)
+      params.push(sanitizeTextInput(description))
     }
 
     if (cover_image_url !== undefined) {
@@ -552,9 +552,7 @@ communitiesApi.get('/:id/members', async (c: Context) => {
     const communityId = c.req.param('id')
     const role = c.req.query('role')
     const search = c.req.query('search')
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '50')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     // Build query
     let query = `

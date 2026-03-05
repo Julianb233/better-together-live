@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { generateId, getCurrentDateTime, isValidEmail } from '../utils'
+import { getPaginationParams } from '../lib/pagination'
 
 const sponsorsApi = new Hono()
 
@@ -200,9 +201,7 @@ sponsorsApi.get('/applications', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const status = c.req.query('status') || 'all'
-    const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
-    const offset = (page - 1) * limit
+    const { limit, offset } = getPaginationParams(c)
 
     let query = `
       SELECT id, business_name, business_type, contact_name, contact_email,

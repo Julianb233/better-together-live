@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
+import { getPaginationParams } from '../lib/pagination'
 
 const notificationsApi = new Hono()
 
@@ -20,7 +21,7 @@ notificationsApi.get('/:userId', async (c: Context) => {
       return forbiddenResponse(c)
     }
 
-    const limit = c.req.query('limit') || '20'
+    const { limit } = getPaginationParams(c)
     const unread_only = c.req.query('unread_only') === 'true'
 
     let query = 'SELECT * FROM notifications WHERE user_id = $1'
@@ -31,7 +32,7 @@ notificationsApi.get('/:userId', async (c: Context) => {
     }
 
     query += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`
-    params.push(parseInt(limit))
+    params.push(limit)
 
     const results = await db.all(query, params)
 

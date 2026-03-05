@@ -9,6 +9,7 @@ import {
   generateId,
   getCurrentDateTime
 } from '../utils'
+import { getPaginationParams } from '../lib/pagination'
 
 const activitiesApi = new Hono()
 
@@ -65,7 +66,7 @@ activitiesApi.get('/:relationshipId', async (c: Context) => {
     const db = createDatabase(c.env as Env)
     const relationshipId = c.req.param('relationshipId')
     const status = c.req.query('status') || 'all'
-    const limit = c.req.query('limit') || '50'
+    const { limit } = getPaginationParams(c)
 
     let query = `
       SELECT a.*, u.name as created_by_name
@@ -82,7 +83,7 @@ activitiesApi.get('/:relationshipId', async (c: Context) => {
     }
 
     query += ` ORDER BY a.planned_date DESC, a.created_at DESC LIMIT $${params.length + 1}`
-    params.push(parseInt(limit))
+    params.push(limit)
 
     const results = await db.all(query, params)
 

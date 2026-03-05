@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { sanitizeTextInput } from '../lib/sanitize'
 
 const postsApi = new Hono()
 
@@ -75,7 +76,7 @@ postsApi.post('/', async (c: Context) => {
       relationshipId || null,
       communityId || null,
       contentType || 'text',
-      content || null,
+      content ? sanitizeTextInput(content) : null,
       mediaUrls ? JSON.stringify(mediaUrls) : null,
       linkedActivityId || null,
       linkedChallengeId || null,
@@ -277,7 +278,7 @@ postsApi.put('/:id', async (c: Context) => {
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $4
     `, [
-      content || null,
+      content ? sanitizeTextInput(content) : null,
       mediaUrls ? JSON.stringify(mediaUrls) : null,
       visibility || null,
       postId
@@ -388,7 +389,7 @@ postsApi.post('/:id/share', async (c: Context) => {
       sharePostId,
       userId,
       communityId || null,
-      content || `Shared a post from ${originalPost.author_id}`,
+      content ? sanitizeTextInput(content) : `Shared a post from ${originalPost.author_id}`,
       visibility || 'connections'
     ])
 
