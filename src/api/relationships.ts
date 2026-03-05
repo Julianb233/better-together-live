@@ -1,124 +1,161 @@
 // Better Together: Relationships API
 // Handles partner linking, relationship status, and management
+// Migrated from Neon raw SQL to Supabase query builder
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { zValidator } from '@hono/zod-validator'
+import {
+  linkPartnersSchema,
+  invitePartnerSchema,
+  updateRelationshipSchema,
+  acceptInviteSchema,
+} from '../lib/validation/schemas/relationships'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const relationshipsApi = new Hono()
 
+function getSupabaseEnv(c: Context): SupabaseEnv {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
+}
+
 // POST /api/relationships/link
 // Link two users as partners
-relationshipsApi.post('/link', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { user1Id, user2Id, relationshipType, startDate } = await c.req.json()
+relationshipsApi.post(
+  '/link',
+  zValidator('json', linkPartnersSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const { user1Id, user2Id, relationshipType, startDate } = c.req.valid('json' as never) as {
+        user1Id: string
+        user2Id: string
+        relationshipType: string
+        startDate?: string
+      }
 
-    if (!user1Id || !user2Id) {
-      return c.json({ error: 'Both user IDs required' }, 400)
+      // Check if relationship already exists
+      const { data: existing } = await supabase
+        .from('relationships')
+        .select('id')
+        .or(`and(user_1_id.eq.${user1Id},user_2_id.eq.${user2Id}),and(user_1_id.eq.${user2Id},user_2_id.eq.${user1Id})`)
+        .maybeSingle()
+
+      if (existing) {
+        return c.json({ error: 'Relationship already exists', relationshipId: existing.id }, 409)
+      }
+
+      // Create relationship
+      const relationshipId = `rel_${Date.now()}_${Math.random().toString(36).substring(7)}`
+
+      const { error } = await supabase
+        .from('relationships')
+        .insert({
+          id: relationshipId,
+          user_1_id: user1Id,
+          user_2_id: user2Id,
+          relationship_type: relationshipType || 'partnership',
+          start_date: startDate || new Date().toISOString().split('T')[0],
+          status: 'active',
+          created_at: new Date().toISOString(),
+        })
+
+      if (error) throw error
+
+      return c.json({
+        success: true,
+        relationshipId,
+        message: 'Partners linked successfully'
+      })
+    } catch (error) {
+      console.error('Link error:', error)
+      return c.json({ error: 'Failed to link partners' }, 500)
     }
-
-    if (user1Id === user2Id) {
-      return c.json({ error: 'Cannot link user to themselves' }, 400)
-    }
-
-    // Check if relationship already exists
-    const existing = await db.first<{ id: string }>(`
-      SELECT id FROM relationships
-      WHERE (user_1_id = $1 AND user_2_id = $2) OR (user_1_id = $2 AND user_2_id = $1)
-    `, [user1Id, user2Id])
-
-    if (existing) {
-      return c.json({ error: 'Relationship already exists', relationshipId: existing.id }, 409)
-    }
-
-    // Create relationship
-    const relationshipId = `rel_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-    await db.run(`
-      INSERT INTO relationships (id, user_1_id, user_2_id, relationship_type, start_date, status, created_at)
-      VALUES ($1, $2, $3, $4, $5, 'active', CURRENT_TIMESTAMP)
-    `, [
-      relationshipId,
-      user1Id,
-      user2Id,
-      relationshipType || 'partnership',
-      startDate || new Date().toISOString().split('T')[0]
-    ])
-
-    return c.json({
-      success: true,
-      relationshipId,
-      message: 'Partners linked successfully'
-    })
-  } catch (error) {
-    console.error('Link error:', error)
-    return c.json({ error: 'Failed to link partners' }, 500)
   }
-})
+)
 
 // POST /api/relationships/invite
 // Send partner invitation
-relationshipsApi.post('/invite', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { inviterUserId, partnerEmail, relationshipType, message } = await c.req.json()
+relationshipsApi.post(
+  '/invite',
+  zValidator('json', invitePartnerSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const { inviterUserId, partnerEmail, relationshipType, message } = c.req.valid('json' as never) as {
+        inviterUserId: string
+        partnerEmail: string
+        relationshipType: string
+        message?: string
+      }
 
-    if (!inviterUserId || !partnerEmail) {
-      return c.json({ error: 'Inviter ID and partner email required' }, 400)
+      // Generate invitation token
+      const inviteToken = `inv_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const invitationId = `invite_${Date.now()}`
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+      const { error } = await supabase
+        .from('partner_invitations')
+        .insert({
+          id: invitationId,
+          inviter_user_id: inviterUserId,
+          partner_email: partnerEmail,
+          invite_token: inviteToken,
+          relationship_type: relationshipType || 'partnership',
+          message: message || null,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          expires_at: expiresAt,
+        })
+
+      if (error) throw error
+
+      return c.json({
+        success: true,
+        invitationId,
+        inviteToken,
+        inviteUrl: `https://better-together.app/accept-invite?token=${inviteToken}`,
+        expiresIn: '7 days'
+      })
+    } catch (error) {
+      console.error('Invite error:', error)
+      return c.json({ error: 'Failed to create invitation' }, 500)
     }
-
-    // Generate invitation token
-    const inviteToken = `inv_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    const invitationId = `invite_${Date.now()}`
-
-    await db.run(`
-      INSERT INTO partner_invitations (id, inviter_user_id, partner_email, invite_token, relationship_type, message, status, created_at, expires_at)
-      VALUES ($1, $2, $3, $4, $5, $6, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days')
-    `, [
-      invitationId,
-      inviterUserId,
-      partnerEmail,
-      inviteToken,
-      relationshipType || 'partnership',
-      message || null
-    ])
-
-    return c.json({
-      success: true,
-      invitationId,
-      inviteToken,
-      inviteUrl: `https://better-together.app/accept-invite?token=${inviteToken}`,
-      expiresIn: '7 days'
-    })
-  } catch (error) {
-    console.error('Invite error:', error)
-    return c.json({ error: 'Failed to create invitation' }, 500)
   }
-})
+)
 
 // GET /api/relationships/:relationshipId/status
 // Get relationship status with stats
 relationshipsApi.get('/:relationshipId/status', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const relationshipId = c.req.param('relationshipId')
 
-    const relationship = await db.first<any>(`
-      SELECT r.*,
-             u1.name as user1_name, u1.email as user1_email,
-             u2.name as user2_name, u2.email as user2_email
-      FROM relationships r
-      LEFT JOIN users u1 ON r.user_1_id = u1.id
-      LEFT JOIN users u2 ON r.user_2_id = u2.id
-      WHERE r.id = $1
-    `, [relationshipId])
+    // Get relationship with user info via separate queries (Supabase doesn't support arbitrary JOINs on same table twice)
+    const { data: relationship, error } = await supabase
+      .from('relationships')
+      .select('*')
+      .eq('id', relationshipId)
+      .maybeSingle()
 
+    if (error) throw error
     if (!relationship) {
       return c.json({ error: 'Relationship not found' }, 404)
     }
+
+    // Get user info for both partners
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', [relationship.user_1_id, relationship.user_2_id])
+
+    const user1 = users?.find(u => u.id === relationship.user_1_id)
+    const user2 = users?.find(u => u.id === relationship.user_2_id)
 
     // Calculate days together
     const startDate = new Date(relationship.start_date)
@@ -126,15 +163,19 @@ relationshipsApi.get('/:relationshipId/status', async (c: Context) => {
     const daysTogether = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
 
     // Get recent activity count
-    const activityCount = await db.first<{ count: number }>(`
-      SELECT COUNT(*) as count FROM activities WHERE relationship_id = $1
-    `, [relationshipId])
+    const { count: activityCount } = await supabase
+      .from('activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
 
     // Get goal progress
-    const goals = await db.first<{ total: number; completed: number }>(`
-      SELECT COUNT(*) as total, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-      FROM shared_goals WHERE relationship_id = $1
-    `, [relationshipId])
+    const { data: goalsData } = await supabase
+      .from('shared_goals')
+      .select('status')
+      .eq('relationship_id', relationshipId)
+
+    const goalsTotal = goalsData?.length || 0
+    const goalsCompleted = goalsData?.filter(g => g.status === 'completed').length || 0
 
     return c.json({
       id: relationship.id,
@@ -143,13 +184,13 @@ relationshipsApi.get('/:relationshipId/status', async (c: Context) => {
       startDate: relationship.start_date,
       daysTogether,
       partners: [
-        { id: relationship.user_1_id, name: relationship.user1_name, email: relationship.user1_email },
-        { id: relationship.user_2_id, name: relationship.user2_name, email: relationship.user2_email }
+        { id: relationship.user_1_id, name: user1?.name, email: user1?.email },
+        { id: relationship.user_2_id, name: user2?.name, email: user2?.email }
       ],
       stats: {
-        activitiesCompleted: activityCount?.count || 0,
-        goalsTotal: goals?.total || 0,
-        goalsCompleted: goals?.completed || 0
+        activitiesCompleted: activityCount || 0,
+        goalsTotal,
+        goalsCompleted
       },
       anniversary: relationship.anniversary_date,
       createdAt: relationship.created_at
@@ -164,32 +205,35 @@ relationshipsApi.get('/:relationshipId/status', async (c: Context) => {
 // Get relationship for a specific user
 relationshipsApi.get('/user/:userId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    const relationship = await db.first<any>(`
-      SELECT r.*,
-             u1.name as user1_name, u1.email as user1_email,
-             u2.name as user2_name, u2.email as user2_email
-      FROM relationships r
-      LEFT JOIN users u1 ON r.user_1_id = u1.id
-      LEFT JOIN users u2 ON r.user_2_id = u2.id
-      WHERE (r.user_1_id = $1 OR r.user_2_id = $1) AND r.status = 'active'
-    `, [userId])
+    // Find active relationship where user is either user_1 or user_2
+    const { data: relationship, error } = await supabase
+      .from('relationships')
+      .select('*')
+      .eq('status', 'active')
+      .or(`user_1_id.eq.${userId},user_2_id.eq.${userId}`)
+      .maybeSingle()
 
+    if (error) throw error
     if (!relationship) {
       return c.json({ hasPartner: false, relationship: null })
     }
 
-    // Determine partner (the other user)
+    // Get user info for both partners
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', [relationship.user_1_id, relationship.user_2_id])
+
     const isUser1 = relationship.user_1_id === userId
-    const partner = isUser1
-      ? { id: relationship.user_2_id, name: relationship.user2_name, email: relationship.user2_email }
-      : { id: relationship.user_1_id, name: relationship.user1_name, email: relationship.user1_email }
+    const partnerId = isUser1 ? relationship.user_2_id : relationship.user_1_id
+    const partnerData = users?.find(u => u.id === partnerId)
 
     const startDate = new Date(relationship.start_date)
     const today = new Date()
@@ -202,7 +246,11 @@ relationshipsApi.get('/user/:userId', async (c: Context) => {
         type: relationship.relationship_type,
         startDate: relationship.start_date,
         daysTogether,
-        partner,
+        partner: {
+          id: partnerId,
+          name: partnerData?.name,
+          email: partnerData?.email,
+        },
         status: relationship.status
       }
     })
@@ -214,38 +262,54 @@ relationshipsApi.get('/user/:userId', async (c: Context) => {
 
 // PUT /api/relationships/:relationshipId
 // Update relationship info
-relationshipsApi.put('/:relationshipId', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const relationshipId = c.req.param('relationshipId')
-    const { relationshipType, startDate, anniversaryDate } = await c.req.json()
+relationshipsApi.put(
+  '/:relationshipId',
+  zValidator('json', updateRelationshipSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const relationshipId = c.req.param('relationshipId')
+      const { relationshipType, startDate, anniversaryDate } = c.req.valid('json' as never) as {
+        relationshipType?: string
+        startDate?: string
+        anniversaryDate?: string
+      }
 
-    await db.run(`
-      UPDATE relationships SET
-        relationship_type = COALESCE($1, relationship_type),
-        start_date = COALESCE($2, start_date),
-        anniversary_date = COALESCE($3, anniversary_date),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-    `, [relationshipType, startDate, anniversaryDate, relationshipId])
+      const updates: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      }
+      if (relationshipType !== undefined) updates.relationship_type = relationshipType
+      if (startDate !== undefined) updates.start_date = startDate
+      if (anniversaryDate !== undefined) updates.anniversary_date = anniversaryDate
 
-    return c.json({ success: true, message: 'Relationship updated' })
-  } catch (error) {
-    console.error('Update error:', error)
-    return c.json({ error: 'Failed to update relationship' }, 500)
+      const { error } = await supabase
+        .from('relationships')
+        .update(updates)
+        .eq('id', relationshipId)
+
+      if (error) throw error
+
+      return c.json({ success: true, message: 'Relationship updated' })
+    } catch (error) {
+      console.error('Update error:', error)
+      return c.json({ error: 'Failed to update relationship' }, 500)
+    }
   }
-})
+)
 
 // DELETE /api/relationships/:relationshipId
 // End relationship (soft delete)
 relationshipsApi.delete('/:relationshipId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const relationshipId = c.req.param('relationshipId')
 
-    await db.run(`
-      UPDATE relationships SET status = 'ended', updated_at = CURRENT_TIMESTAMP WHERE id = $1
-    `, [relationshipId])
+    const { error } = await supabase
+      .from('relationships')
+      .update({ status: 'ended', updated_at: new Date().toISOString() })
+      .eq('id', relationshipId)
+
+    if (error) throw error
 
     return c.json({ success: true, message: 'Relationship ended' })
   } catch (error) {
@@ -256,54 +320,73 @@ relationshipsApi.delete('/:relationshipId', async (c: Context) => {
 
 // POST /api/relationships/accept-invite
 // Accept partner invitation
-relationshipsApi.post('/accept-invite', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { inviteToken, acceptingUserId } = await c.req.json()
+relationshipsApi.post(
+  '/accept-invite',
+  zValidator('json', acceptInviteSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const { inviteToken, acceptingUserId } = c.req.valid('json' as never) as {
+        inviteToken: string
+        acceptingUserId: string
+      }
 
-    // Find invitation
-    const invitation = await db.first<any>(`
-      SELECT * FROM partner_invitations
-      WHERE invite_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-    `, [inviteToken])
+      // Find invitation
+      const { data: invitation, error: inviteErr } = await supabase
+        .from('partner_invitations')
+        .select('*')
+        .eq('invite_token', inviteToken)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
 
-    if (!invitation) {
-      return c.json({ error: 'Invalid or expired invitation' }, 400)
+      if (inviteErr) throw inviteErr
+      if (!invitation) {
+        return c.json({ error: 'Invalid or expired invitation' }, 400)
+      }
+
+      // Create relationship
+      const relationshipId = `rel_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const now = new Date().toISOString()
+
+      const { error: relErr } = await supabase
+        .from('relationships')
+        .insert({
+          id: relationshipId,
+          user_1_id: invitation.inviter_user_id,
+          user_2_id: acceptingUserId,
+          relationship_type: invitation.relationship_type,
+          start_date: now,
+          status: 'active',
+          created_at: now,
+        })
+
+      if (relErr) throw relErr
+
+      // Update invitation status
+      const { error: updateErr } = await supabase
+        .from('partner_invitations')
+        .update({ status: 'accepted', accepted_at: now })
+        .eq('id', invitation.id)
+
+      if (updateErr) throw updateErr
+
+      return c.json({
+        success: true,
+        relationshipId,
+        message: 'Invitation accepted! You are now connected.'
+      })
+    } catch (error) {
+      console.error('Accept invite error:', error)
+      return c.json({ error: 'Failed to accept invitation' }, 500)
     }
-
-    // Create relationship
-    const relationshipId = `rel_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-    await db.run(`
-      INSERT INTO relationships (id, user_1_id, user_2_id, relationship_type, start_date, status, created_at)
-      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP)
-    `, [
-      relationshipId,
-      invitation.inviter_user_id,
-      acceptingUserId,
-      invitation.relationship_type
-    ])
-
-    // Update invitation status
-    await db.run(`
-      UPDATE partner_invitations SET status = 'accepted', accepted_at = CURRENT_TIMESTAMP WHERE id = $1
-    `, [invitation.id])
-
-    return c.json({
-      success: true,
-      relationshipId,
-      message: 'Invitation accepted! You are now connected.'
-    })
-  } catch (error) {
-    console.error('Accept invite error:', error)
-    return c.json({ error: 'Failed to accept invitation' }, 500)
   }
-})
+)
 
 // GET /api/partner/comparison - Get quiz comparison data
 relationshipsApi.get('/partner/comparison', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const relationshipId = c.req.query('relationshipId')
     const userId = c.req.query('userId')
 
@@ -312,10 +395,13 @@ relationshipsApi.get('/partner/comparison', async (c: Context) => {
     }
 
     // Get relationship to find partner
-    const relationship = await db.first<any>(`
-      SELECT * FROM relationships WHERE id = $1
-    `, [relationshipId])
+    const { data: relationship, error: relErr } = await supabase
+      .from('relationships')
+      .select('*')
+      .eq('id', relationshipId)
+      .maybeSingle()
 
+    if (relErr) throw relErr
     if (!relationship) {
       return c.json({ error: 'Relationship not found' }, 404)
     }
@@ -325,33 +411,31 @@ relationshipsApi.get('/partner/comparison', async (c: Context) => {
       : relationship.user_1_id
 
     // Get both users' data
-    const [user, partner] = await Promise.all([
-      db.first<any>(`
-        SELECT id, name, primary_love_language, secondary_love_language
-        FROM users WHERE id = $1
-      `, [userId]),
-      db.first<any>(`
-        SELECT id, name, primary_love_language, secondary_love_language
-        FROM users WHERE id = $1
-      `, [partnerId])
-    ])
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('id, name, primary_love_language, secondary_love_language')
+      .in('id', [userId, partnerId])
+
+    if (usersErr) throw usersErr
+
+    const user = users?.find(u => u.id === userId)
+    const partner = users?.find(u => u.id === partnerId)
 
     // In production, this would query quiz responses and calculate detailed compatibility
-    // For now, return mock comparison data
     const comparison = {
       relationshipId,
       users: {
         user: {
-          id: user.id,
-          name: user.name,
-          primaryLoveLanguage: user.primary_love_language,
-          secondaryLoveLanguage: user.secondary_love_language
+          id: user?.id,
+          name: user?.name,
+          primaryLoveLanguage: user?.primary_love_language,
+          secondaryLoveLanguage: user?.secondary_love_language
         },
         partner: {
-          id: partner.id,
-          name: partner.name,
-          primaryLoveLanguage: partner.primary_love_language,
-          secondaryLoveLanguage: partner.secondary_love_language
+          id: partner?.id,
+          name: partner?.name,
+          primaryLoveLanguage: partner?.primary_love_language,
+          secondaryLoveLanguage: partner?.secondary_love_language
         }
       },
       compatibility: {

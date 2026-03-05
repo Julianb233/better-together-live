@@ -1,10 +1,17 @@
 // Better Together: Challenges API
 // Handles relationship challenges and participation tracking
+// Migrated from Neon raw SQL to Supabase query builder
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { zValidator } from '@hono/zod-validator'
+import {
+  challengesQuerySchema,
+  startChallengeSchema,
+  updateProgressSchema,
+  createEntrySchema,
+} from '../lib/validation/schemas/challenges'
 import {
   generateId,
   getCurrentDate,
@@ -13,30 +20,39 @@ import {
 
 const challengesApi = new Hono()
 
+function getSupabaseEnv(c: Context): SupabaseEnv {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
+}
+
 // GET /api/challenges
 // Get available challenges
 challengesApi.get('/', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const category = c.req.query('category')
     const difficulty = c.req.query('difficulty')
 
-    let query = 'SELECT * FROM challenges WHERE is_template = true'
-    const params: any[] = []
+    let query = supabase
+      .from('challenges')
+      .select('*')
+      .eq('is_template', true)
+      .order('created_at', { ascending: false })
 
     if (category) {
-      query += ` AND category = $${params.length + 1}`
-      params.push(category)
+      query = query.eq('category', category)
     }
 
     if (difficulty) {
-      query += ` AND difficulty_level = $${params.length + 1}`
-      params.push(difficulty)
+      query = query.eq('difficulty_level', difficulty)
     }
 
-    query += ' ORDER BY created_at DESC'
+    const { data: results, error } = await query
 
-    const results = await db.all(query, params)
+    if (error) throw error
 
     return c.json({ challenges: results || [] })
   } catch (error) {
@@ -47,83 +63,107 @@ challengesApi.get('/', async (c: Context) => {
 
 // POST /api/challenges/:challengeId/start
 // Start challenge participation
-challengesApi.post('/:challengeId/start', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const challengeId = c.req.param('challengeId')
-    const { relationship_id } = await c.req.json()
+challengesApi.post(
+  '/:challengeId/start',
+  zValidator('json', startChallengeSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const challengeId = c.req.param('challengeId')
+      const { relationship_id } = c.req.valid('json' as never) as { relationship_id: string }
 
-    if (!relationship_id) {
-      return c.json({ error: 'Relationship ID is required' }, 400)
+      // Get challenge details
+      const { data: challenge, error: challengeErr } = await supabase
+        .from('challenges')
+        .select('*')
+        .eq('id', challengeId)
+        .maybeSingle()
+
+      if (challengeErr) throw challengeErr
+      if (!challenge) {
+        return c.json({ error: 'Challenge not found' }, 404)
+      }
+
+      const participationId = generateId()
+      const today = getCurrentDate()
+      const now = getCurrentDateTime()
+
+      // Calculate target end date
+      let targetEndDate = null
+      if (challenge.duration_days) {
+        const endDate = new Date()
+        endDate.setDate(endDate.getDate() + challenge.duration_days)
+        targetEndDate = endDate.toISOString().split('T')[0]
+      }
+
+      const { error: insertErr } = await supabase
+        .from('challenge_participation')
+        .insert({
+          id: participationId,
+          relationship_id,
+          challenge_id: challengeId,
+          start_date: today,
+          target_end_date: targetEndDate,
+          status: 'active',
+          progress_percentage: 0,
+          created_at: now,
+          updated_at: now,
+        })
+
+      if (insertErr) throw insertErr
+
+      return c.json({
+        message: 'Challenge started successfully',
+        participation_id: participationId
+      })
+    } catch (error) {
+      console.error('Start challenge error:', error)
+      return c.json({ error: 'Failed to start challenge' }, 500)
     }
-
-    // Get challenge details
-    const challenge = await db.first<any>(
-      'SELECT * FROM challenges WHERE id = $1',
-      [challengeId]
-    )
-
-    if (!challenge) {
-      return c.json({ error: 'Challenge not found' }, 404)
-    }
-
-    const participationId = generateId()
-    const today = getCurrentDate()
-    const now = getCurrentDateTime()
-
-    // Calculate target end date
-    let targetEndDate = null
-    if (challenge.duration_days) {
-      const endDate = new Date()
-      endDate.setDate(endDate.getDate() + challenge.duration_days)
-      targetEndDate = endDate.toISOString().split('T')[0]
-    }
-
-    await db.run(`
-      INSERT INTO challenge_participation (
-        id, relationship_id, challenge_id, start_date, target_end_date,
-        status, progress_percentage, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, 'active', 0, $6, $7)
-    `, [participationId, relationship_id, challengeId, today, targetEndDate, now, now])
-
-    return c.json({
-      message: 'Challenge started successfully',
-      participation_id: participationId
-    })
-  } catch (error) {
-    console.error('Start challenge error:', error)
-    return c.json({ error: 'Failed to start challenge' }, 500)
   }
-})
+)
 
 // GET /api/challenges/participation/:relationshipId
 // Get challenge participation for relationship
 challengesApi.get('/participation/:relationshipId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const relationshipId = c.req.param('relationshipId')
     const status = c.req.query('status') || 'all'
 
-    let query = `
-      SELECT cp.*, c.challenge_name, c.challenge_description, c.category, c.difficulty_level
-      FROM challenge_participation cp
-      JOIN challenges c ON cp.challenge_id = c.id
-      WHERE cp.relationship_id = $1
-    `
-
-    const params: any[] = [relationshipId]
+    let query = supabase
+      .from('challenge_participation')
+      .select(`
+        *,
+        challenges (
+          challenge_name,
+          challenge_description,
+          category,
+          difficulty_level
+        )
+      `)
+      .eq('relationship_id', relationshipId)
+      .order('created_at', { ascending: false })
 
     if (status !== 'all') {
-      query += ' AND cp.status = $2'
-      params.push(status)
+      query = query.eq('status', status)
     }
 
-    query += ' ORDER BY cp.created_at DESC'
+    const { data: results, error } = await query
 
-    const results = await db.all(query, params)
+    if (error) throw error
 
-    return c.json({ participations: results || [] })
+    // Flatten the nested challenge data to match original response shape
+    const participations = (results || []).map((cp: any) => ({
+      ...cp,
+      challenge_name: cp.challenges?.challenge_name,
+      challenge_description: cp.challenges?.challenge_description,
+      category: cp.challenges?.category,
+      difficulty_level: cp.challenges?.difficulty_level,
+      challenges: undefined,
+    }))
+
+    return c.json({ participations })
   } catch (error) {
     console.error('Get challenge participation error:', error)
     return c.json({ error: 'Failed to get challenge participation' }, 500)
@@ -132,172 +172,200 @@ challengesApi.get('/participation/:relationshipId', async (c: Context) => {
 
 // PUT /api/challenges/participation/:participationId/progress
 // Update challenge progress
-challengesApi.put('/participation/:participationId/progress', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const participationId = c.req.param('participationId')
-    const { progress_percentage, completion_notes, status } = await c.req.json()
-
-    // Validate progress percentage
-    if (progress_percentage !== undefined && (progress_percentage < 0 || progress_percentage > 100)) {
-      return c.json({ error: 'Progress percentage must be between 0 and 100' }, 400)
-    }
-
-    // Get current participation
-    const participation = await db.first<any>(
-      'SELECT * FROM challenge_participation WHERE id = $1',
-      [participationId]
-    )
-
-    if (!participation) {
-      return c.json({ error: 'Challenge participation not found' }, 404)
-    }
-
-    const now = getCurrentDateTime()
-    const today = getCurrentDate()
-
-    // Determine new status
-    let newStatus = status || participation.status
-    let actualEndDate = participation.actual_end_date
-
-    // Auto-complete if progress reaches 100%
-    if (progress_percentage === 100 && newStatus !== 'completed') {
-      newStatus = 'completed'
-      actualEndDate = today
-    }
-
-    await db.run(`
-      UPDATE challenge_participation
-      SET progress_percentage = COALESCE($1, progress_percentage),
-          completion_notes = COALESCE($2, completion_notes),
-          status = $3,
-          actual_end_date = $4,
-          updated_at = $5
-      WHERE id = $6
-    `, [
-      progress_percentage,
-      completion_notes,
-      newStatus,
-      actualEndDate,
-      now,
-      participationId
-    ])
-
-    return c.json({
-      success: true,
-      message: newStatus === 'completed' ? 'Challenge completed!' : 'Progress updated',
-      participation: {
-        id: participationId,
-        progress_percentage: progress_percentage ?? participation.progress_percentage,
-        status: newStatus,
-        actual_end_date: actualEndDate
+challengesApi.put(
+  '/participation/:participationId/progress',
+  zValidator('json', updateProgressSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const participationId = c.req.param('participationId')
+      const { progress_percentage, completion_notes, status } = c.req.valid('json' as never) as {
+        progress_percentage?: number
+        completion_notes?: string
+        status?: string
       }
-    })
-  } catch (error) {
-    console.error('Update challenge progress error:', error)
-    return c.json({ error: 'Failed to update progress' }, 500)
-  }
-})
 
-// POST /api/challenges/participation/:participationId/entry
-// Add a challenge entry (daily/weekly log)
-challengesApi.post('/participation/:participationId/entry', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const participationId = c.req.param('participationId')
-    const { user_id, entry_content, reflection, completion_status } = await c.req.json()
+      // Get current participation
+      const { data: participation, error: fetchErr } = await supabase
+        .from('challenge_participation')
+        .select('*')
+        .eq('id', participationId)
+        .maybeSingle()
 
-    if (!user_id) {
-      return c.json({ error: 'User ID is required' }, 400)
-    }
+      if (fetchErr) throw fetchErr
+      if (!participation) {
+        return c.json({ error: 'Challenge participation not found' }, 404)
+      }
 
-    // Verify participation exists
-    const participation = await db.first<any>(
-      'SELECT * FROM challenge_participation WHERE id = $1',
-      [participationId]
-    )
+      const now = getCurrentDateTime()
+      const today = getCurrentDate()
 
-    if (!participation) {
-      return c.json({ error: 'Challenge participation not found' }, 404)
-    }
+      // Determine new status
+      let newStatus = status || participation.status
+      let actualEndDate = participation.actual_end_date
 
-    const entryId = generateId()
-    const today = getCurrentDate()
-    const now = getCurrentDateTime()
+      // Auto-complete if progress reaches 100%
+      if (progress_percentage === 100 && newStatus !== 'completed') {
+        newStatus = 'completed'
+        actualEndDate = today
+      }
 
-    // Check if entry already exists for today
-    const existingEntry = await db.first<any>(
-      'SELECT id FROM challenge_entries WHERE participation_id = $1 AND user_id = $2 AND entry_date = $3',
-      [participationId, user_id, today]
-    )
+      const { error: updateErr } = await supabase
+        .from('challenge_participation')
+        .update({
+          progress_percentage: progress_percentage ?? participation.progress_percentage,
+          completion_notes: completion_notes ?? participation.completion_notes,
+          status: newStatus,
+          actual_end_date: actualEndDate,
+          updated_at: now,
+        })
+        .eq('id', participationId)
 
-    if (existingEntry) {
-      // Update existing entry
-      await db.run(`
-        UPDATE challenge_entries
-        SET entry_content = COALESCE($1, entry_content),
-            reflection = COALESCE($2, reflection),
-            completion_status = COALESCE($3, completion_status)
-        WHERE id = $4
-      `, [entry_content, reflection, completion_status, existingEntry.id])
+      if (updateErr) throw updateErr
 
       return c.json({
         success: true,
-        message: 'Entry updated',
-        entryId: existingEntry.id
+        message: newStatus === 'completed' ? 'Challenge completed!' : 'Progress updated',
+        participation: {
+          id: participationId,
+          progress_percentage: progress_percentage ?? participation.progress_percentage,
+          status: newStatus,
+          actual_end_date: actualEndDate
+        }
       })
+    } catch (error) {
+      console.error('Update challenge progress error:', error)
+      return c.json({ error: 'Failed to update progress' }, 500)
     }
-
-    // Create new entry
-    await db.run(`
-      INSERT INTO challenge_entries (id, participation_id, user_id, entry_date, entry_content, reflection, completion_status, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `, [entryId, participationId, user_id, today, entry_content, reflection, completion_status || false, now])
-
-    // Calculate and update overall progress
-    const challenge = await db.first<any>(
-      'SELECT duration_days FROM challenges WHERE id = $1',
-      [participation.challenge_id]
-    )
-
-    if (challenge && challenge.duration_days) {
-      const entriesResult = await db.first<{ count: number }>(
-        'SELECT COUNT(*) as count FROM challenge_entries WHERE participation_id = $1 AND completion_status = true',
-        [participationId]
-      )
-      const completedEntries = entriesResult?.count || 0
-      const newProgress = Math.min(100, Math.round((completedEntries / challenge.duration_days) * 100))
-
-      await db.run(
-        'UPDATE challenge_participation SET progress_percentage = $1, updated_at = $2 WHERE id = $3',
-        [newProgress, now, participationId]
-      )
-    }
-
-    return c.json({
-      success: true,
-      message: 'Entry created',
-      entryId
-    })
-  } catch (error) {
-    console.error('Create challenge entry error:', error)
-    return c.json({ error: 'Failed to create entry' }, 500)
   }
-})
+)
+
+// POST /api/challenges/participation/:participationId/entry
+// Add a challenge entry (daily/weekly log)
+challengesApi.post(
+  '/participation/:participationId/entry',
+  zValidator('json', createEntrySchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const participationId = c.req.param('participationId')
+      const { user_id, entry_content, reflection, completion_status } = c.req.valid('json' as never) as {
+        user_id: string
+        entry_content?: string
+        reflection?: string
+        completion_status?: boolean
+      }
+
+      // Verify participation exists
+      const { data: participation, error: fetchErr } = await supabase
+        .from('challenge_participation')
+        .select('*')
+        .eq('id', participationId)
+        .maybeSingle()
+
+      if (fetchErr) throw fetchErr
+      if (!participation) {
+        return c.json({ error: 'Challenge participation not found' }, 404)
+      }
+
+      const entryId = generateId()
+      const today = getCurrentDate()
+      const now = getCurrentDateTime()
+
+      // Check if entry already exists for today
+      const { data: existingEntry } = await supabase
+        .from('challenge_entries')
+        .select('id')
+        .eq('participation_id', participationId)
+        .eq('user_id', user_id)
+        .eq('entry_date', today)
+        .maybeSingle()
+
+      if (existingEntry) {
+        // Update existing entry
+        const { error: updateErr } = await supabase
+          .from('challenge_entries')
+          .update({
+            entry_content: entry_content ?? undefined,
+            reflection: reflection ?? undefined,
+            completion_status: completion_status ?? undefined,
+          })
+          .eq('id', existingEntry.id)
+
+        if (updateErr) throw updateErr
+
+        return c.json({
+          success: true,
+          message: 'Entry updated',
+          entryId: existingEntry.id
+        })
+      }
+
+      // Create new entry
+      const { error: insertErr } = await supabase
+        .from('challenge_entries')
+        .insert({
+          id: entryId,
+          participation_id: participationId,
+          user_id,
+          entry_date: today,
+          entry_content: entry_content || null,
+          reflection: reflection || null,
+          completion_status: completion_status || false,
+          created_at: now,
+        })
+
+      if (insertErr) throw insertErr
+
+      // Calculate and update overall progress
+      const { data: challenge } = await supabase
+        .from('challenges')
+        .select('duration_days')
+        .eq('id', participation.challenge_id)
+        .maybeSingle()
+
+      if (challenge && challenge.duration_days) {
+        const { count } = await supabase
+          .from('challenge_entries')
+          .select('*', { count: 'exact', head: true })
+          .eq('participation_id', participationId)
+          .eq('completion_status', true)
+
+        const completedEntries = count || 0
+        const newProgress = Math.min(100, Math.round((completedEntries / challenge.duration_days) * 100))
+
+        await supabase
+          .from('challenge_participation')
+          .update({ progress_percentage: newProgress, updated_at: now })
+          .eq('id', participationId)
+      }
+
+      return c.json({
+        success: true,
+        message: 'Entry created',
+        entryId
+      })
+    } catch (error) {
+      console.error('Create challenge entry error:', error)
+      return c.json({ error: 'Failed to create entry' }, 500)
+    }
+  }
+)
 
 // GET /api/challenges/participation/:participationId/entries
 // Get all entries for a challenge participation
 challengesApi.get('/participation/:participationId/entries', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const participationId = c.req.param('participationId')
 
-    const entries = await db.all(
-      `SELECT * FROM challenge_entries
-       WHERE participation_id = $1
-       ORDER BY entry_date DESC`,
-      [participationId]
-    )
+    const { data: entries, error } = await supabase
+      .from('challenge_entries')
+      .select('*')
+      .eq('participation_id', participationId)
+      .order('entry_date', { ascending: false })
+
+    if (error) throw error
 
     return c.json({ entries: entries || [] })
   } catch (error) {

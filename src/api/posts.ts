@@ -1,167 +1,184 @@
 // Better Together: Posts API
 // Handles post creation, retrieval, updates, deletion, and sharing
+// Migrated from Neon raw SQL to Supabase query builder
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { zValidator } from '@hono/zod-validator'
+import {
+  createPostSchema,
+  updatePostSchema,
+  sharePostSchema,
+} from '../lib/validation/schemas/social'
 import { sanitizeTextInput } from '../lib/sanitize'
 
 const postsApi = new Hono()
 
-// POST /api/posts - Create a new post
-postsApi.post('/', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const {
-      authorId,
-      content,
-      mediaUrls,
-      visibility,
-      communityId,
-      contentType,
-      relationshipId,
-      linkedActivityId,
-      linkedChallengeId,
-      linkedAchievementId
-    } = await c.req.json()
-
-    // Validation
-    if (!authorId) {
-      return c.json({ error: 'Author ID required' }, 400)
-    }
-
-    if (!content && (!mediaUrls || mediaUrls.length === 0)) {
-      return c.json({ error: 'Either content or media URLs required' }, 400)
-    }
-
-    if (!visibility) {
-      return c.json({ error: 'Visibility setting required' }, 400)
-    }
-
-    const validVisibilities = ['public', 'community', 'connections', 'private']
-    if (!validVisibilities.includes(visibility)) {
-      return c.json({ error: 'Invalid visibility setting' }, 400)
-    }
-
-    // If posting to a community, verify membership
-    if (communityId) {
-      const membership = await db.first<{ id: string; status: string }>(`
-        SELECT id, status FROM community_members
-        WHERE community_id = $1 AND user_id = $2
-      `, [communityId, authorId])
-
-      if (!membership || membership.status !== 'active') {
-        return c.json({ error: 'Not a member of this community' }, 403)
-      }
-    }
-
-    // Create post
-    const postId = `post_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-    await db.run(`
-      INSERT INTO posts (
-        id, author_id, relationship_id, community_id,
-        content_type, content, media_urls,
-        linked_activity_id, linked_challenge_id, linked_achievement_id,
-        visibility,
-        like_count, comment_count, share_count,
-        created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-    `, [
-      postId,
-      authorId,
-      relationshipId || null,
-      communityId || null,
-      contentType || 'text',
-      content ? sanitizeTextInput(content) : null,
-      mediaUrls ? JSON.stringify(mediaUrls) : null,
-      linkedActivityId || null,
-      linkedChallengeId || null,
-      linkedAchievementId || null,
-      visibility
-    ])
-
-    // Update community post count
-    if (communityId) {
-      await db.run(`
-        UPDATE communities
-        SET post_count = post_count + 1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `, [communityId])
-    }
-
-    // Fetch created post with author info
-    const post = await db.first<any>(`
-      SELECT
-        p.*,
-        u.name as author_name,
-        u.profile_photo_url as author_photo
-      FROM posts p
-      LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.id = $1
-    `, [postId])
-
-    return c.json({
-      success: true,
-      post: {
-        id: post.id,
-        authorId: post.author_id,
-        authorName: post.author_name,
-        authorPhoto: post.author_photo,
-        relationshipId: post.relationship_id,
-        communityId: post.community_id,
-        contentType: post.content_type,
-        content: post.content,
-        mediaUrls: post.media_urls ? JSON.parse(post.media_urls) : [],
-        visibility: post.visibility,
-        isPinned: post.is_pinned,
-        isFeatured: post.is_featured,
-        likeCount: post.like_count,
-        commentCount: post.comment_count,
-        shareCount: post.share_count,
-        createdAt: post.created_at,
-        updatedAt: post.updated_at
-      }
-    }, 201)
-  } catch (error) {
-    console.error('Create post error:', error)
-    return c.json({ error: 'Failed to create post' }, 500)
+function getSupabaseEnv(c: Context): SupabaseEnv {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
   }
-})
+}
+
+// POST /api/posts - Create a new post
+postsApi.post(
+  '/',
+  zValidator('json', createPostSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const body = c.req.valid('json' as never) as {
+        authorId: string
+        content?: string
+        mediaUrls?: string[]
+        visibility: string
+        communityId?: string | null
+        contentType?: string
+        relationshipId?: string | null
+        linkedActivityId?: string | null
+        linkedChallengeId?: string | null
+        linkedAchievementId?: string | null
+      }
+
+      // If posting to a community, verify membership
+      if (body.communityId) {
+        const { data: membership } = await supabase
+          .from('community_members')
+          .select('id, status')
+          .eq('community_id', body.communityId)
+          .eq('user_id', body.authorId)
+          .maybeSingle()
+
+        if (!membership || membership.status !== 'active') {
+          return c.json({ error: 'Not a member of this community' }, 403)
+        }
+      }
+
+      // Create post
+      const postId = `post_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const now = new Date().toISOString()
+
+      const { error: insertErr } = await supabase
+        .from('posts')
+        .insert({
+          id: postId,
+          author_id: body.authorId,
+          relationship_id: body.relationshipId || null,
+          community_id: body.communityId || null,
+          content_type: body.contentType || 'text',
+          content: body.content ? sanitizeTextInput(body.content) : null,
+          media_urls: body.mediaUrls ? JSON.stringify(body.mediaUrls) : null,
+          linked_activity_id: body.linkedActivityId || null,
+          linked_challenge_id: body.linkedChallengeId || null,
+          linked_achievement_id: body.linkedAchievementId || null,
+          visibility: body.visibility,
+          like_count: 0,
+          comment_count: 0,
+          share_count: 0,
+          created_at: now,
+          updated_at: now,
+        })
+
+      if (insertErr) throw insertErr
+
+      // Update community post count
+      if (body.communityId) {
+        // Use RPC or manual increment
+        const { data: comm } = await supabase
+          .from('communities')
+          .select('post_count')
+          .eq('id', body.communityId)
+          .single()
+
+        if (comm) {
+          await supabase
+            .from('communities')
+            .update({ post_count: (comm.post_count || 0) + 1, updated_at: now })
+            .eq('id', body.communityId)
+        }
+      }
+
+      // Fetch created post with author info
+      const { data: post } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .single()
+
+      const { data: author } = await supabase
+        .from('users')
+        .select('name, profile_photo_url')
+        .eq('id', body.authorId)
+        .maybeSingle()
+
+      return c.json({
+        success: true,
+        post: {
+          id: post!.id,
+          authorId: post!.author_id,
+          authorName: author?.name,
+          authorPhoto: author?.profile_photo_url,
+          relationshipId: post!.relationship_id,
+          communityId: post!.community_id,
+          contentType: post!.content_type,
+          content: post!.content,
+          mediaUrls: post!.media_urls ? JSON.parse(post!.media_urls as string) : [],
+          visibility: post!.visibility,
+          isPinned: post!.is_pinned,
+          isFeatured: post!.is_featured,
+          likeCount: post!.like_count,
+          commentCount: post!.comment_count,
+          shareCount: post!.share_count,
+          createdAt: post!.created_at,
+          updatedAt: post!.updated_at
+        }
+      }, 201)
+    } catch (error) {
+      console.error('Create post error:', error)
+      return c.json({ error: 'Failed to create post' }, 500)
+    }
+  }
+)
 
 // GET /api/posts/:id - Get a single post
 postsApi.get('/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('id')
-    const userId = c.req.query('userId') // For permission checking
+    const userId = c.req.query('userId')
 
-    // Fetch post with author info
-    const post = await db.first<any>(`
-      SELECT
-        p.*,
-        u.name as author_name,
-        u.profile_photo_url as author_photo,
-        u.email as author_email
-      FROM posts p
-      LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.id = $1 AND p.deleted_at IS NULL
-    `, [postId])
+    // Fetch post
+    const { data: post, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
+    if (error) throw error
     if (!post) {
       return c.json({ error: 'Post not found' }, 404)
     }
 
+    // Get author info
+    const { data: author } = await supabase
+      .from('users')
+      .select('name, profile_photo_url, email')
+      .eq('id', post.author_id)
+      .maybeSingle()
+
     // Check visibility permissions
     if (userId) {
       // Check if user is blocked
-      const isBlocked = await db.first<{ id: string }>(`
-        SELECT id FROM user_blocks
-        WHERE blocker_id = $1 AND blocked_id = $2
-      `, [post.author_id, userId])
+      const { data: isBlocked } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .eq('blocker_id', post.author_id)
+        .eq('blocked_id', userId)
+        .maybeSingle()
 
       if (isBlocked) {
         return c.json({ error: 'Post not found' }, 404)
@@ -173,10 +190,13 @@ postsApi.get('/:id', async (c: Context) => {
       }
 
       if (post.visibility === 'community' && post.community_id) {
-        const membership = await db.first<{ id: string }>(`
-          SELECT id FROM community_members
-          WHERE community_id = $1 AND user_id = $2 AND status = 'active'
-        `, [post.community_id, userId])
+        const { data: membership } = await supabase
+          .from('community_members')
+          .select('id')
+          .eq('community_id', post.community_id)
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .maybeSingle()
 
         if (!membership) {
           return c.json({ error: 'Access denied' }, 403)
@@ -184,10 +204,13 @@ postsApi.get('/:id', async (c: Context) => {
       }
 
       if (post.visibility === 'connections') {
-        const isConnected = await db.first<{ id: string }>(`
-          SELECT id FROM user_connections
-          WHERE follower_id = $1 AND following_id = $2 AND status = 'accepted'
-        `, [userId, post.author_id])
+        const { data: isConnected } = await supabase
+          .from('user_connections')
+          .select('id')
+          .eq('follower_id', userId)
+          .eq('following_id', post.author_id)
+          .eq('status', 'accepted')
+          .maybeSingle()
 
         if (!isConnected && post.author_id !== userId) {
           return c.json({ error: 'Access denied' }, 403)
@@ -200,10 +223,13 @@ postsApi.get('/:id', async (c: Context) => {
     // Get user's reaction if logged in
     let userReaction = null
     if (userId) {
-      const reaction = await db.first<{ reaction_type: string }>(`
-        SELECT reaction_type FROM reactions
-        WHERE user_id = $1 AND target_type = 'post' AND target_id = $2
-      `, [userId, postId])
+      const { data: reaction } = await supabase
+        .from('reactions')
+        .select('reaction_type')
+        .eq('user_id', userId)
+        .eq('target_type', 'post')
+        .eq('target_id', postId)
+        .maybeSingle()
 
       userReaction = reaction?.reaction_type || null
     }
@@ -211,13 +237,13 @@ postsApi.get('/:id', async (c: Context) => {
     return c.json({
       id: post.id,
       authorId: post.author_id,
-      authorName: post.author_name,
-      authorPhoto: post.author_photo,
+      authorName: author?.name,
+      authorPhoto: author?.profile_photo_url,
       relationshipId: post.relationship_id,
       communityId: post.community_id,
       contentType: post.content_type,
       content: post.content,
-      mediaUrls: post.media_urls ? JSON.parse(post.media_urls) : [],
+      mediaUrls: post.media_urls ? JSON.parse(post.media_urls as string) : [],
       linkedActivityId: post.linked_activity_id,
       linkedChallengeId: post.linked_challenge_id,
       linkedAchievementId: post.linked_achievement_id,
@@ -238,63 +264,61 @@ postsApi.get('/:id', async (c: Context) => {
 })
 
 // PUT /api/posts/:id - Update a post
-postsApi.put('/:id', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const postId = c.req.param('id')
-    const { userId, content, mediaUrls, visibility } = await c.req.json()
-
-    if (!userId) {
-      return c.json({ error: 'User ID required' }, 400)
-    }
-
-    // Check if user is the author
-    const post = await db.first<{ author_id: string }>(`
-      SELECT author_id FROM posts WHERE id = $1 AND deleted_at IS NULL
-    `, [postId])
-
-    if (!post) {
-      return c.json({ error: 'Post not found' }, 404)
-    }
-
-    if (post.author_id !== userId) {
-      return c.json({ error: 'Only the author can update this post' }, 403)
-    }
-
-    // Validate visibility if provided
-    if (visibility) {
-      const validVisibilities = ['public', 'community', 'connections', 'private']
-      if (!validVisibilities.includes(visibility)) {
-        return c.json({ error: 'Invalid visibility setting' }, 400)
+postsApi.put(
+  '/:id',
+  zValidator('json', updatePostSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const postId = c.req.param('id')
+      const { userId, content, mediaUrls, visibility } = c.req.valid('json' as never) as {
+        userId: string
+        content?: string
+        mediaUrls?: string[]
+        visibility?: string
       }
+
+      // Check if user is the author
+      const { data: post } = await supabase
+        .from('posts')
+        .select('author_id')
+        .eq('id', postId)
+        .is('deleted_at', null)
+        .maybeSingle()
+
+      if (!post) {
+        return c.json({ error: 'Post not found' }, 404)
+      }
+
+      if (post.author_id !== userId) {
+        return c.json({ error: 'Only the author can update this post' }, 403)
+      }
+
+      // Update post
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+      if (content !== undefined) updates.content = content ? sanitizeTextInput(content) : null
+      if (mediaUrls !== undefined) updates.media_urls = mediaUrls ? JSON.stringify(mediaUrls) : null
+      if (visibility !== undefined) updates.visibility = visibility
+
+      const { error } = await supabase
+        .from('posts')
+        .update(updates)
+        .eq('id', postId)
+
+      if (error) throw error
+
+      return c.json({ success: true, message: 'Post updated' })
+    } catch (error) {
+      console.error('Update post error:', error)
+      return c.json({ error: 'Failed to update post' }, 500)
     }
-
-    // Update post
-    await db.run(`
-      UPDATE posts SET
-        content = COALESCE($1, content),
-        media_urls = COALESCE($2, media_urls),
-        visibility = COALESCE($3, visibility),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-    `, [
-      content ? sanitizeTextInput(content) : null,
-      mediaUrls ? JSON.stringify(mediaUrls) : null,
-      visibility || null,
-      postId
-    ])
-
-    return c.json({ success: true, message: 'Post updated' })
-  } catch (error) {
-    console.error('Update post error:', error)
-    return c.json({ error: 'Failed to update post' }, 500)
   }
-})
+)
 
 // DELETE /api/posts/:id - Delete a post (soft delete)
 postsApi.delete('/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('id')
     const userId = c.req.query('userId')
 
@@ -303,11 +327,12 @@ postsApi.delete('/:id', async (c: Context) => {
     }
 
     // Check if user is the author or community moderator
-    const post = await db.first<any>(`
-      SELECT p.author_id, p.community_id
-      FROM posts p
-      WHERE p.id = $1 AND p.deleted_at IS NULL
-    `, [postId])
+    const { data: post } = await supabase
+      .from('posts')
+      .select('author_id, community_id')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!post) {
       return c.json({ error: 'Post not found' }, 404)
@@ -317,10 +342,13 @@ postsApi.delete('/:id', async (c: Context) => {
 
     // Check if user is community moderator
     if (!canDelete && post.community_id) {
-      const moderator = await db.first<{ role: string }>(`
-        SELECT role FROM community_members
-        WHERE community_id = $1 AND user_id = $2 AND status = 'active'
-      `, [post.community_id, userId])
+      const { data: moderator } = await supabase
+        .from('community_members')
+        .select('role')
+        .eq('community_id', post.community_id)
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle()
 
       if (moderator && ['owner', 'admin', 'moderator'].includes(moderator.role)) {
         canDelete = true
@@ -332,17 +360,30 @@ postsApi.delete('/:id', async (c: Context) => {
     }
 
     // Soft delete
-    await db.run(`
-      UPDATE posts SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1
-    `, [postId])
+    const { error } = await supabase
+      .from('posts')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', postId)
+
+    if (error) throw error
 
     // Update community post count
     if (post.community_id) {
-      await db.run(`
-        UPDATE communities
-        SET post_count = GREATEST(post_count - 1, 0), updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `, [post.community_id])
+      const { data: comm } = await supabase
+        .from('communities')
+        .select('post_count')
+        .eq('id', post.community_id)
+        .single()
+
+      if (comm) {
+        await supabase
+          .from('communities')
+          .update({
+            post_count: Math.max((comm.post_count || 0) - 1, 0),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', post.community_id)
+      }
     }
 
     return c.json({ success: true, message: 'Post deleted' })
@@ -353,60 +394,78 @@ postsApi.delete('/:id', async (c: Context) => {
 })
 
 // POST /api/posts/:id/share - Share a post
-postsApi.post('/:id/share', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const postId = c.req.param('id')
-    const { userId, content, visibility, communityId } = await c.req.json()
+postsApi.post(
+  '/:id/share',
+  zValidator('json', sharePostSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const postId = c.req.param('id')
+      const { userId, content, visibility, communityId } = c.req.valid('json' as never) as {
+        userId: string
+        content?: string
+        visibility?: string
+        communityId?: string | null
+      }
 
-    if (!userId) {
-      return c.json({ error: 'User ID required' }, 400)
+      // Check if original post exists and is accessible
+      const { data: originalPost } = await supabase
+        .from('posts')
+        .select('id, visibility, author_id')
+        .eq('id', postId)
+        .is('deleted_at', null)
+        .maybeSingle()
+
+      if (!originalPost) {
+        return c.json({ error: 'Original post not found' }, 404)
+      }
+
+      // Create share post
+      const sharePostId = `post_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const now = new Date().toISOString()
+
+      const { error: insertErr } = await supabase
+        .from('posts')
+        .insert({
+          id: sharePostId,
+          author_id: userId,
+          community_id: communityId || null,
+          content_type: 'text',
+          content: content ? sanitizeTextInput(content) : `Shared a post from ${originalPost.author_id}`,
+          visibility: visibility || 'connections',
+          like_count: 0,
+          comment_count: 0,
+          share_count: 0,
+          created_at: now,
+          updated_at: now,
+        })
+
+      if (insertErr) throw insertErr
+
+      // Increment share count on original post
+      const { data: orig } = await supabase
+        .from('posts')
+        .select('share_count')
+        .eq('id', postId)
+        .single()
+
+      if (orig) {
+        await supabase
+          .from('posts')
+          .update({ share_count: (orig.share_count || 0) + 1 })
+          .eq('id', postId)
+      }
+
+      return c.json({
+        success: true,
+        sharePostId,
+        message: 'Post shared successfully'
+      })
+    } catch (error) {
+      console.error('Share post error:', error)
+      return c.json({ error: 'Failed to share post' }, 500)
     }
-
-    // Check if original post exists and is accessible
-    const originalPost = await db.first<{ id: string; visibility: string; author_id: string }>(`
-      SELECT id, visibility, author_id FROM posts WHERE id = $1 AND deleted_at IS NULL
-    `, [postId])
-
-    if (!originalPost) {
-      return c.json({ error: 'Original post not found' }, 404)
-    }
-
-    // Create share post
-    const sharePostId = `post_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-    await db.run(`
-      INSERT INTO posts (
-        id, author_id, community_id,
-        content_type, content,
-        visibility,
-        like_count, comment_count, share_count,
-        created_at, updated_at
-      ) VALUES (
-        $1, $2, $3, 'text', $4, $5, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-    `, [
-      sharePostId,
-      userId,
-      communityId || null,
-      content ? sanitizeTextInput(content) : `Shared a post from ${originalPost.author_id}`,
-      visibility || 'connections'
-    ])
-
-    // Increment share count on original post
-    await db.run(`
-      UPDATE posts SET share_count = share_count + 1 WHERE id = $1
-    `, [postId])
-
-    return c.json({
-      success: true,
-      sharePostId,
-      message: 'Post shared successfully'
-    })
-  } catch (error) {
-    console.error('Share post error:', error)
-    return c.json({ error: 'Failed to share post' }, 500)
   }
-})
+)
 
 export default postsApi
