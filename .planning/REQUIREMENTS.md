@@ -31,17 +31,17 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Database Consolidation
 
-- [ ] **DB-01**: All API routes use Supabase client (Neon adapter removed)
-- [ ] **DB-02**: Single migration system using Supabase migrations
-- [ ] **DB-03**: RLS policies applied and working (column names match, anon key used where appropriate)
-- [ ] **DB-04**: No raw SQL string interpolation in any API route
-- [ ] **DB-05**: Database connection handled via Supabase client (no per-request instantiation)
+- [x] **DB-01**: All API routes use Supabase client (Neon adapter removed)
+- [x] **DB-02**: Single migration system using Supabase migrations
+- [x] **DB-03**: RLS policies applied and working (column names match, anon key used where appropriate)
+- [x] **DB-04**: No raw SQL string interpolation in any API route
+- [x] **DB-05**: Database connection handled via Supabase client (no per-request instantiation)
 
 ### Input Validation
 
-- [ ] **VAL-01**: All API endpoints validate input with Zod schemas
-- [ ] **VAL-02**: Zod is listed in package.json dependencies
-- [ ] **VAL-03**: Invalid input returns 400 with descriptive error messages
+- [x] **VAL-01**: All API endpoints validate input with Zod schemas
+- [x] **VAL-02**: Zod is listed in package.json dependencies
+- [x] **VAL-03**: Invalid input returns 400 with descriptive error messages
 
 ### AI Coach
 
@@ -67,13 +67,13 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Product Integrity
 
-- [ ] **INT-01**: All homepage CTA buttons link to real actions (no fake spinners)
-- [ ] **INT-02**: Fake social proof removed or replaced with real metrics
-- [ ] **INT-03**: Internal business metrics page (/in-app-purchases.html) removed or protected
-- [ ] **INT-04**: Unimplemented features (subscription boxes, human coaching, rewards, surprise credits) marked "coming soon" or removed from navigation
-- [ ] **INT-05**: "End-to-end encryption" claim removed (not implemented)
-- [ ] **INT-06**: "Watch Demo" buttons either link to real demo or removed
-- [ ] **INT-07**: Pricing unified to single consistent freemium model across homepage, paywall, premium page
+- [x] **INT-01**: All homepage CTA buttons link to real actions (no fake spinners)
+- [x] **INT-02**: Fake social proof removed or replaced with real metrics
+- [x] **INT-03**: Internal business metrics page (/in-app-purchases.html) removed or protected
+- [x] **INT-04**: Unimplemented features (subscription boxes, human coaching, rewards, surprise credits) marked "coming soon" or removed from navigation
+- [x] **INT-05**: "End-to-end encryption" claim removed (not implemented)
+- [x] **INT-06**: "Watch Demo" buttons either link to real demo or removed
+- [x] **INT-07**: Pricing unified to single consistent freemium model across homepage, paywall, premium page
 
 ### Testing
 
@@ -156,9 +156,9 @@ Deferred to future release. Tracked but not in current roadmap.
 |-------------|-------|--------|
 | SEC-01 thru SEC-10 | Phase 1 | Complete |
 | AUTH-01 thru AUTH-06 | Phase 2 | Complete |
-| DB-01 thru DB-05 | Phase 3 | Pending |
-| VAL-01 thru VAL-03 | Phase 3 | Pending |
-| INT-01 thru INT-07 | Phase 4 | Pending |
+| DB-01 thru DB-05 | Phase 3 | Complete |
+| VAL-01 thru VAL-03 | Phase 3 | Complete |
+| INT-01 thru INT-07 | Phase 4 | Complete |
 | PAY-01 thru PAY-06 | Phase 5 | Pending |
 | AI-01 thru AI-05 | Phase 6 | Pending |
 | ANL-01 thru ANL-02 | Phase 7 | Pending |

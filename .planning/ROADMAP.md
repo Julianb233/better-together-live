@@ -8,8 +8,8 @@ Take Better Together from a feature-rich but insecure prototype to a production-
 
 - [x] **Phase 1: Security Hardening** - Fix critical security vulnerabilities before any other work
 - [x] **Phase 2: Auth Consolidation** - Migrate to Supabase Auth as sole auth system
-- [ ] **Phase 3: Database Consolidation** - Migrate all routes from Neon to Supabase client, add input validation
-- [ ] **Phase 4: Product Integrity** - Fix fake CTAs, remove fake social proof, unify pricing, hide unimplemented features
+- [x] **Phase 3: Database Consolidation** - Migrate all routes from Neon to Supabase client, add input validation
+- [x] **Phase 4: Product Integrity** - Fix fake CTAs, remove fake social proof, unify pricing, hide unimplemented features
 - [ ] **Phase 5: Payment System** - Implement real Stripe subscriptions with freemium gating
 - [ ] **Phase 6: AI Coach** - Build tiered AI coach with Claude + OpenAI
 - [ ] **Phase 7: Analytics & Performance** - Replace mock analytics, fix N+1 queries, optimize discovery
@@ -68,11 +68,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 03-01: Install Zod, create shared validation schemas for all API endpoints
-- [ ] 03-02: Migrate API routes A-G (activities, ai-coach, analytics, auth, challenges, checkins, communities) from Neon to Supabase
-- [ ] 03-03: Migrate API routes D-M (dashboard, discovery, email, experiences, feed, gamification, goals, intimacy, messaging) from Neon to Supabase
-- [ ] 03-04: Migrate API routes N-V (notifications, payments, posts, push-notifications, quiz, recommendations, relationships, social, sponsors, users, video) from Neon to Supabase
-- [ ] 03-05: Fix RLS policies, consolidate migrations, delete Neon adapter and D1 migration files
+- [x] 03-01: Install Zod, create shared validation schemas for all API endpoints
+- [x] 03-02: Migrate API routes A-G (activities, ai-coach, analytics, auth, challenges, checkins, communities) from Neon to Supabase
+- [x] 03-03: Migrate API routes D-M (dashboard, discovery, email, experiences, feed, gamification, goals, intimacy, messaging) from Neon to Supabase
+- [x] 03-04: Migrate API routes N-V (notifications, payments, posts, push-notifications, quiz, recommendations, relationships, social, sponsors, users, video) from Neon to Supabase
+- [x] 03-05: Fix RLS policies, consolidate migrations, delete Neon adapter and D1 migration files
 
 ### Phase 4: Product Integrity
 **Goal**: Remove all fake/broken/leaked content — every page and button works honestly
@@ -87,9 +87,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Fix all homepage CTAs — link buttons to real pages (signup, login, pricing)
-- [ ] 04-02: Remove fake social proof, leaked business metrics, false encryption claims
-- [ ] 04-03: Unify pricing model across homepage, paywall, and premium pricing pages; mark unimplemented features as "coming soon"
+- [x] 04-01: Fix all homepage CTAs — link buttons to real pages (signup, login, pricing)
+- [x] 04-02: Remove fake social proof, leaked business metrics, false encryption claims
+- [x] 04-03: Unify pricing model across homepage, paywall, and premium pricing pages; mark unimplemented features as "coming soon"
 
 ### Phase 5: Payment System
 **Goal**: Working freemium Stripe subscription flow — users can upgrade, downgrade, and cancel
@@ -200,8 +200,8 @@ Phases execute in dependency order: 1 → 2 → 3 → 4 (parallel with 2) → 5 
 |-------|----------------|--------|-----------|
 | 1. Security Hardening | 5/5 | Complete | 2026-03-05 |
 | 2. Auth Consolidation | 3/3 | Complete | 2026-03-05 |
-| 3. Database Consolidation & Validation | 0/5 | Not started | - |
-| 4. Product Integrity | 0/3 | Not started | - |
+| 3. Database Consolidation & Validation | 5/5 | Complete | 2026-03-05 |
+| 4. Product Integrity | 3/3 | Complete | 2026-03-05 |
 | 5. Payment System | 0/3 | Not started | - |
 | 6. AI Coach | 0/3 | Not started | - |
 | 7. Analytics & Performance | 0/3 | Not started | - |
@@ -209,4 +209,4 @@ Phases execute in dependency order: 1 → 2 → 3 → 4 (parallel with 2) → 5 
 | 9. Test Suite | 0/4 | Not started | - |
 | 10. Mobile Production Readiness | 0/2 | Not started | - |
 
-**Total:** 8/35 plans complete
+**Total:** 16/35 plans complete
