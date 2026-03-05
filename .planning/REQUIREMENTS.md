@@ -77,13 +77,13 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TST-01**: Vitest installed and configured with Vite
-- [ ] **TST-02**: Unit tests for utility functions (src/utils.ts)
-- [ ] **TST-03**: Integration tests for auth flows (signup, login, logout, password reset)
-- [ ] **TST-04**: Integration tests for payment flows (checkout, webhook, cancellation)
-- [ ] **TST-05**: Integration tests for core API routes (check-ins, goals, activities, challenges)
-- [ ] **TST-06**: CI pipeline runs tests on PR and blocks merge on failure
-- [ ] **TST-07**: Test coverage reported (no minimum threshold for v1)
+- [x] **TST-01**: Vitest installed and configured with Vite
+- [x] **TST-02**: Unit tests for utility functions (src/utils.ts)
+- [x] **TST-03**: Integration tests for auth flows (signup, login, logout, password reset)
+- [x] **TST-04**: Integration tests for payment flows (checkout, webhook, cancellation)
+- [x] **TST-05**: Integration tests for core API routes (check-ins, goals, activities, challenges)
+- [x] **TST-06**: CI pipeline runs tests on PR and blocks merge on failure
+- [x] **TST-07**: Test coverage reported (no minimum threshold for v1)
 
 ### Monitoring
 
@@ -106,9 +106,9 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Mobile
 
-- [ ] **MOB-01**: Mobile app uses Supabase Auth (aligned with web)
-- [ ] **MOB-02**: Mobile API client points to production Vercel URL
-- [ ] **MOB-03**: Mobile app builds without errors
+- [x] **MOB-01**: Mobile app uses Supabase Auth (aligned with web)
+- [x] **MOB-02**: Mobile API client points to production Vercel URL
+- [x] **MOB-03**: Mobile app builds without errors
 
 ## v2 Requirements
 
@@ -165,8 +165,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | PERF-01 thru PERF-03 | Phase 7 | Complete |
 | INF-01 thru INF-04 | Phase 8 | Complete |
 | MON-01 thru MON-03 | Phase 8 | Complete |
-| TST-01 thru TST-07 | Phase 9 | Pending |
-| MOB-01 thru MOB-03 | Phase 10 | Pending |
+| TST-01 thru TST-07 | Phase 9 | Complete |
+| MOB-01 thru MOB-03 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 58 total
