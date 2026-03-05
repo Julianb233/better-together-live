@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 3 complete -- moving to Phase 4 (Testing & Quality)
+**Current focus:** Phase 4 (Product Integrity) -- fixing broken UI elements
 
 ## Current Position
 
-Phase: 3 of 10 (Database Consolidation) -- COMPLETE
-Plan: 5 of 5 in current phase
-Status: Phase complete
-Last activity: 2026-03-05 -- Completed 03-05-PLAN.md (Neon Cleanup & Final Verification)
+Phase: 4 of 10 (Product Integrity)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-05 -- Completed 04-01-PLAN.md (Fix Homepage CTA Buttons)
 
-Progress: [█████████████░] 37% (13/35)
+Progress: [██████████████░] 40% (14/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: ~4.0 minutes
-- Total execution time: ~57 minutes
+- Total execution time: ~59.5 minutes
 
 **By Phase:**
 
@@ -30,6 +30,7 @@ Progress: [█████████████░] 37% (13/35)
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
 | 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
+| 4 - Product Integrity | 1/3 | ~2.5m | ~2.5m |
 
 ## Accumulated Context
 
@@ -77,6 +78,7 @@ Recent decisions affecting current work:
 - [03-04] JS aggregation replaces SQL GROUP BY in analytics
 - [03-05] Delete db-supabase.ts entirely (unused wrapper with broken rpc query method)
 - [03-05] RLS policies use user1_id/user2_id matching DB schema (TypeScript types differ but service role bypasses RLS)
+- [04-01] Replace dead footer nav links with real app routes instead of removing footer columns entirely
 
 ### Pending Todos
 
@@ -92,11 +94,12 @@ Recent decisions affecting current work:
 - Phase 1 (security) complete -- all 5 plans executed
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
 - Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
+- Phase 4 plan 1 complete -- all homepage CTA buttons fixed, fake spinner removed, dead links cleaned up
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 03-05-PLAN.md (Neon Cleanup & Final Verification) -- Phase 3 complete
+Stopped at: Completed 04-01-PLAN.md (Fix Homepage CTA Buttons)
 Resume file: None
