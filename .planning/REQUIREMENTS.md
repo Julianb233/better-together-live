@@ -9,16 +9,16 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Security
 
-- [ ] **SEC-01**: All API routes require authentication (except login, register, health check)
-- [ ] **SEC-02**: Users can only access/modify their own data (IDOR protection on all userId endpoints)
-- [ ] **SEC-03**: Stripe webhook signatures are verified before processing events
-- [ ] **SEC-04**: CORS restricted to production domain(s) only
-- [ ] **SEC-05**: User-generated content is sanitized against XSS before storage/rendering
-- [ ] **SEC-06**: Admin routes require admin role verification
-- [ ] **SEC-07**: Video room creation/access requires authenticated relationship membership
-- [ ] **SEC-08**: Pagination limits enforced (max 100) on all list endpoints
-- [ ] **SEC-09**: No hardcoded secrets in codebase (JWT fallback removed)
-- [ ] **SEC-10**: Rate limiting uses distributed store (not in-memory)
+- [x] **SEC-01**: All API routes require authentication (except login, register, health check)
+- [x] **SEC-02**: Users can only access/modify their own data (IDOR protection on all userId endpoints)
+- [x] **SEC-03**: Stripe webhook signatures are verified before processing events
+- [x] **SEC-04**: CORS restricted to production domain(s) only
+- [x] **SEC-05**: User-generated content is sanitized against XSS before storage/rendering
+- [x] **SEC-06**: Admin routes require admin role verification
+- [x] **SEC-07**: Video room creation/access requires authenticated relationship membership
+- [x] **SEC-08**: Pagination limits enforced (max 100) on all list endpoints
+- [x] **SEC-09**: No hardcoded secrets in codebase (JWT fallback removed)
+- [x] **SEC-10**: Rate limiting uses distributed store (not in-memory)
 
 ### Auth Consolidation
 
@@ -154,7 +154,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 thru SEC-10 | Phase 1 | Pending |
+| SEC-01 thru SEC-10 | Phase 1 | Complete |
 | AUTH-01 thru AUTH-06 | Phase 2 | Pending |
 | DB-01 thru DB-05 | Phase 3 | Pending |
 | VAL-01 thru VAL-03 | Phase 3 | Pending |

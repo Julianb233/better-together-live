@@ -6,7 +6,7 @@ Take Better Together from a feature-rich but insecure prototype to a production-
 
 ## Phases
 
-- [ ] **Phase 1: Security Hardening** - Fix critical security vulnerabilities before any other work
+- [x] **Phase 1: Security Hardening** - Fix critical security vulnerabilities before any other work
 - [ ] **Phase 2: Auth Consolidation** - Migrate to Supabase Auth as sole auth system
 - [ ] **Phase 3: Database Consolidation** - Migrate all routes from Neon to Supabase client, add input validation
 - [ ] **Phase 4: Product Integrity** - Fix fake CTAs, remove fake social proof, unify pricing, hide unimplemented features
@@ -32,11 +32,11 @@ Take Better Together from a feature-rich but insecure prototype to a production-
 **Plans**: 5 plans
 
 Plans:
-- [ ] 01-01: Apply global auth middleware to all /api/* routes with public endpoint whitelist
-- [ ] 01-02: Add IDOR protection — verify authenticated user matches requested userId on all endpoints
-- [ ] 01-03: Implement Stripe webhook signature verification
-- [ ] 01-04: Lock down CORS, admin routes, video endpoints, and remove hardcoded secrets
-- [ ] 01-05: Add XSS sanitization, pagination limits, and distributed rate limiting (Upstash Redis)
+- [x] 01-01: Apply global auth middleware to all /api/* routes with public endpoint whitelist
+- [x] 01-02: Add IDOR protection — verify authenticated user matches requested userId on all endpoints
+- [x] 01-03: Implement Stripe webhook signature verification
+- [x] 01-04: Lock down CORS, admin routes, video endpoints, and remove hardcoded secrets
+- [x] 01-05: Add XSS sanitization, pagination limits, and distributed rate limiting (Upstash Redis)
 
 ### Phase 2: Auth Consolidation
 **Goal**: Single auth system — Supabase Auth only, custom JWT removed entirely
@@ -198,7 +198,7 @@ Phases execute in dependency order: 1 → 2 → 3 → 4 (parallel with 2) → 5 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 0/5 | Not started | - |
+| 1. Security Hardening | 5/5 | Complete | 2026-03-05 |
 | 2. Auth Consolidation | 0/3 | Not started | - |
 | 3. Database Consolidation & Validation | 0/5 | Not started | - |
 | 4. Product Integrity | 0/3 | Not started | - |
@@ -209,4 +209,4 @@ Phases execute in dependency order: 1 → 2 → 3 → 4 (parallel with 2) → 5 
 | 9. Test Suite | 0/4 | Not started | - |
 | 10. Mobile Production Readiness | 0/2 | Not started | - |
 
-**Total:** 0/35 plans complete
+**Total:** 5/35 plans complete
