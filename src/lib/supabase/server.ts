@@ -1,14 +1,19 @@
 /**
  * Supabase Server Client
  *
- * Use this for server-side operations in Hono/API routes.
- * Supports service role key for admin operations.
+ * Uses @supabase/ssr for proper cookie-based session management.
+ * createClientWithContext handles automatic token refresh via getAll/setAll.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import {
+  createServerClient as createSSRClient,
+  parseCookieHeader,
+  serializeCookieHeader,
+} from '@supabase/ssr'
 import type { Database } from './types'
 import type { Context } from 'hono'
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
+import { setCookie, deleteCookie } from 'hono/cookie'
 
 export interface SupabaseEnv {
   SUPABASE_URL: string
@@ -17,10 +22,10 @@ export interface SupabaseEnv {
 }
 
 /**
- * Create a Supabase client for server-side usage with anon key
- * Use this for operations that respect RLS policies
+ * Create a plain Supabase client with anon key (no cookie session).
+ * Use this for auth route handlers (signup/login) where no session exists yet.
  */
-export function createServerClient(env: SupabaseEnv): SupabaseClient<Database> {
+export function createAnonClient(env: SupabaseEnv): SupabaseClient<Database> {
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
     throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required')
   }
@@ -54,34 +59,39 @@ export function createAdminClient(env: SupabaseEnv): SupabaseClient<Database> {
 }
 
 /**
- * Create a Supabase client with user context from cookies
- * Use this in API routes to maintain user session
+ * Create a Supabase client with user context from cookies using @supabase/ssr.
+ * Handles automatic token refresh via getAll/setAll cookie pattern.
+ * Response cookies are stored on the Hono context for the cookie relay middleware to apply.
  */
 export function createClientWithContext(c: Context, env: SupabaseEnv): SupabaseClient<Database> {
-  const accessToken = getCookie(c, 'sb-access-token')
-  const refreshToken = getCookie(c, 'sb-refresh-token')
+  // Accumulate Set-Cookie headers from @supabase/ssr's setAll calls
+  const responseHeaders = new Headers()
 
-  const supabase = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
+  const supabase = createSSRClient<Database>(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll() {
+        const cookieHeader = c.req.header('Cookie') ?? ''
+        return parseCookieHeader(cookieHeader) as { name: string; value: string }[]
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value, options } of cookiesToSet) {
+          const serialized = serializeCookieHeader(name, value, options)
+          responseHeaders.append('Set-Cookie', serialized)
+        }
+      },
+    },
   })
 
-  // Set session if tokens exist
-  if (accessToken && refreshToken) {
-    supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken
-    })
-  }
+  // Store response headers on context for the cookie relay middleware
+  c.set('supabaseResponseHeaders', responseHeaders)
 
   return supabase
 }
 
 /**
  * Set auth cookies from Supabase session
+ * Used by supabase-auth.ts for login/signup responses.
+ * Will be removed in plan 02-03 when auth routes use @supabase/ssr directly.
  */
 export function setSupabaseAuthCookies(
   c: Context,
@@ -106,6 +116,8 @@ export function setSupabaseAuthCookies(
 
 /**
  * Clear auth cookies
+ * Used by supabase-auth.ts for logout.
+ * Will be removed in plan 02-03.
  */
 export function clearSupabaseAuthCookies(c: Context) {
   deleteCookie(c, 'sb-access-token', { path: '/' })
@@ -114,6 +126,7 @@ export function clearSupabaseAuthCookies(c: Context) {
 
 /**
  * Get current user from Supabase session
+ * Uses getUser() which validates with the auth server (not getSession()).
  */
 export async function getCurrentUser(c: Context, env: SupabaseEnv) {
   const supabase = createClientWithContext(c, env)

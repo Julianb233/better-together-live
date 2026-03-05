@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import {
-  createServerClient,
+  createAnonClient,
   createAdminClient,
   setSupabaseAuthCookies,
   clearSupabaseAuthCookies,
@@ -43,7 +43,7 @@ supabaseAuth.post('/signup', async (c: Context) => {
     }
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     // Sign up with Supabase Auth
     const { data, error } = await supabase.auth.signUp({
@@ -124,7 +124,7 @@ supabaseAuth.post('/login', async (c: Context) => {
     }
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -178,7 +178,7 @@ supabaseAuth.post('/login', async (c: Context) => {
 supabaseAuth.post('/logout', async (c: Context) => {
   try {
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     await supabase.auth.signOut()
     clearSupabaseAuthCookies(c)
@@ -205,7 +205,7 @@ supabaseAuth.post('/forgot-password', async (c: Context) => {
     }
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${c.req.url.split('/api')[0]}/auth/reset-password`
@@ -246,7 +246,7 @@ supabaseAuth.post('/reset-password', async (c: Context) => {
     }
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword
@@ -276,7 +276,7 @@ supabaseAuth.post('/refresh', async (c: Context) => {
     const { refreshToken } = await c.req.json()
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token: refreshToken
@@ -315,7 +315,7 @@ supabaseAuth.post('/refresh', async (c: Context) => {
 supabaseAuth.get('/me', async (c: Context) => {
   try {
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data: { user }, error } = await supabase.auth.getUser()
 
@@ -357,7 +357,7 @@ supabaseAuth.get('/me', async (c: Context) => {
 supabaseAuth.post('/oauth/google', async (c: Context) => {
   try {
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -388,7 +388,7 @@ supabaseAuth.post('/oauth/google', async (c: Context) => {
 supabaseAuth.post('/oauth/facebook', async (c: Context) => {
   try {
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
@@ -421,7 +421,7 @@ supabaseAuth.post('/update-profile', async (c: Context) => {
     const { name, phone, avatar_url, metadata } = await c.req.json()
 
     const env = getSupabaseEnv(c)
-    const supabase = createServerClient(env)
+    const supabase = createAnonClient(env)
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 

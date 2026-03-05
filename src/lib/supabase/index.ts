@@ -14,7 +14,7 @@ export {
 
 // Server-side utilities
 export {
-  createServerClient,
+  createAnonClient,
   createAdminClient,
   createClientWithContext,
   setSupabaseAuthCookies,
