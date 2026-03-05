@@ -387,52 +387,55 @@ export const loginHtml = `<!DOCTYPE html>
             });
             
             // Handle Login Form Submit
-            loginForm.addEventListener('submit', function(e) {
+            loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                
+
                 // Add loading state
                 loginBtn.classList.add('loading');
                 loginBtn.disabled = true;
-                
-                // Simulate authentication
-                setTimeout(() => {
-                    // Set authentication status
-                    localStorage.setItem('bt_authenticated', 'true');
-                    localStorage.setItem('bt_user', JSON.stringify({
-                        email: document.getElementById('email').value,
-                        name: 'Analytics Admin',
-                        role: 'admin',
-                        loginTime: new Date().toISOString()
-                    }));
-                    
-                    // Show success modal
-                    successModal.classList.remove('hidden');
-                    
-                    // Redirect to dashboard after 2 seconds
-                    setTimeout(() => {
-                        window.location.href = '/dashboard.html';
-                    }, 2000);
-                }, 2000);
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            email: document.getElementById('email').value,
+                            password: document.getElementById('password').value
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.user) {
+                        // Show success modal
+                        successModal.classList.remove('hidden');
+
+                        // Redirect to dashboard after 2 seconds
+                        setTimeout(() => {
+                            window.location.href = '/dashboard';
+                        }, 2000);
+                    } else {
+                        loginBtn.classList.remove('loading');
+                        loginBtn.disabled = false;
+                        alert('Login failed: ' + (data.error || 'Invalid credentials'));
+                    }
+                } catch (error) {
+                    loginBtn.classList.remove('loading');
+                    loginBtn.disabled = false;
+                    alert('Login failed. Please try again.');
+                }
             });
-            
+
             // Demo Login
             demoBtn.addEventListener('click', function() {
                 // Add loading animation
                 this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading Demo...';
                 this.disabled = true;
-                
-                // Set demo authentication
-                localStorage.setItem('bt_authenticated', 'true');
-                localStorage.setItem('bt_user', JSON.stringify({
-                    email: 'demo@bettertogether.com',
-                    name: 'Demo User',
-                    role: 'demo',
-                    loginTime: new Date().toISOString()
-                }));
-                
-                // Redirect to dashboard after 1 second
+
+                // Redirect to dashboard demo mode after 1 second
                 setTimeout(() => {
-                    window.location.href = '/dashboard.html?demo=true';
+                    window.location.href = '/dashboard?demo=true';
                 }, 1000);
             });
             

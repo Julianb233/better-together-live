@@ -27,7 +27,7 @@ function getSupabaseEnv(c: Context): SupabaseEnv {
 }
 
 /**
- * POST /api/auth/supabase/signup
+ * POST /api/auth/signup
  * Register a new user with Supabase Auth
  */
 supabaseAuth.post('/signup', async (c: Context) => {
@@ -112,7 +112,7 @@ supabaseAuth.post('/signup', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/login
+ * POST /api/auth/login
  * Login with email and password
  */
 supabaseAuth.post('/login', async (c: Context) => {
@@ -172,7 +172,7 @@ supabaseAuth.post('/login', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/logout
+ * POST /api/auth/logout
  * Sign out the current user
  */
 supabaseAuth.post('/logout', async (c: Context) => {
@@ -193,7 +193,7 @@ supabaseAuth.post('/logout', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/forgot-password
+ * POST /api/auth/forgot-password
  * Send password reset email
  */
 supabaseAuth.post('/forgot-password', async (c: Context) => {
@@ -208,7 +208,7 @@ supabaseAuth.post('/forgot-password', async (c: Context) => {
     const supabase = createAnonClient(env)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${c.req.url.split('/api')[0]}/api/auth/supabase/callback`
+      redirectTo: `${c.req.url.split('/api')[0]}/api/auth/callback`
     })
 
     // Always return success to prevent email enumeration
@@ -230,7 +230,7 @@ supabaseAuth.post('/forgot-password', async (c: Context) => {
 })
 
 /**
- * GET /api/auth/supabase/callback
+ * GET /api/auth/callback
  * Handle redirect from Supabase password reset / email verification links.
  *
  * Supabase emails contain a link with a PKCE `code` query param.
@@ -283,7 +283,7 @@ supabaseAuth.get('/callback', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/reset-password
+ * POST /api/auth/reset-password
  * Reset password with recovery session tokens
  *
  * The frontend passes accessToken and refreshToken obtained from the
@@ -352,7 +352,7 @@ supabaseAuth.post('/reset-password', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/refresh
+ * POST /api/auth/refresh
  * Refresh the access token
  */
 supabaseAuth.post('/refresh', async (c: Context) => {
@@ -393,7 +393,7 @@ supabaseAuth.post('/refresh', async (c: Context) => {
 })
 
 /**
- * GET /api/auth/supabase/me
+ * GET /api/auth/me
  * Get current user info
  */
 supabaseAuth.get('/me', async (c: Context) => {
@@ -435,7 +435,7 @@ supabaseAuth.get('/me', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/oauth/google
+ * POST /api/auth/oauth/google
  * Initiate Google OAuth flow
  */
 supabaseAuth.post('/oauth/google', async (c: Context) => {
@@ -466,7 +466,7 @@ supabaseAuth.post('/oauth/google', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/oauth/facebook
+ * POST /api/auth/oauth/facebook
  * Initiate Facebook OAuth flow
  */
 supabaseAuth.post('/oauth/facebook', async (c: Context) => {
@@ -497,7 +497,7 @@ supabaseAuth.post('/oauth/facebook', async (c: Context) => {
 })
 
 /**
- * POST /api/auth/supabase/update-profile
+ * POST /api/auth/update-profile
  * Update user profile
  */
 supabaseAuth.post('/update-profile', async (c: Context) => {

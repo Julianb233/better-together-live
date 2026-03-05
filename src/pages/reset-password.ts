@@ -1,6 +1,6 @@
 // Password Reset Page
 // Renders a form for setting a new password after clicking the reset link in email.
-// Expects access_token and refresh_token as query params (set by /api/auth/supabase/callback).
+// Expects access_token and refresh_token as query params (set by /api/auth/callback).
 export const resetPasswordHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -175,7 +175,7 @@ export const resetPasswordHtml = `<!DOCTYPE html>
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Resetting...';
 
             try {
-                const response = await fetch('/api/auth/supabase/reset-password', {
+                const response = await fetch('/api/auth/reset-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

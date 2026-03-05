@@ -448,7 +448,7 @@ export const loginSystemHtml = `<!DOCTYPE html>
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
 
             try {
-                var response = await fetch('/api/auth/supabase/forgot-password', {
+                var response = await fetch('/api/auth/forgot-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',

@@ -480,76 +480,23 @@ export const userPortalHtml = `<!DOCTYPE html>
             }
         }
 
-        // Get auth token from cookies or localStorage
-        function getAuthToken() {
-            // First try to get from cookies (httpOnly cookies are set by auth-routes)
-            const cookieToken = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('access_token='))
-                ?.split('=')[1];
-
-            // Fallback to localStorage for backward compatibility
-            return cookieToken || localStorage.getItem('authToken');
-        }
-
-        // API call helper with auth
+        // API call helper with auth (cookie-based)
         async function apiCall(endpoint, options = {}) {
-            const token = getAuthToken();
-
             const response = await fetch(endpoint, {
                 ...options,
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token && !document.cookie.includes('access_token=')
-                        ? { 'Authorization': 'Bearer ' + token }
-                        : {}),
                     ...options.headers
                 },
-                credentials: 'include' // Include cookies for httpOnly tokens
+                credentials: 'include'
             });
 
             if (response.status === 401) {
-                // Try to refresh token
-                const refreshed = await refreshAuthToken();
-                if (!refreshed) {
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
-                    throw new Error('Authentication failed');
-                }
-                // Retry the original request
-                return fetch(endpoint, {
-                    ...options,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
-                    credentials: 'include'
-                });
+                window.location.href = '/login';
+                throw new Error('Authentication failed');
             }
 
             return response;
-        }
-
-        // Refresh auth token
-        async function refreshAuthToken() {
-            try {
-                const response = await fetch('/api/auth/refresh', {
-                    method: 'POST',
-                    credentials: 'include'
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.accessToken) {
-                        localStorage.setItem('authToken', data.accessToken);
-                    }
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                console.error('Token refresh error:', error);
-                return false;
-            }
         }
 
         // Show loading state
@@ -565,14 +512,7 @@ export const userPortalHtml = `<!DOCTYPE html>
         // Load user data
         async function loadUserData() {
             try {
-                // Check authentication first
-                const token = getAuthToken();
-                if (!token) {
-                    window.location.href = '/login';
-                    return;
-                }
-
-                // Step 1: Verify authentication with /api/auth/me
+                // Verify authentication with /api/auth/me (cookie-based)
                 showLoading('dashboard-section');
                 const authResponse = await apiCall('/api/auth/me');
 
@@ -587,7 +527,7 @@ export const userPortalHtml = `<!DOCTYPE html>
                 updateBasicUserInfo(user);
 
                 // Step 2: Load dashboard data in parallel
-                const relationshipId = user.relationshipId || localStorage.getItem('relationshipId');
+                const relationshipId = user.relationshipId;
 
                 if (relationshipId) {
                     await Promise.all([
@@ -826,9 +766,15 @@ export const userPortalHtml = `<!DOCTYPE html>
 
 
         // Logout function
-        function logout() {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('user');
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (e) {
+                // Continue to redirect even if logout call fails
+            }
             window.location.href = '/login';
         }
 

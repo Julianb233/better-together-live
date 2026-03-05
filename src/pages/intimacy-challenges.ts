@@ -653,40 +653,42 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
             const confirmAge = document.getElementById('confirmAge');
             const exitPage = document.getElementById('exitPage');
 
-            // Helper function to check authentication
-            function checkAuth() {
-                const token = localStorage.getItem('authToken');
-                if (!token) {
+            // Helper function to check authentication (cookie-based)
+            async function checkAuth() {
+                try {
+                    const response = await fetch('/api/auth/me', { credentials: 'include' });
+                    if (!response.ok) {
+                        window.location.href = '/login?redirect=/intimacy-challenges';
+                        return false;
+                    }
+                    return true;
+                } catch (e) {
                     window.location.href = '/login?redirect=/intimacy-challenges';
                     return false;
                 }
-                return true;
             }
 
-            // Helper function to get auth headers
+            // Helper function to get auth headers (cookie-based, no Bearer token needed)
             function getAuthHeaders() {
-                const token = localStorage.getItem('authToken');
                 return {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
+                    'Content-Type': 'application/json'
                 };
             }
 
             // Load user's active challenges on page load
             async function loadActiveChallenges() {
-                if (!checkAuth()) return;
+                if (!(await checkAuth())) return;
 
                 try {
                     const response = await fetch('/api/challenges/participating', {
-                        headers: getAuthHeaders()
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
                     });
 
                     if (response.ok) {
                         const data = await response.json();
                         updateChallengeUI(data.participations);
                     } else if (response.status === 401) {
-                        // Token expired, redirect to login
-                        localStorage.removeItem('authToken');
                         window.location.href = '/login?redirect=/intimacy-challenges';
                     }
                 } catch (error) {
@@ -708,12 +710,13 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
 
             // Start a new challenge
             async function startChallenge(challengeId, challengeName) {
-                if (!checkAuth()) return;
+                if (!(await checkAuth())) return;
 
                 try {
                     const response = await fetch('/api/challenges/join', {
                         method: 'POST',
                         headers: getAuthHeaders(),
+                        credentials: 'include',
                         body: JSON.stringify({ challengeId })
                     });
 
@@ -727,7 +730,6 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                         // Show success message
                         showNotification('Started ' + challengeName + ' journey!', 'success');
                     } else if (response.status === 401) {
-                        localStorage.removeItem('authToken');
                         window.location.href = '/login?redirect=/intimacy-challenges';
                     } else {
                         const error = await response.json();
@@ -741,12 +743,13 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
 
             // Track challenge progress
             async function updateProgress(participationId, progressPercentage) {
-                if (!checkAuth()) return;
+                if (!(await checkAuth())) return;
 
                 try {
                     const response = await fetch('/api/challenges/participation/' + participationId + '/progress', {
                         method: 'PUT',
                         headers: getAuthHeaders(),
+                        credentials: 'include',
                         body: JSON.stringify({ progress_percentage: progressPercentage })
                     });
 
@@ -756,7 +759,6 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                         showNotification('Progress updated to ' + progressPercentage + '%', 'success');
                         await loadActiveChallenges();
                     } else if (response.status === 401) {
-                        localStorage.removeItem('authToken');
                         window.location.href = '/login?redirect=/intimacy-challenges';
                     }
                 } catch (error) {

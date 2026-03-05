@@ -649,32 +649,37 @@ export const dashboardHtml = `<!DOCTYPE html>
         let charts = {};
 
         // Initialize Dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check authentication (demo purposes - in production use proper auth)
-            const isAuthenticated = localStorage.getItem('bt_authenticated') === 'true';
-            if (!isAuthenticated && !window.location.search.includes('demo=true')) {
-                // Redirect to login page
-                window.location.href = '/login.html';
-                return;
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check authentication via cookie-based session (skip for demo mode)
+            if (!window.location.search.includes('demo=true')) {
+                try {
+                    const authResponse = await fetch('/api/auth/me', { credentials: 'include' });
+                    if (!authResponse.ok) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    const authData = await authResponse.json();
+                    const userInfo = document.getElementById('userInfo');
+                    if (userInfo && authData.user && authData.user.name) {
+                        userInfo.textContent = authData.user.name;
+                    }
+                } catch (e) {
+                    window.location.href = '/login';
+                    return;
+                }
             }
-            
-            // Display user info
-            const user = JSON.parse(localStorage.getItem('bt_user') || '{}');
-            const userInfo = document.getElementById('userInfo');
-            if (userInfo && user.name) {
-                userInfo.textContent = user.name;
-            }
-            
+
             // Logout functionality
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) {
-                logoutBtn.addEventListener('click', function() {
-                    localStorage.removeItem('bt_authenticated');
-                    localStorage.removeItem('bt_user');
-                    window.location.href = '/login.html';
+                logoutBtn.addEventListener('click', async function() {
+                    try {
+                        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                    } catch (e) {}
+                    window.location.href = '/login';
                 });
             }
-            
+
             initializeCharts();
             startRealTimeUpdates();
             updateLastUpdatedTime();
