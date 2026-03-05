@@ -5,29 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 1 — Security Hardening
+**Current focus:** Phase 2 — Auth Consolidation
 
 ## Current Position
 
 Phase: 2 of 10 (Auth Consolidation)
-Plan: 0 of 3 in current phase
-Status: Phase 1 verified and complete, Phase 2 planned and ready for execution
-Last activity: 2026-03-05 — Phase 1 verified (7/7 must-haves passed), proceeding to Phase 2
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-05 — Completed 02-01-PLAN.md (SSR Client Migration)
 
-Progress: [█████░░░░░] 14% (5/35)
+Progress: [██████░░░░] 17% (6/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: ~3.5 minutes
-- Total execution time: ~17.5 minutes
+- Total plans completed: 6
+- Average duration: ~3.3 minutes
+- Total execution time: ~19.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
+| 2 - Auth Consolidation | 1/3 | ~2m | ~2m |
 
 ## Accumulated Context
 
@@ -52,6 +53,8 @@ Recent decisions affecting current work:
 - [01-05] Rate limiting gracefully skips when Upstash not configured (dev mode passthrough)
 - [01-05] Kept auth-specific in-memory rate limiting separate from global API rate limiting
 - [01-05] Sanitize-on-input for all UGC (defense-in-depth with Hono TSX auto-escape)
+- [02-01] Store @supabase/ssr response headers on Hono context for cookie relay
+- [02-01] Rename createServerClient to createAnonClient to avoid @supabase/ssr name collision
 
 ### Pending Todos
 
@@ -68,5 +71,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 01-05-PLAN.md (XSS, Pagination, Rate Limiting) — Phase 1 complete
+Stopped at: Completed 02-01-PLAN.md (SSR Client Migration)
 Resume file: None
