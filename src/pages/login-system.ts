@@ -292,7 +292,9 @@ export const loginSystemHtml = `<!DOCTYPE html>
                            placeholder="your.email@example.com">
                 </div>
 
-                <button type="submit" 
+                <div id="forgotMessage" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm hidden"></div>
+
+                <button type="submit" id="forgotSubmitBtn"
                         class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-purple-700 transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl">
                     <i class="fas fa-paper-plane mr-2"></i>
                     Send Reset Link
@@ -335,6 +337,14 @@ export const loginSystemHtml = `<!DOCTYPE html>
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('registerForm').classList.add('hidden');
             document.getElementById('forgotPasswordForm').classList.remove('hidden');
+            // Pre-fill forgot email from login form if entered
+            var loginEmail = document.getElementById('loginEmail').value;
+            if (loginEmail) {
+                document.getElementById('forgotEmail').value = loginEmail;
+            }
+            // Reset any previous messages
+            var msgEl = document.getElementById('forgotMessage');
+            if (msgEl) { msgEl.classList.add('hidden'); }
         }
 
         // Password visibility toggle
@@ -365,20 +375,17 @@ export const loginSystemHtml = `<!DOCTYPE html>
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password }),
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
-                    // Store auth token
-                    localStorage.setItem('authToken', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    
-                    // Redirect to dashboard
+                if (response.ok && data.user) {
+                    // Session is stored in HTTP-only cookies by the server
                     window.location.href = '/portal';
                 } else {
-                    alert('Login failed: ' + data.message);
+                    alert('Login failed: ' + (data.error || data.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Login error:', error);
@@ -388,33 +395,42 @@ export const loginSystemHtml = `<!DOCTYPE html>
 
         async function handleRegister(event) {
             event.preventDefault();
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
             const formData = {
-                firstName: document.getElementById('firstName').value,
-                lastName: document.getElementById('lastName').value,
+                name: firstName + ' ' + lastName,
                 email: document.getElementById('registerEmail').value,
                 phone: document.getElementById('phoneNumber').value,
                 password: document.getElementById('registerPassword').value,
-                relationshipStatus: document.getElementById('relationshipStatus').value,
-                agreeTerms: document.getElementById('agreeTerms').checked,
-                subscribeNewsletter: document.getElementById('subscribeNewsletter').checked
+                metadata: {
+                    relationshipStatus: document.getElementById('relationshipStatus').value,
+                    subscribeNewsletter: document.getElementById('subscribeNewsletter').checked
+                }
             };
 
             try {
-                const response = await fetch('/api/auth/register', {
+                const response = await fetch('/api/auth/signup', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify(formData),
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
-                    alert('Registration successful! Please check your email to verify your account.');
-                    showLogin();
+                if (response.ok && data.user) {
+                    if (data.session) {
+                        // Session created (email confirmation disabled) - redirect
+                        window.location.href = '/portal';
+                    } else {
+                        // Email confirmation required
+                        alert('Registration successful! Please check your email to verify your account.');
+                        showLogin();
+                    }
                 } else {
-                    alert('Registration failed: ' + data.message);
+                    alert('Registration failed: ' + (data.error || data.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Registration error:', error);
@@ -424,28 +440,32 @@ export const loginSystemHtml = `<!DOCTYPE html>
 
         async function handleForgotPassword(event) {
             event.preventDefault();
-            const email = document.getElementById('forgotEmail').value;
+            var email = document.getElementById('forgotEmail').value;
+            var msgEl = document.getElementById('forgotMessage');
+            var submitBtn = document.getElementById('forgotSubmitBtn');
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
 
             try {
-                const response = await fetch('/api/auth/forgot-password', {
+                var response = await fetch('/api/auth/supabase/forgot-password', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ email }),
                 });
 
-                const data = await response.json();
-
-                if (data.success) {
-                    alert('Password reset link sent! Check your email.');
-                    showLogin();
-                } else {
-                    alert('Failed to send reset link: ' + data.message);
-                }
+                // Always show success message to prevent email enumeration
+                msgEl.textContent = "If an account exists with this email, you'll receive a password reset link.";
+                msgEl.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Reset Link';
             } catch (error) {
                 console.error('Forgot password error:', error);
-                alert('Failed to send reset link. Please try again.');
+                msgEl.textContent = "If an account exists with this email, you'll receive a password reset link.";
+                msgEl.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Reset Link';
             }
         }
 
