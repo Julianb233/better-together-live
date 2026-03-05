@@ -661,19 +661,17 @@ app.get('/', (c) => {
               <a href="/mobile-ui.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">iOS Design</a>
               <a href="/iphone-examples.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Live Examples</a>
               <a href="/member-rewards.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Rewards</a>
-              <a href="/premium-pricing.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Premium</a>
+              <a href="/paywall" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">Premium</a>
               <a href="/login" className="text-gray-600 hover:text-pink-600 transition-all duration-300 text-sm lg:text-base font-medium hover:scale-105">
                 <i className="fas fa-sign-in-alt mr-1"></i>Login
               </a>
               <a href="/login" className="bg-white text-pink-600 px-5 py-2.5 rounded-full font-semibold border-2 border-pink-300 hover:border-pink-500 hover:bg-pink-50 transform hover:scale-105 hover:shadow-md transition-all duration-300 text-sm lg:text-base">
                 <i className="fas fa-user-plus mr-1"></i>Sign Up
               </a>
-              <button className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-3 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-lg transition-all duration-300 text-sm lg:text-base">
-                <span className="flex items-center">
-                  <i className="fas fa-crown mr-2 animate-pulse"></i>
-                  Get Premium Access
-                </span>
-              </button>
+              <a href="/paywall" className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-3 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-lg transition-all duration-300 text-sm lg:text-base inline-flex items-center justify-center">
+                <i className="fas fa-crown mr-2 animate-pulse"></i>
+                Get Premium Access
+              </a>
             </div>
             <div className="md:hidden">
               <button className="text-gray-600 hover:text-gray-900 p-2" id="mobileMenuButton">
@@ -696,7 +694,7 @@ app.get('/', (c) => {
               <a href="/member-rewards.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
                 <i className="fas fa-gift mr-3 text-green-500"></i>Rewards
               </a>
-              <a href="/premium-pricing.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
+              <a href="/paywall" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
                 <i className="fas fa-crown mr-3 text-yellow-500"></i>Premium
               </a>
               <div className="border-t border-pink-200 my-2"></div>
@@ -706,12 +704,10 @@ app.get('/', (c) => {
               <a href="/login" className="text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-300 py-3 px-4 rounded-lg font-medium">
                 <i className="fas fa-user-plus mr-3"></i>Sign Up Free
               </a>
-              <button className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-xl transition-all duration-300 w-full mt-4">
-                <span className="flex items-center justify-center">
-                  <i className="fas fa-crown mr-2 animate-pulse"></i>
-                  Get Premium Access
-                </span>
-              </button>
+              <a href="/paywall" className="bg-gradient-to-r from-pink-600 to-purple-600 text-white px-6 py-4 rounded-full font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 hover:shadow-xl transition-all duration-300 w-full mt-4 inline-flex items-center justify-center">
+                <i className="fas fa-crown mr-2 animate-pulse"></i>
+                Get Premium Access
+              </a>
             </div>
           </div>
         </div>
@@ -762,17 +758,11 @@ app.get('/', (c) => {
             
             {/* CTAs - Enhanced with Animations */}
             <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 mb-8 px-4 animate-fade-in-up" style="animation-delay: 0.8s;">
-              <button className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-purple-600 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-full font-bold hover:from-pink-700 hover:to-purple-700 transition-all transform hover:scale-110 hover:shadow-2xl text-sm sm:text-base group relative overflow-hidden animate-glow">
-                <span className="relative z-10">
-                  <i className="fas fa-crown mr-2 group-hover:animate-bounce"></i>
-                  Get Premium Access Now
-                </span>
+              <a href="/paywall" className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-purple-600 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-full font-bold hover:from-pink-700 hover:to-purple-700 transition-all transform hover:scale-110 hover:shadow-2xl text-sm sm:text-base group relative overflow-hidden animate-glow inline-flex items-center justify-center">
+                <i className="fas fa-crown mr-2 group-hover:animate-bounce"></i>
+                Get Premium Access Now
                 <div className="absolute inset-0 bg-gradient-to-r from-pink-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </button>
-              <button className="w-full sm:w-auto bg-white text-gray-700 px-8 sm:px-10 py-4 sm:py-5 rounded-full font-semibold border-2 border-pink-200 hover:border-pink-400 hover:bg-pink-50 hover:text-pink-700 transition-all transform hover:scale-105 hover:shadow-lg text-sm sm:text-base group hover-lift">
-                <i className="fas fa-play mr-2 group-hover:text-pink-600 transition-colors"></i>
-                Watch 2-Min Demo
-              </button>
+              </a>
             </div>
 
             {/* Limited Time Offer - Enhanced Urgency */}
@@ -1534,9 +1524,9 @@ app.get('/', (c) => {
                     <span>$50 Surprise Credits</span>
                   </li>
                 </ul>
-                <button className="w-full bg-white text-pink-600 py-4 rounded-lg font-semibold hover:bg-pink-50 transition-colors text-lg">
+                <a href="/paywall" className="w-full bg-white text-pink-600 py-4 rounded-lg font-semibold hover:bg-pink-50 transition-colors text-lg inline-flex items-center justify-center">
                   Transform Our Relationship
-                </button>
+                </a>
               </div>
             </div>
 
@@ -1585,15 +1575,15 @@ app.get('/', (c) => {
                     <span>Email support only</span>
                   </li>
                 </ul>
-                <button className="w-full bg-gray-600 text-white py-4 rounded-lg font-semibold hover:bg-gray-700 transition-colors text-lg">
+                <a href="/paywall" className="w-full bg-gray-600 text-white py-4 rounded-lg font-semibold hover:bg-gray-700 transition-colors text-lg inline-flex items-center justify-center">
                   Try It Out First
-                </button>
+                </a>
               </div>
             </div>
           </div>
 
           <div className="text-center mt-12">
-            <a href="/premium-pricing.html" className="inline-flex items-center text-pink-600 hover:text-pink-700 font-semibold">
+            <a href="/paywall" className="inline-flex items-center text-pink-600 hover:text-pink-700 font-semibold">
               <i className="fas fa-gift mr-2"></i>
               Surprise Your Partner & View Couples Packages
               <i className="fas fa-arrow-right ml-2"></i>
@@ -1612,14 +1602,10 @@ app.get('/', (c) => {
             Join thousands of couples who are building stronger, more connected relationships with Better Together.
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button className="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-lg font-semibold hover:bg-pink-50 transition-all transform hover:scale-105 shadow-lg">
+            <a href="/paywall" className="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-lg font-semibold hover:bg-pink-50 transition-all transform hover:scale-105 shadow-lg inline-flex items-center justify-center">
               <i className="fas fa-crown mr-2"></i>
               Get Premium Access
-            </button>
-            <button className="w-full sm:w-auto bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-pink-600 transition-colors">
-              <i className="fas fa-play mr-2"></i>
-              Watch How It Works
-            </button>
+            </a>
           </div>
         </div>
       </section>
