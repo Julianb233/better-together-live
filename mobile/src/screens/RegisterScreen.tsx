@@ -18,15 +18,15 @@ import { COLORS, SPACING, FONT_SIZES } from '../utils/constants'
 interface FormErrors {
   email?: string
   name?: string
-  phone?: string
+  password?: string
 }
 
 const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
-  const { login, isLoading } = useAuth()
+  const { register, isLoading } = useAuth()
 
   const validateForm = () => {
     const newErrors: FormErrors = {}
@@ -41,8 +41,10 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       newErrors.name = 'Name must be at least 2 characters'
     }
 
-    if (phone && !/^\+?[\d\s-()]+$/.test(phone)) {
-      newErrors.phone = 'Phone number is invalid'
+    if (!password) {
+      newErrors.password = 'Password is required'
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters'
     }
 
     setErrors(newErrors)
@@ -52,11 +54,18 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleRegister = async () => {
     if (!validateForm()) return
 
-    const result = await login(email.trim(), name.trim())
+    const result = await register(email.trim(), password, name.trim())
 
     if (result.success) {
-      // Successfully registered and logged in
-      navigation.replace('MainTabs')
+      if (result.confirmationRequired) {
+        Alert.alert(
+          'Check Your Email',
+          'Please confirm your email address before logging in.'
+        )
+        // Do not navigate -- user must confirm email first
+      }
+      // If no confirmation required, onAuthStateChange fires and
+      // AppNavigator switches to MainTabs automatically
     } else {
       Alert.alert('Registration Failed', result.error || 'An error occurred')
     }
@@ -73,7 +82,6 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.emoji}>💕</Text>
             <Text style={styles.title}>Join Better Together</Text>
             <Text style={styles.subtitle}>
               Start building a stronger relationship today
@@ -102,13 +110,13 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             />
 
             <Input
-              label="Phone Number (Optional)"
-              placeholder="+1 (555) 123-4567"
-              value={phone}
-              onChangeText={setPhone}
-              error={errors.phone}
-              keyboardType="phone-pad"
-              autoComplete="tel"
+              label="Password"
+              placeholder="Min 6 characters"
+              value={password}
+              onChangeText={setPassword}
+              error={errors.password}
+              secureTextEntry={true}
+              autoComplete="new-password"
             />
 
             <Button
@@ -155,10 +163,6 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: SPACING.xxl,
     alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 64,
-    marginBottom: SPACING.md,
   },
   title: {
     fontSize: FONT_SIZES.xxl,

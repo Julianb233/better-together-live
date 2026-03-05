@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  TouchableOpacity,
 } from 'react-native'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
@@ -16,12 +17,12 @@ import { COLORS, SPACING, FONT_SIZES } from '../utils/constants'
 
 const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [email, setEmail] = useState('')
-  const [name, setName] = useState('')
-  const [errors, setErrors] = useState<{ email?: string; name?: string }>({})
+  const [password, setPassword] = useState('')
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const { login, isLoading } = useAuth()
 
   const validateForm = () => {
-    const newErrors: { email?: string; name?: string } = {}
+    const newErrors: { email?: string; password?: string } = {}
 
     if (!email) {
       newErrors.email = 'Email is required'
@@ -29,8 +30,10 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       newErrors.email = 'Email is invalid'
     }
 
-    if (!name || name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters'
+    if (!password) {
+      newErrors.password = 'Password is required'
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters'
     }
 
     setErrors(newErrors)
@@ -40,11 +43,12 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogin = async () => {
     if (!validateForm()) return
 
-    const result = await login(email.trim(), name.trim())
+    const result = await login(email.trim(), password)
 
     if (!result.success) {
       Alert.alert('Login Failed', result.error || 'An error occurred')
     }
+    // On success, onAuthStateChange fires and AppNavigator switches to MainTabs
   }
 
   return (
@@ -74,16 +78,29 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             />
 
             <Input
-              label="Name"
-              placeholder="Your name"
-              value={name}
-              onChangeText={setName}
-              error={errors.name}
-              autoCapitalize="words"
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              error={errors.password}
+              secureTextEntry={true}
+              autoComplete="password"
             />
 
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert(
+                  'Forgot Password?',
+                  'Password reset is available on the web app at better-together.live'
+                )
+              }
+              style={styles.forgotPassword}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
             <Button
-              title="Get Started"
+              title="Sign In"
               onPress={handleLogin}
               loading={isLoading}
               style={styles.button}
@@ -141,6 +158,15 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: SPACING.xl,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  forgotPasswordText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
   },
   button: {
     marginTop: SPACING.md,
