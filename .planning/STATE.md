@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 3 -- Database Consolidation & Validation
+**Current focus:** Phase 3 complete -- moving to Phase 4 (Testing & Quality)
 
 ## Current Position
 
-Phase: 3 of 10 (Database Consolidation)
-Plan: 4 of 5 in current phase
-Status: In progress
-Last activity: 2026-03-05 -- Completed 03-04-PLAN.md (Tier 3+4 API Migration)
+Phase: 3 of 10 (Database Consolidation) -- COMPLETE
+Plan: 5 of 5 in current phase
+Status: Phase complete
+Last activity: 2026-03-05 -- Completed 03-05-PLAN.md (Neon Cleanup & Final Verification)
 
-Progress: [███████████░] 34% (12/35)
+Progress: [█████████████░] 37% (13/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: ~3.8 minutes
-- Total execution time: ~51.5 minutes
+- Total plans completed: 13
+- Average duration: ~4.0 minutes
+- Total execution time: ~57 minutes
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [███████████░] 34% (12/35)
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
-| 3 - Database Consolidation | 4/5 | ~24m | ~6.0m |
+| 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
 
 ## Accumulated Context
 
@@ -75,12 +75,15 @@ Recent decisions affecting current work:
 - [03-04] Fetch-then-enrich pattern for all JOIN queries across API files
 - [03-04] Read-then-update for counter increments (Supabase lacks SQL increment)
 - [03-04] JS aggregation replaces SQL GROUP BY in analytics
+- [03-05] Delete db-supabase.ts entirely (unused wrapper with broken rpc query method)
+- [03-05] RLS policies use user1_id/user2_id matching DB schema (TypeScript types differ but service role bypasses RLS)
 
 ### Pending Todos
 
 - Configure Upstash Redis credentials in Vercel (UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN)
 - Configure Resend SMTP in Supabase dashboard (host: smtp.resend.com, port: 465, user: resend, password: RESEND_API_KEY)
 - Regenerate Supabase Database types from live schema (to eliminate `as any` casts in API files)
+- Reconcile TypeScript type column names (user_1_id) with actual DB schema (user1_id)
 
 ### Blockers/Concerns
 
@@ -88,11 +91,12 @@ Recent decisions affecting current work:
 - Zero existing tests means refactoring has high regression risk
 - Phase 1 (security) complete -- all 5 plans executed
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
+- Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 03-04-PLAN.md (Tier 3+4 API Migration)
+Stopped at: Completed 03-05-PLAN.md (Neon Cleanup & Final Verification) -- Phase 3 complete
 Resume file: None
