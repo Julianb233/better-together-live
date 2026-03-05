@@ -1,52 +1,27 @@
 // Better Together: Stripe Payment Integration
-// Handles subscriptions, checkout sessions, and webhooks
+// Handles subscriptions, checkout sessions, webhooks, and customer portal
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import Stripe from 'stripe'
 import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
-import { verifyStripeSignature } from '../lib/stripe'
+import { createStripeClient, STRIPE_PLANS, getPriceId, type PlanId } from '../lib/stripe'
 import { zValidator, zodErrorHandler } from '../lib/validation'
-import { createCheckoutSchema, cancelSubscriptionSchema, createGiftCheckoutSchema, subscriptionStatusQuerySchema } from '../lib/validation/schemas/payments'
+import {
+  createCheckoutSchema,
+  cancelSubscriptionSchema,
+  createGiftCheckoutSchema,
+  subscriptionStatusQuerySchema,
+  createPortalSessionSchema,
+} from '../lib/validation/schemas/payments'
 
 const paymentsApi = new Hono()
 
-// Stripe configuration
-const STRIPE_API_VERSION = '2023-10-16'
-
-// Subscription tiers from paywall
-const SUBSCRIPTION_TIERS = {
-  'growing-together': {
-    name: 'Growing Together',
-    price: 3900, // $39.00 in cents
-    interval: 'month',
-    features: ['AI Relationship Coach', 'Smart Scheduling', 'Basic Analytics', 'Email Support']
-  },
-  'growing-together-plus': {
-    name: 'Growing Together+',
-    price: 6900, // $69.00 in cents
-    interval: 'month',
-    features: ['Everything in Growing Together', 'Advanced Analytics', 'Priority Support', 'Partner Gifting', 'Intimacy Challenges']
-  },
-  'growing-together-annual': {
-    name: 'Growing Together (Annual)',
-    price: 39000, // $390.00/year (~$32.50/mo, ~17% savings vs monthly)
-    interval: 'year',
-    features: ['All Growing Together features', '17% savings vs monthly', 'Exclusive annual benefits']
-  }
-}
-
-// Helper: Make Stripe API request
-async function stripeRequest(endpoint: string, method: string, body: any, apiKey: string) {
-  const response = await fetch(`https://api.stripe.com/v1${endpoint}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Stripe-Version': STRIPE_API_VERSION
-    },
-    body: method !== 'GET' ? new URLSearchParams(body).toString() : undefined
-  })
-  return response.json()
+// Helper to get Stripe client from Hono context
+function getStripe(c: Context): Stripe | null {
+  const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+  if (!apiKey) return null
+  return createStripeClient(apiKey)
 }
 
 // POST /api/payments/create-checkout-session
@@ -55,44 +30,54 @@ paymentsApi.post('/create-checkout-session',
   zValidator('json', createCheckoutSchema, zodErrorHandler),
   async (c: Context) => {
     try {
-      const { tierId, userId, email, successUrl, cancelUrl } = c.req.valid('json' as never)
-      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+      const { planId, userId, email } = c.req.valid('json' as never)
+      const stripe = getStripe(c)
 
-      if (!apiKey) {
+      if (!stripe) {
         return c.json({ error: 'Stripe not configured' }, 500)
       }
 
-      const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
-      if (!tier) {
-        return c.json({ error: 'Invalid subscription tier' }, 400)
+      // Validate planId against known plans (server-side whitelist)
+      if (!(planId in STRIPE_PLANS)) {
+        return c.json({ error: 'Invalid plan' }, 400)
       }
 
-      // Create Stripe checkout session
-      const session = await stripeRequest('/checkout/sessions', 'POST', {
-        'mode': 'subscription',
-        'customer_email': email,
-        'client_reference_id': userId,
-        'success_url': successUrl || 'https://better-together.app/portal?success=true',
-        'cancel_url': cancelUrl || 'https://better-together.app/paywall?canceled=true',
-        'line_items[0][price_data][currency]': 'usd',
-        'line_items[0][price_data][product_data][name]': tier.name,
-        'line_items[0][price_data][unit_amount]': tier.price,
-        'line_items[0][price_data][recurring][interval]': tier.interval,
-        'line_items[0][quantity]': 1,
-        'metadata[userId]': userId,
-        'metadata[tierId]': tierId,
-        'subscription_data[metadata][userId]': userId,
-        'subscription_data[metadata][tierId]': tierId,
-        'allow_promotion_codes': 'true'
-      }, apiKey)
+      const priceId = getPriceId(planId as PlanId, c.env as Record<string, string>)
+      const supabase = createAdminClient(c.env as SupabaseEnv)
 
-      if (session.error) {
-        return c.json({ error: session.error.message }, 400)
+      // Check if user already has a stripe_customer_id
+      const { data: user } = await supabase
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .maybeSingle()
+
+      const origin = new URL(c.req.url).origin
+
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        mode: 'subscription',
+        line_items: [{ price: priceId, quantity: 1 }],
+        subscription_data: {
+          metadata: { userId, planId },
+        },
+        client_reference_id: userId,
+        success_url: `${origin}/portal?success=true`,
+        cancel_url: `${origin}/paywall?canceled=true`,
+        allow_promotion_codes: true,
       }
+
+      // Use existing customer if available, otherwise let Stripe create one
+      if (user?.stripe_customer_id) {
+        sessionParams.customer = user.stripe_customer_id
+      } else {
+        sessionParams.customer_email = email
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams)
 
       return c.json({
         sessionId: session.id,
-        url: session.url
+        url: session.url,
       })
     } catch (error) {
       console.error('Checkout error:', error)
@@ -105,42 +90,90 @@ paymentsApi.post('/create-checkout-session',
 // Handle Stripe webhook events
 paymentsApi.post('/webhook', async (c: Context) => {
   try {
+    // Must read raw body BEFORE any JSON parsing
     const body = await c.req.text()
     const signature = c.req.header('stripe-signature')
     const webhookSecret = (c.env as any)?.STRIPE_WEBHOOK_SECRET
+    const stripe = getStripe(c)
 
-    if (!signature || !webhookSecret) {
-      return c.json({ error: 'Missing signature or webhook secret' }, 400)
+    if (!signature || !webhookSecret || !stripe) {
+      return c.json({ error: 'Missing signature, webhook secret, or Stripe config' }, 400)
     }
 
-    const isValid = await verifyStripeSignature(body, signature, webhookSecret)
-    if (!isValid) {
-      console.error('Stripe webhook signature verification failed')
-      return c.json({ error: 'Invalid signature' }, 401)
-    }
-
-    const event = JSON.parse(body)
-
+    // Verify signature using SDK
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret)
     const supabase = createAdminClient(c.env as SupabaseEnv)
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object
+        const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.userId || session.client_reference_id
-        const tierId = session.metadata?.tierId
+        const planId = session.subscription_data?.metadata?.planId || session.metadata?.planId
 
         if (userId) {
+          // Upsert subscription record
           const { error } = await supabase
             .from('subscriptions')
             .upsert({
               id: `sub_${Date.now()}`,
               user_id: userId,
-              tier_id: tierId,
-              stripe_subscription_id: session.subscription,
+              plan_id: planId || 'try-it-out',
+              stripe_subscription_id: session.subscription as string,
+              stripe_customer_id: session.customer as string,
               status: 'active',
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' })
+              updated_at: new Date().toISOString(),
+            } as any, { onConflict: 'user_id' })
+
+          if (error) throw error
+
+          // Store stripe_customer_id on users table for future checkouts
+          if (session.customer) {
+            await supabase
+              .from('users')
+              .update({ stripe_customer_id: session.customer as string, updated_at: new Date().toISOString() } as any)
+              .eq('id', userId)
+          }
+        }
+        break
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId = invoice.subscription as string
+
+        if (subscriptionId) {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({
+              status: 'active',
+              current_period_start: invoice.period_start
+                ? new Date(invoice.period_start * 1000).toISOString()
+                : undefined,
+              current_period_end: invoice.period_end
+                ? new Date(invoice.period_end * 1000).toISOString()
+                : undefined,
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq('stripe_subscription_id', subscriptionId)
+
+          if (error) throw error
+        }
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId = invoice.subscription as string
+
+        if (subscriptionId) {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({
+              status: 'past_due',
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq('stripe_subscription_id', subscriptionId)
 
           if (error) throw error
         }
@@ -148,36 +181,34 @@ paymentsApi.post('/webhook', async (c: Context) => {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object
-        const userId = subscription.metadata?.userId
-
-        if (userId) {
-          const { error } = await supabase
-            .from('subscriptions')
-            .update({ status: subscription.status, updated_at: new Date().toISOString() })
-            .eq('stripe_subscription_id', subscription.id)
-
-          if (error) throw error
-        }
-        break
-      }
-
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object
-
+        const subscription = event.data.object as Stripe.Subscription
         const { error } = await supabase
           .from('subscriptions')
-          .update({ status: 'canceled', updated_at: new Date().toISOString() })
+          .update({
+            status: subscription.status,
+            canceled_at: subscription.canceled_at
+              ? new Date(subscription.canceled_at * 1000).toISOString()
+              : null,
+            updated_at: new Date().toISOString(),
+          } as any)
           .eq('stripe_subscription_id', subscription.id)
 
         if (error) throw error
         break
       }
 
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object
-        // Handle failed payment - send notification email
-        console.log('Payment failed for subscription:', invoice.subscription)
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({
+            status: 'canceled',
+            canceled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('stripe_subscription_id', subscription.id)
+
+        if (error) throw error
         break
       }
     }
@@ -188,6 +219,46 @@ paymentsApi.post('/webhook', async (c: Context) => {
     return c.json({ error: 'Webhook processing failed' }, 400)
   }
 })
+
+// POST /api/payments/create-portal-session
+// Create Stripe Customer Portal session for subscription management
+paymentsApi.post('/create-portal-session',
+  zValidator('json', createPortalSessionSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const { userId } = c.req.valid('json' as never)
+      const stripe = getStripe(c)
+
+      if (!stripe) {
+        return c.json({ error: 'Stripe not configured' }, 500)
+      }
+
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+
+      // Look up stripe_customer_id from users table
+      const { data: user } = await supabase
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (!user?.stripe_customer_id) {
+        return c.json({ error: 'No Stripe customer found. Please subscribe first.' }, 404)
+      }
+
+      const origin = new URL(c.req.url).origin
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: user.stripe_customer_id,
+        return_url: `${origin}/portal`,
+      })
+
+      return c.json({ url: portalSession.url })
+    } catch (error) {
+      console.error('Portal session error:', error)
+      return c.json({ error: 'Failed to create portal session' }, 500)
+    }
+  }
+)
 
 // GET /api/payments/subscription-status
 // Get current subscription status for user
@@ -213,19 +284,19 @@ paymentsApi.get('/subscription-status', async (c: Context) => {
     if (!subscription) {
       return c.json({
         hasSubscription: false,
-        tier: null,
-        status: 'none'
+        plan: null,
+        status: 'none',
       })
     }
 
-    const tier = SUBSCRIPTION_TIERS[subscription.tier_id as keyof typeof SUBSCRIPTION_TIERS]
+    const plan = STRIPE_PLANS[subscription.plan_id as PlanId]
 
     return c.json({
       hasSubscription: subscription.status === 'active',
-      tier: tier ? { id: subscription.tier_id, ...tier } : null,
+      plan: plan ? { id: subscription.plan_id, ...plan } : null,
       status: subscription.status,
       stripeSubscriptionId: subscription.stripe_subscription_id,
-      createdAt: subscription.created_at
+      createdAt: subscription.created_at,
     })
   } catch (error) {
     console.error('Status error:', error)
@@ -234,16 +305,16 @@ paymentsApi.get('/subscription-status', async (c: Context) => {
 })
 
 // POST /api/payments/cancel-subscription
-// Cancel subscription
+// Cancel subscription at end of billing period
 paymentsApi.post('/cancel-subscription',
   zValidator('json', cancelSubscriptionSchema, zodErrorHandler),
   async (c: Context) => {
     try {
       const supabase = createAdminClient(c.env as SupabaseEnv)
       const { userId } = c.req.valid('json' as never)
-      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+      const stripe = getStripe(c)
 
-      if (!apiKey) {
+      if (!stripe) {
         return c.json({ error: 'Stripe not configured' }, 500)
       }
 
@@ -262,21 +333,15 @@ paymentsApi.post('/cancel-subscription',
       }
 
       // Cancel at period end (not immediately)
-      const result = await stripeRequest(
-        `/subscriptions/${subscription.stripe_subscription_id}`,
-        'POST',
-        { 'cancel_at_period_end': 'true' },
-        apiKey
+      const result = await stripe.subscriptions.update(
+        subscription.stripe_subscription_id,
+        { cancel_at_period_end: true }
       )
-
-      if (result.error) {
-        return c.json({ error: result.error.message }, 400)
-      }
 
       return c.json({
         success: true,
         cancelAt: result.cancel_at,
-        message: 'Subscription will be canceled at end of billing period'
+        message: 'Subscription will be canceled at end of billing period',
       })
     } catch (error) {
       console.error('Cancel error:', error)
@@ -291,43 +356,49 @@ paymentsApi.post('/create-gift-checkout',
   zValidator('json', createGiftCheckoutSchema, zodErrorHandler),
   async (c: Context) => {
     try {
-      const { tierId, senderUserId, recipientEmail, recipientName, message, successUrl, cancelUrl } = c.req.valid('json' as never)
-      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+      const { planId, senderUserId, recipientEmail, recipientName, message } = c.req.valid('json' as never)
+      const stripe = getStripe(c)
 
-      if (!apiKey) {
+      if (!stripe) {
         return c.json({ error: 'Stripe not configured' }, 500)
       }
 
-      const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
-      if (!tier) {
-        return c.json({ error: 'Invalid subscription tier' }, 400)
+      // Validate planId
+      if (!(planId in STRIPE_PLANS)) {
+        return c.json({ error: 'Invalid plan' }, 400)
       }
 
-      // Create one-time payment for gift
-      const session = await stripeRequest('/checkout/sessions', 'POST', {
-        'mode': 'payment',
-        'success_url': successUrl || 'https://better-together.app/gift-sent?success=true',
-        'cancel_url': cancelUrl || 'https://better-together.app/gift?canceled=true',
-        'line_items[0][price_data][currency]': 'usd',
-        'line_items[0][price_data][product_data][name]': `Gift: ${tier.name}`,
-        'line_items[0][price_data][product_data][description]': `Gift subscription for ${recipientName || recipientEmail}`,
-        'line_items[0][price_data][unit_amount]': tier.price,
-        'line_items[0][quantity]': 1,
-        'metadata[type]': 'gift',
-        'metadata[senderUserId]': senderUserId,
-        'metadata[recipientEmail]': recipientEmail,
-        'metadata[recipientName]': recipientName || '',
-        'metadata[message]': message || '',
-        'metadata[tierId]': tierId
-      }, apiKey)
+      const plan = STRIPE_PLANS[planId as PlanId]
+      const origin = new URL(c.req.url).origin
 
-      if (session.error) {
-        return c.json({ error: session.error.message }, 400)
-      }
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        success_url: `${origin}/gift-sent?success=true`,
+        cancel_url: `${origin}/gift?canceled=true`,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Gift: ${plan.name}`,
+              description: `Gift subscription for ${recipientName || recipientEmail}`,
+            },
+            unit_amount: plan.amount,
+          },
+          quantity: 1,
+        }],
+        metadata: {
+          type: 'gift',
+          senderUserId,
+          recipientEmail,
+          recipientName: recipientName || '',
+          message: message || '',
+          planId,
+        },
+      })
 
       return c.json({
         sessionId: session.id,
-        url: session.url
+        url: session.url,
       })
     } catch (error) {
       console.error('Gift checkout error:', error)
@@ -337,14 +408,16 @@ paymentsApi.post('/create-gift-checkout',
 )
 
 // GET /api/payments/tiers
-// Get available subscription tiers
+// Get available subscription plans
 paymentsApi.get('/tiers', async (c: Context) => {
   return c.json({
-    tiers: Object.entries(SUBSCRIPTION_TIERS).map(([id, tier]) => ({
+    plans: Object.entries(STRIPE_PLANS).map(([id, plan]) => ({
       id,
-      ...tier,
-      priceFormatted: `$${(tier.price / 100).toFixed(2)}`
-    }))
+      name: plan.name,
+      interval: plan.interval,
+      amount: plan.amount,
+      priceFormatted: `$${(plan.amount / 100).toFixed(2)}`,
+    })),
   })
 })
 
