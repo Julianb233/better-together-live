@@ -1,7 +1,7 @@
 // Better Together Mobile: WebSocket Client
 // Handles real-time messaging with automatic reconnection
 
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { supabase } from '../lib/supabase'
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -51,8 +51,9 @@ class WebSocketClient {
     this.setStatus('connecting')
 
     try {
-      const userId = await AsyncStorage.getItem('@better_together:user_id')
-      const wsUrl = `${this.config.url}${userId ? `?userId=${userId}` : ''}`
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const wsUrl = `${this.config.url}${token ? `?token=${token}` : ''}`
 
       this.ws = new WebSocket(wsUrl)
 

@@ -535,9 +535,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
     setLoading(true)
 
     try {
-      // Create user
-      const userData = {
-        email: `user_${Date.now()}@bettertogether.app`, // Temporary email for demo
+      // Update user profile (user already authenticated via Supabase Auth)
+      const userId = await apiClient.getUserId()
+      if (!userId) {
+        console.error('No authenticated user found')
+        setLoading(false)
+        return
+      }
+
+      const profileData = {
         name,
         nickname: nickname || undefined,
         love_language_primary: primaryLanguage,
@@ -545,16 +551,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
         relationship_preferences: relationshipType,
       }
 
-      const result = await apiClient.createUser(userData)
+      const result = await apiClient.updateUser(userId, profileData)
 
       if (result.data?.user) {
-        await apiClient.storeUserId(result.data.user.id)
         await apiClient.storeUserData(result.data.user)
 
         // Invite partner if email provided
         if (partnerEmail) {
           await apiClient.invitePartner({
-            user_id: result.data.user.id,
+            user_id: userId,
             partner_email: partnerEmail,
             relationship_type: relationshipType,
           })

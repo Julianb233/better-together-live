@@ -292,6 +292,12 @@ class ApiClient {
     return this.request('get', `/ai-coach/history/${relationshipId}`)
   }
 
+  // Auth helpers (delegates to Supabase session)
+  async getUserId(): Promise<string | null> {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.user?.id ?? null
+  }
+
   // Profile cache helpers (not auth tokens -- Supabase handles those)
   async storeUserData(userData: any) {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData))
