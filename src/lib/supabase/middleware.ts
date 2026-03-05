@@ -2,18 +2,24 @@
  * Supabase Auth Middleware for Hono
  *
  * Provides authentication middleware for API routes.
+ * Reads env from c.env at request time (required for Vercel per-request env).
  */
 
 import type { Context, Next } from 'hono'
-import { createClientWithContext, type SupabaseEnv } from './server'
+import { createClientWithContext } from './server'
 
 /**
  * Middleware that requires authentication
- * Sets userId and userEmail in context if authenticated
+ * Sets userId, userEmail, user, and supabase in context if authenticated
  */
-export function requireAuth(env: SupabaseEnv) {
+export function requireAuth() {
   return async (c: Context, next: Next) => {
     try {
+      const env = {
+        SUPABASE_URL: c.env?.SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+        SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+      }
       const supabase = createClientWithContext(c, env)
       const { data: { user }, error } = await supabase.auth.getUser()
 
@@ -39,9 +45,14 @@ export function requireAuth(env: SupabaseEnv) {
  * Middleware that optionally authenticates
  * Sets user info if authenticated, but allows unauthenticated access
  */
-export function optionalAuth(env: SupabaseEnv) {
+export function optionalAuth() {
   return async (c: Context, next: Next) => {
     try {
+      const env = {
+        SUPABASE_URL: c.env?.SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+        SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+      }
       const supabase = createClientWithContext(c, env)
       const { data: { user } } = await supabase.auth.getUser()
 
@@ -57,6 +68,20 @@ export function optionalAuth(env: SupabaseEnv) {
       // Continue without auth on error
       await next()
     }
+  }
+}
+
+/**
+ * Middleware that requires admin role
+ * Must be used after requireAuth() in the middleware chain
+ */
+export function requireAdmin() {
+  return async (c: Context, next: Next) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
+    const isAdmin = user.app_metadata?.role === 'admin'
+    if (!isAdmin) return c.json({ error: 'Forbidden' }, 403)
+    await next()
   }
 }
 

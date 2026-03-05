@@ -28,6 +28,7 @@ export {
 export {
   requireAuth,
   optionalAuth,
+  requireAdmin,
   getSupabaseFromContext,
   getUserFromContext,
   getUserIdFromContext
