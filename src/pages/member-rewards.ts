@@ -53,6 +53,17 @@ export const memberRewardsHtml = `<!DOCTYPE html>
 <body class="bg-gray-50">
     ${navigationHtml}
 
+    <!-- Coming Soon Banner -->
+    <section class="bg-amber-50 border-b border-amber-200">
+        <div class="max-w-4xl mx-auto px-4 py-6 text-center">
+            <div class="inline-flex items-center px-4 py-2 bg-amber-100 border border-amber-300 rounded-full mb-2">
+                <i class="fas fa-clock text-amber-600 mr-2"></i>
+                <span class="text-amber-800 font-semibold text-lg">Coming Soon</span>
+            </div>
+            <p class="text-amber-700 text-sm mt-1">Member rewards and savings are currently in development. Join our waitlist to be notified when they launch.</p>
+        </div>
+    </section>
+
     <!-- Hero Section -->
     <section class="gradient-bg py-16 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -104,14 +115,14 @@ export const memberRewardsHtml = `<!DOCTYPE html>
 
                 <!-- CTA Buttons -->
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <button class="w-full sm:w-auto bg-pink-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-pink-700 transition-all transform hover:scale-105 shadow-lg">
-                        <i class="fas fa-rocket mr-2"></i>
-                        Start Earning Rewards
+                    <button disabled class="w-full sm:w-auto bg-gray-400 text-white px-8 py-4 rounded-lg font-semibold cursor-not-allowed opacity-75 shadow-lg">
+                        <i class="fas fa-clock mr-2"></i>
+                        Coming Soon
                     </button>
-                    <button class="w-full sm:w-auto bg-white text-gray-700 px-8 py-4 rounded-lg font-semibold border border-gray-300 hover:bg-gray-50 transition-colors shadow-md">
-                        <i class="fas fa-play mr-2"></i>
-                        See How It Works
-                    </button>
+                    <a href="/paywall" class="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-lg font-semibold border border-pink-300 hover:bg-pink-50 transition-colors shadow-md text-center">
+                        <i class="fas fa-crown mr-2"></i>
+                        View Current Plans
+                    </a>
                 </div>
             </div>
         </div>
@@ -241,7 +252,7 @@ export const memberRewardsHtml = `<!DOCTYPE html>
                             </div>
                         </div>
                         <div class="mt-6 p-3 bg-gray-50 rounded-lg">
-                            <p class="text-gray-800 text-sm font-medium">Avg. Monthly Savings: $240</p>
+                            <p class="text-gray-800 text-sm font-medium">Savings details coming soon</p>
                         </div>
                     </div>
                 </div>
@@ -676,8 +687,8 @@ export const memberRewardsHtml = `<!DOCTYPE html>
                             </div>
                             <div class="text-sm text-gray-500">Perfect for date night upgrades</div>
                         </div>
-                        <button class="w-full bg-gray-100 text-gray-800 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-                            Purchase Credits
+                        <button disabled class="w-full bg-gray-100 text-gray-400 py-2 rounded-lg font-medium cursor-not-allowed">
+                            Coming Soon
                         </button>
                     </div>
 
@@ -699,8 +710,8 @@ export const memberRewardsHtml = `<!DOCTYPE html>
                             </div>
                             <div class="text-sm text-pink-100">Great for weekend getaways</div>
                         </div>
-                        <button class="w-full bg-white text-pink-600 py-2 rounded-lg font-medium hover:bg-pink-50 transition-colors">
-                            Purchase Credits
+                        <button disabled class="w-full bg-white/50 text-pink-300 py-2 rounded-lg font-medium cursor-not-allowed">
+                            Coming Soon
                         </button>
                     </div>
 
@@ -717,8 +728,8 @@ export const memberRewardsHtml = `<!DOCTYPE html>
                             </div>
                             <div class="text-sm text-gray-500">Ideal for luxury experiences</div>
                         </div>
-                        <button class="w-full bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors">
-                            Purchase Credits
+                        <button disabled class="w-full bg-gray-400 text-white py-2 rounded-lg font-medium cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -753,14 +764,14 @@ export const memberRewardsHtml = `<!DOCTYPE html>
             </div>
             
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                <button class="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-lg font-semibold hover:bg-pink-50 transition-all transform hover:scale-105 shadow-lg">
-                    <i class="fas fa-heart mr-2"></i>
-                    Start Your Free Trial & Earn Rewards
+                <button disabled class="w-full sm:w-auto bg-white/50 text-pink-300 px-8 py-4 rounded-lg font-semibold cursor-not-allowed shadow-lg">
+                    <i class="fas fa-clock mr-2"></i>
+                    Rewards Coming Soon
                 </button>
-                <button class="w-full sm:w-auto bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-pink-600 transition-colors">
-                    <i class="fas fa-play mr-2"></i>
-                    See Member Success Stories
-                </button>
+                <a href="/paywall" class="w-full sm:w-auto bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white hover:text-pink-600 transition-colors text-center">
+                    <i class="fas fa-crown mr-2"></i>
+                    View Current Plans
+                </a>
             </div>
             
             <!-- Trust Indicators -->

@@ -29,9 +29,9 @@ const SUBSCRIPTION_TIERS = {
   },
   'growing-together-annual': {
     name: 'Growing Together (Annual)',
-    price: 24000, // $240.00/year ($20/mo)
+    price: 39000, // $390.00/year (~$32.50/mo, ~17% savings vs monthly)
     interval: 'year',
-    features: ['All Growing Together features', '48% savings', 'Exclusive annual benefits']
+    features: ['All Growing Together features', '17% savings vs monthly', 'Exclusive annual benefits']
   }
 }
 

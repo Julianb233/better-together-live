@@ -687,7 +687,7 @@ app.get('/', (c) => {
                 <i className="fas fa-play-circle mr-3 text-blue-500"></i>Live Examples
               </a>
               <a href="/member-rewards.html" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
-                <i className="fas fa-gift mr-3 text-green-500"></i>Rewards
+                <i className="fas fa-gift mr-3 text-green-500"></i>Rewards <span className="text-xs text-amber-600 font-normal">(Coming Soon)</span>
               </a>
               <a href="/paywall" className="text-gray-600 hover:text-pink-600 transition-all duration-300 py-3 px-4 rounded-lg hover:bg-pink-50 font-medium">
                 <i className="fas fa-crown mr-3 text-yellow-500"></i>Premium

@@ -66,6 +66,17 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
 <body class="bg-gray-50 font-inter">
     ${navigationHtml}
 
+    <!-- Coming Soon Banner -->
+    <section class="bg-amber-50 border-b border-amber-200">
+        <div class="max-w-4xl mx-auto px-4 py-6 text-center">
+            <div class="inline-flex items-center px-4 py-2 bg-amber-100 border border-amber-300 rounded-full mb-2">
+                <i class="fas fa-clock text-amber-600 mr-2"></i>
+                <span class="text-amber-800 font-semibold text-lg">Coming Soon</span>
+            </div>
+            <p class="text-amber-700 text-sm mt-1">Subscription boxes are currently in development. Join our waitlist to be notified when they launch.</p>
+        </div>
+    </section>
+
     <!-- Hero Section -->
     <section class="gradient-bg py-16 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -104,14 +115,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <button class="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-pink-700 hover:to-purple-700 transform hover:scale-105 shadow-lg transition-all duration-300">
-                        <i class="fas fa-box-heart mr-2"></i>
-                        Start Your Subscription
+                    <button disabled class="w-full sm:w-auto bg-gray-400 text-white px-8 py-4 rounded-xl font-semibold cursor-not-allowed opacity-75 shadow-lg">
+                        <i class="fas fa-clock mr-2"></i>
+                        Coming Soon
                     </button>
-                    <button class="w-full sm:w-auto bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold border border-gray-300 hover:bg-gray-50 transition-colors shadow-lg">
-                        <i class="fas fa-play mr-2"></i>
-                        See Unboxing Video
-                    </button>
+                    <a href="/paywall" class="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-xl font-semibold border border-pink-300 hover:bg-pink-50 transition-colors shadow-lg text-center">
+                        <i class="fas fa-crown mr-2"></i>
+                        View Current Plans
+                    </a>
                 </div>
             </div>
         </div>
@@ -147,8 +158,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$60<span class="text-lg font-normal text-gray-600">/month</span></div>
                         <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
-                        <button class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 transition-colors">
-                            Subscribe Now
+                        <button disabled class="w-full bg-gray-400 text-white py-3 rounded-lg font-semibold cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -170,8 +181,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$85<span class="text-lg font-normal text-gray-600">/month</span></div>
                         <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
-                        <button class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                            Subscribe Now
+                        <button disabled class="w-full bg-gray-400 text-white py-3 rounded-lg font-semibold cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -193,8 +204,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$120<span class="text-lg font-normal text-gray-600">/month</span></div>
                         <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
-                        <button class="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
-                            Subscribe Now
+                        <button disabled class="w-full bg-gray-400 text-white py-3 rounded-lg font-semibold cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -216,8 +227,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$50<span class="text-lg font-normal text-gray-600">/month</span></div>
                         <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
-                        <button class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                            Subscribe Now
+                        <button disabled class="w-full bg-gray-400 text-white py-3 rounded-lg font-semibold cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -236,8 +247,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$100<span class="text-lg font-normal text-gray-600">/month</span></div>
                         <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
-                        <button class="w-full bg-yellow-600 text-white py-3 rounded-lg font-semibold hover:bg-yellow-700 transition-colors">
-                            Subscribe Now
+                        <button disabled class="w-full bg-gray-400 text-white py-3 rounded-lg font-semibold cursor-not-allowed opacity-75">
+                            Coming Soon
                         </button>
                     </div>
                 </div>
@@ -355,8 +366,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                             <span class="font-semibold text-green-600">Save $228</span> compared to monthly billing
                         </div>
                     </div>
-                    <button class="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-4 rounded-xl font-semibold mt-6 hover:from-pink-700 hover:to-purple-700 transition-all">
-                        Subscribe Annually & Save
+                    <button disabled class="w-full bg-gray-400 text-white py-4 rounded-xl font-semibold mt-6 cursor-not-allowed opacity-75">
+                        Coming Soon
                     </button>
                 </div>
             </div>
@@ -435,14 +446,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
             </p>
             
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
-                <button class="w-full sm:w-auto bg-white text-pink-600 px-8 py-4 rounded-xl font-semibold hover:bg-gray-100 transition-colors shadow-lg">
-                    <i class="fas fa-box-heart mr-2"></i>
-                    Choose Your First Box
+                <button disabled class="w-full sm:w-auto bg-white/50 text-pink-300 px-8 py-4 rounded-xl font-semibold cursor-not-allowed shadow-lg">
+                    <i class="fas fa-clock mr-2"></i>
+                    Coming Soon
                 </button>
-                <button class="w-full sm:w-auto bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-pink-600 transition-colors">
-                    <i class="fas fa-mobile-alt mr-2"></i>
-                    Download the App
-                </button>
+                <a href="/paywall" class="w-full sm:w-auto bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-pink-600 transition-colors text-center">
+                    <i class="fas fa-crown mr-2"></i>
+                    View Current Plans
+                </a>
             </div>
 
             <div class="text-pink-100">
