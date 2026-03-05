@@ -1,16 +1,36 @@
 // Better Together: Communities API
 // Handles community/group management, membership, and invitations
+// Migrated from Neon raw SQL to Supabase client
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { zValidator } from '@hono/zod-validator'
+import { createAdminClient } from '../lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   generateId,
   getCurrentDateTime
 } from '../utils'
 import { getPaginationParams } from '../lib/pagination'
 import { sanitizeTextInput } from '../lib/sanitize'
+import {
+  createCommunitySchema,
+  updateCommunitySchema,
+  communityQuerySchema,
+  joinCommunitySchema,
+  updateMemberRoleSchema,
+  removeMemberSchema,
+  createInviteSchema,
+  memberQuerySchema
+} from '../lib/validation/schemas/communities'
+
+function getSupabaseEnv(c: Context) {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
+}
 
 const communitiesApi = new Hono()
 
@@ -42,15 +62,18 @@ function generateInviteCode(): string {
  * Check if user has permission to manage community
  */
 async function checkCommunityPermission(
-  db: any,
+  supabase: SupabaseClient,
   communityId: string,
   userId: string,
   requiredRole: 'owner' | 'admin' | 'moderator' = 'admin'
 ): Promise<boolean> {
-  const member = await db.first(
-    'SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = $3',
-    [communityId, userId, 'active']
-  )
+  const { data: member } = await supabase
+    .from('community_members')
+    .select('role')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle()
 
   if (!member) return false
 
@@ -66,72 +89,67 @@ async function checkCommunityPermission(
 
 // GET /api/communities
 // List communities with filtering and pagination
-communitiesApi.get('/', async (c: Context) => {
+communitiesApi.get('/',
+  zValidator('query', communityQuerySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
-    const category = c.req.query('category')
-    const search = c.req.query('search')
-    const sort = c.req.query('sort') || 'recent'
+    const supabase = createAdminClient(getSupabaseEnv(c))
+    const { category, search, sort, limit: qLimit, page: qPage } = c.req.valid('query' as never) as any
     const { limit, offset } = getPaginationParams(c)
 
-    // Build base query
-    let query = 'SELECT * FROM communities WHERE 1=1'
-    const params: any[] = []
+    // Build query
+    let query = supabase.from('communities').select('*')
 
-    // Filter by category
     if (category) {
-      query += ` AND category = $${params.length + 1}`
-      params.push(category)
+      query = query.eq('category', category)
     }
 
-    // Filter by search term
     if (search) {
-      query += ` AND (name ILIKE $${params.length + 1} OR description ILIKE $${params.length + 2})`
-      params.push(`%${search}%`, `%${search}%`)
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
     }
 
     // Apply sorting
     switch (sort) {
       case 'popular':
-        query += ' ORDER BY member_count DESC, created_at DESC'
+        query = query.order('member_count', { ascending: false }).order('created_at', { ascending: false })
         break
       case 'alphabetical':
-        query += ' ORDER BY name ASC'
+        query = query.order('name', { ascending: true })
         break
       case 'recent':
       default:
-        query += ' ORDER BY created_at DESC'
+        query = query.order('created_at', { ascending: false })
         break
     }
 
     // Add pagination
-    query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(limit, offset)
+    query = query.range(offset, offset + limit - 1)
 
-    const communities = await db.all(query, params)
+    const { data: communities, error } = await query
 
-    // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as count FROM communities WHERE 1=1'
-    const countParams: any[] = []
+    if (error) {
+      console.error('Get communities query error:', error)
+      return c.json({ error: 'Failed to get communities' }, 500)
+    }
+
+    // Get total count
+    let countQuery = supabase.from('communities').select('*', { count: 'exact', head: true })
     if (category) {
-      countQuery += ` AND category = $${countParams.length + 1}`
-      countParams.push(category)
+      countQuery = countQuery.eq('category', category)
     }
     if (search) {
-      countQuery += ` AND (name ILIKE $${countParams.length + 1} OR description ILIKE $${countParams.length + 2})`
-      countParams.push(`%${search}%`, `%${search}%`)
+      countQuery = countQuery.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
     }
-
-    const countResult = await db.first<{ count: number }>(countQuery, countParams)
-    const total = countResult?.count || 0
+    const { count: total } = await countQuery
+    const totalCount = total || 0
 
     return c.json({
       communities: communities || [],
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
-        total,
-        pages: Math.ceil(total / limit)
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit)
       }
     })
   } catch (error) {
@@ -144,27 +162,30 @@ communitiesApi.get('/', async (c: Context) => {
 // Get community details with membership status
 communitiesApi.get('/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId') // Optional - may not be authenticated
 
     // Get community details
-    const community = await db.first<any>(
-      'SELECT * FROM communities WHERE id = $1',
-      [communityId]
-    )
+    const { data: community } = await supabase
+      .from('communities')
+      .select('*')
+      .eq('id', communityId)
+      .maybeSingle()
 
     if (!community) {
       return c.json({ error: 'Community not found' }, 404)
     }
 
-    // Check if community is private and user doesn't have access
+    // Check membership status
     let membershipStatus = null
     if (userId) {
-      const membership = await db.first<any>(
-        'SELECT * FROM community_members WHERE community_id = $1 AND user_id = $2',
-        [communityId, userId]
-      )
+      const { data: membership } = await supabase
+        .from('community_members')
+        .select('*')
+        .eq('community_id', communityId)
+        .eq('user_id', userId)
+        .maybeSingle()
       membershipStatus = membership
     }
 
@@ -179,21 +200,39 @@ communitiesApi.get('/:id', async (c: Context) => {
       })
     }
 
-    // Get recent posts preview (limited to 3)
-    const recentPosts = await db.all(
-      `SELECT p.*, u.name as author_name, u.profile_photo_url as author_photo
-       FROM posts p
-       JOIN users u ON p.author_id = u.id
-       WHERE p.community_id = $1 AND p.is_hidden = false
-       ORDER BY p.created_at DESC
-       LIMIT 3`,
-      [communityId]
-    )
+    // Get recent posts preview (limited to 3) with author info
+    const { data: recentPostsRaw } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('community_id', communityId)
+      .eq('is_hidden', false)
+      .order('created_at', { ascending: false })
+      .limit(3)
+
+    // Enrich posts with author info
+    let recentPosts: any[] = []
+    if (recentPostsRaw && recentPostsRaw.length > 0) {
+      const authorIds = [...new Set(recentPostsRaw.map(p => p.author_id))]
+      const { data: authors } = await supabase
+        .from('users')
+        .select('id, name, profile_photo_url')
+        .in('id', authorIds)
+
+      const authorsMap = new Map((authors || []).map(a => [a.id, a]))
+      recentPosts = recentPostsRaw.map(p => {
+        const author = authorsMap.get(p.author_id)
+        return {
+          ...p,
+          author_name: author?.name || null,
+          author_photo: author?.profile_photo_url || null
+        }
+      })
+    }
 
     return c.json({
       ...community,
       membership_status: membershipStatus,
-      recent_posts: recentPosts || []
+      recent_posts: recentPosts
     })
   } catch (error) {
     console.error('Get community error:', error)
@@ -203,40 +242,29 @@ communitiesApi.get('/:id', async (c: Context) => {
 
 // POST /api/communities
 // Create new community
-communitiesApi.post('/', async (c: Context) => {
+communitiesApi.post('/',
+  zValidator('json', createCommunitySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
-    // Check authentication
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const {
-      name,
-      description,
-      category,
-      privacy_level,
-      cover_image_url
-    } = await c.req.json()
+    const { name, description, category, privacy_level, cover_image_url } = c.req.valid('json' as never) as any
 
-    // Validation
-    if (!name || !description || !category) {
-      return c.json({ error: 'Name, description, and category are required' }, 400)
-    }
-
-    const validCategories = ['relationship_stage', 'interests', 'location', 'support', 'lifestyle', 'other']
-    if (!validCategories.includes(category)) {
-      return c.json({ error: 'Invalid category' }, 400)
-    }
-
-    const validPrivacyLevels = ['public', 'private', 'invite_only']
-    const finalPrivacyLevel = privacy_level && validPrivacyLevels.includes(privacy_level) ? privacy_level : 'public'
+    const finalPrivacyLevel = privacy_level || 'public'
 
     // Generate unique slug
     let slug = generateSlug(name)
-    const existingSlug = await db.first('SELECT id FROM communities WHERE slug = $1', [slug])
+    const { data: existingSlug } = await supabase
+      .from('communities')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle()
+
     if (existingSlug) {
       slug = `${slug}-${generateId().substring(0, 6)}`
     }
@@ -245,33 +273,41 @@ communitiesApi.post('/', async (c: Context) => {
     const now = getCurrentDateTime()
 
     // Create community
-    await db.run(`
-      INSERT INTO communities (
-        id, name, slug, description, cover_image_url, privacy_level, category,
-        created_by, member_count, post_count, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, 0, $9, $10)
-    `, [
-      communityId,
-      sanitizeTextInput(name),
-      slug,
-      sanitizeTextInput(description),
-      cover_image_url || null,
-      finalPrivacyLevel,
-      category,
-      userId,
-      now,
-      now
-    ])
+    const { error: insertError } = await supabase
+      .from('communities')
+      .insert({
+        id: communityId,
+        name: sanitizeTextInput(name),
+        slug,
+        description: sanitizeTextInput(description),
+        cover_image_url: cover_image_url || null,
+        privacy_level: finalPrivacyLevel,
+        category,
+        created_by: userId,
+        member_count: 1,
+        post_count: 0,
+        created_at: now,
+        updated_at: now
+      })
+
+    if (insertError) {
+      console.error('Create community insert error:', insertError)
+      return c.json({ error: 'Failed to create community' }, 500)
+    }
 
     // Add creator as owner
     const memberId = generateId()
-    await db.run(`
-      INSERT INTO community_members (
-        id, community_id, user_id, role, status, joined_at, last_active_at
-      )
-      VALUES ($1, $2, $3, 'owner', 'active', $4, $5)
-    `, [memberId, communityId, userId, now, now])
+    await supabase
+      .from('community_members')
+      .insert({
+        id: memberId,
+        community_id: communityId,
+        user_id: userId,
+        role: 'owner',
+        status: 'active',
+        joined_at: now,
+        last_active_at: now
+      })
 
     return c.json({
       success: true,
@@ -292,80 +328,60 @@ communitiesApi.post('/', async (c: Context) => {
 
 // PUT /api/communities/:id
 // Update community details (owner/admin only)
-communitiesApi.put('/:id', async (c: Context) => {
+communitiesApi.put('/:id',
+  zValidator('json', updateCommunitySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId')
 
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
-    const {
-      name,
-      description,
-      cover_image_url,
-      privacy_level,
-      category
-    } = await c.req.json()
+
+    const body = c.req.valid('json' as never) as any
 
     // Check permissions
-    const hasPermission = await checkCommunityPermission(db, communityId, userId, 'admin')
+    const hasPermission = await checkCommunityPermission(supabase, communityId, userId, 'admin')
     if (!hasPermission) {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 
-    // Build update query
-    const updates: string[] = []
-    const params: any[] = []
-    let paramIndex = 1
+    // Build update object
+    const updates: Record<string, any> = {}
 
-    if (name !== undefined) {
-      updates.push(`name = $${paramIndex++}`)
-      params.push(sanitizeTextInput(name))
+    if (body.name !== undefined) {
+      updates.name = sanitizeTextInput(body.name)
+    }
+    if (body.description !== undefined) {
+      updates.description = sanitizeTextInput(body.description)
+    }
+    if (body.cover_image_url !== undefined) {
+      updates.cover_image_url = body.cover_image_url
+    }
+    if (body.privacy_level !== undefined) {
+      updates.privacy_level = body.privacy_level
+    }
+    if (body.category !== undefined) {
+      updates.category = body.category
     }
 
-    if (description !== undefined) {
-      updates.push(`description = $${paramIndex++}`)
-      params.push(sanitizeTextInput(description))
-    }
-
-    if (cover_image_url !== undefined) {
-      updates.push(`cover_image_url = $${paramIndex++}`)
-      params.push(cover_image_url)
-    }
-
-    if (privacy_level !== undefined) {
-      const validPrivacyLevels = ['public', 'private', 'invite_only']
-      if (!validPrivacyLevels.includes(privacy_level)) {
-        return c.json({ error: 'Invalid privacy level' }, 400)
-      }
-      updates.push(`privacy_level = $${paramIndex++}`)
-      params.push(privacy_level)
-    }
-
-    if (category !== undefined) {
-      const validCategories = ['relationship_stage', 'interests', 'location', 'support', 'lifestyle', 'other']
-      if (!validCategories.includes(category)) {
-        return c.json({ error: 'Invalid category' }, 400)
-      }
-      updates.push(`category = $${paramIndex++}`)
-      params.push(category)
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return c.json({ error: 'No fields to update' }, 400)
     }
 
-    updates.push(`updated_at = $${paramIndex++}`)
-    params.push(getCurrentDateTime())
+    updates.updated_at = getCurrentDateTime()
 
-    params.push(communityId)
+    const { error: updateError } = await supabase
+      .from('communities')
+      .update(updates)
+      .eq('id', communityId)
 
-    await db.run(
-      `UPDATE communities SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-      params
-    )
+    if (updateError) {
+      console.error('Update community error:', updateError)
+      return c.json({ error: 'Failed to update community' }, 500)
+    }
 
     return c.json({ success: true, message: 'Community updated successfully' })
   } catch (error) {
@@ -378,7 +394,7 @@ communitiesApi.put('/:id', async (c: Context) => {
 // Soft delete community (owner only)
 communitiesApi.delete('/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId')
 
@@ -387,14 +403,21 @@ communitiesApi.delete('/:id', async (c: Context) => {
     }
 
     // Check if user is owner
-    const hasPermission = await checkCommunityPermission(db, communityId, userId, 'owner')
+    const hasPermission = await checkCommunityPermission(supabase, communityId, userId, 'owner')
     if (!hasPermission) {
       return c.json({ error: 'Only the community owner can delete' }, 403)
     }
 
-    // Soft delete by removing the community (CASCADE will handle members)
-    // For true soft delete, add deleted_at column to schema
-    await db.run('DELETE FROM communities WHERE id = $1', [communityId])
+    // Delete community (CASCADE will handle members)
+    const { error: deleteError } = await supabase
+      .from('communities')
+      .delete()
+      .eq('id', communityId)
+
+    if (deleteError) {
+      console.error('Delete community error:', deleteError)
+      return c.json({ error: 'Failed to delete community' }, 500)
+    }
 
     return c.json({ success: true, message: 'Community deleted successfully' })
   } catch (error) {
@@ -405,9 +428,11 @@ communitiesApi.delete('/:id', async (c: Context) => {
 
 // POST /api/communities/:id/join
 // Join a community
-communitiesApi.post('/:id/join', async (c: Context) => {
+communitiesApi.post('/:id/join',
+  zValidator('json', joinCommunitySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId')
 
@@ -415,29 +440,31 @@ communitiesApi.post('/:id/join', async (c: Context) => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const { invite_code } = await c.req.json()
+    const { invite_code } = c.req.valid('json' as never) as any
 
     // Get community details
-    const community = await db.first<{ privacy_level: string }>(
-      'SELECT privacy_level FROM communities WHERE id = $1',
-      [communityId]
-    )
+    const { data: community } = await supabase
+      .from('communities')
+      .select('privacy_level')
+      .eq('id', communityId)
+      .maybeSingle()
 
     if (!community) {
       return c.json({ error: 'Community not found' }, 404)
     }
 
     // Check if already a member
-    const existingMember = await db.first(
-      'SELECT id, status FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, userId]
-    )
+    const { data: existingMember } = await supabase
+      .from('community_members')
+      .select('id, status')
+      .eq('community_id', communityId)
+      .eq('user_id', userId)
+      .maybeSingle()
 
     if (existingMember) {
       return c.json({ error: 'Already a member of this community' }, 400)
     }
 
-    let status = 'active'
     let invitedBy = null
 
     // Handle privacy level logic
@@ -447,11 +474,14 @@ communitiesApi.post('/:id/join', async (c: Context) => {
       }
 
       // Validate invite code
-      const invite = await db.first<any>(
-        `SELECT * FROM community_invites
-         WHERE community_id = $1 AND invite_code = $2 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP`,
-        [communityId, invite_code]
-      )
+      const { data: invite } = await supabase
+        .from('community_invites')
+        .select('*')
+        .eq('community_id', communityId)
+        .eq('invite_code', invite_code)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
 
       if (!invite) {
         return c.json({ error: 'Invalid or expired invite code' }, 400)
@@ -460,30 +490,44 @@ communitiesApi.post('/:id/join', async (c: Context) => {
       invitedBy = invite.invited_by
 
       // Mark invite as accepted
-      await db.run(
-        `UPDATE community_invites
-         SET status = 'accepted', accepted_at = $1, accepted_by = $2
-         WHERE id = $3`,
-        [getCurrentDateTime(), userId, invite.id]
-      )
+      await supabase
+        .from('community_invites')
+        .update({
+          status: 'accepted',
+          accepted_at: getCurrentDateTime(),
+          accepted_by: userId
+        })
+        .eq('id', invite.id)
     }
 
     // Add user as member
     const memberId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO community_members (
-        id, community_id, user_id, role, status, invited_by, joined_at, last_active_at
-      )
-      VALUES ($1, $2, $3, 'member', $4, $5, $6, $7)
-    `, [memberId, communityId, userId, status, invitedBy, now, now])
+    await supabase
+      .from('community_members')
+      .insert({
+        id: memberId,
+        community_id: communityId,
+        user_id: userId,
+        role: 'member',
+        status: 'active',
+        invited_by: invitedBy,
+        joined_at: now,
+        last_active_at: now
+      })
 
-    // Update member count
-    await db.run(
-      'UPDATE communities SET member_count = member_count + 1 WHERE id = $1',
-      [communityId]
-    )
+    // Update member count (read + write since Supabase doesn't support increment directly)
+    const { data: currentCommunity } = await supabase
+      .from('communities')
+      .select('member_count')
+      .eq('id', communityId)
+      .single()
+
+    await supabase
+      .from('communities')
+      .update({ member_count: (currentCommunity?.member_count || 0) + 1 })
+      .eq('id', communityId)
 
     return c.json({
       success: true,
@@ -500,7 +544,7 @@ communitiesApi.post('/:id/join', async (c: Context) => {
 // Leave a community
 communitiesApi.post('/:id/leave', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId')
 
@@ -509,10 +553,12 @@ communitiesApi.post('/:id/leave', async (c: Context) => {
     }
 
     // Check membership
-    const membership = await db.first<{ role: string }>(
-      'SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, userId]
-    )
+    const { data: membership } = await supabase
+      .from('community_members')
+      .select('role')
+      .eq('community_id', communityId)
+      .eq('user_id', userId)
+      .maybeSingle()
 
     if (!membership) {
       return c.json({ error: 'Not a member of this community' }, 400)
@@ -526,16 +572,23 @@ communitiesApi.post('/:id/leave', async (c: Context) => {
     }
 
     // Remove membership
-    await db.run(
-      'DELETE FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, userId]
-    )
+    await supabase
+      .from('community_members')
+      .delete()
+      .eq('community_id', communityId)
+      .eq('user_id', userId)
 
     // Update member count
-    await db.run(
-      'UPDATE communities SET member_count = GREATEST(0, member_count - 1) WHERE id = $1',
-      [communityId]
-    )
+    const { data: currentCommunity } = await supabase
+      .from('communities')
+      .select('member_count')
+      .eq('id', communityId)
+      .single()
+
+    await supabase
+      .from('communities')
+      .update({ member_count: Math.max(0, (currentCommunity?.member_count || 1) - 1) })
+      .eq('id', communityId)
 
     return c.json({ success: true, message: 'Successfully left community' })
   } catch (error) {
@@ -546,49 +599,73 @@ communitiesApi.post('/:id/leave', async (c: Context) => {
 
 // GET /api/communities/:id/members
 // List community members
-communitiesApi.get('/:id/members', async (c: Context) => {
+communitiesApi.get('/:id/members',
+  zValidator('query', memberQuerySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
-    const role = c.req.query('role')
-    const search = c.req.query('search')
+    const { role, search } = c.req.valid('query' as never) as any
     const { limit, offset } = getPaginationParams(c)
 
-    // Build query
-    let query = `
-      SELECT
-        cm.id, cm.role, cm.status, cm.joined_at,
-        u.id as user_id, u.name, u.nickname, u.profile_photo_url
-      FROM community_members cm
-      JOIN users u ON cm.user_id = u.id
-      WHERE cm.community_id = $1
-    `
-    const params: any[] = [communityId]
+    // Fetch community members
+    let membersQuery = supabase
+      .from('community_members')
+      .select('id, role, status, joined_at, user_id')
+      .eq('community_id', communityId)
 
     if (role) {
-      query += ` AND cm.role = $${params.length + 1}`
-      params.push(role)
+      membersQuery = membersQuery.eq('role', role)
     }
+
+    // Order by role hierarchy then joined_at
+    membersQuery = membersQuery
+      .order('joined_at', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    const { data: membersRaw } = await membersQuery
+
+    if (!membersRaw || membersRaw.length === 0) {
+      return c.json({ members: [] })
+    }
+
+    // Fetch user details for members
+    const userIds = membersRaw.map(m => m.user_id)
+    let usersQuery = supabase
+      .from('users')
+      .select('id, name, nickname, profile_photo_url')
+      .in('id', userIds)
 
     if (search) {
-      query += ` AND (u.name ILIKE $${params.length + 1} OR u.nickname ILIKE $${params.length + 2})`
-      params.push(`%${search}%`, `%${search}%`)
+      usersQuery = usersQuery.or(`name.ilike.%${search}%,nickname.ilike.%${search}%`)
     }
 
-    query += ` ORDER BY
-      CASE cm.role
-        WHEN 'owner' THEN 1
-        WHEN 'admin' THEN 2
-        WHEN 'moderator' THEN 3
-        ELSE 4
-      END,
-      cm.joined_at ASC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(limit, offset)
+    const { data: users } = await usersQuery
+    const usersMap = new Map((users || []).map(u => [u.id, u]))
 
-    const members = await db.all(query, params)
+    // Combine members with user info
+    let members = membersRaw
+      .map(m => {
+        const user = usersMap.get(m.user_id)
+        if (!user) return null // user was filtered out by search
+        return {
+          id: m.id,
+          role: m.role,
+          status: m.status,
+          joined_at: m.joined_at,
+          user_id: user.id,
+          name: user.name,
+          nickname: user.nickname,
+          profile_photo_url: user.profile_photo_url
+        }
+      })
+      .filter(Boolean)
 
-    return c.json({ members: members || [] })
+    // Sort by role hierarchy
+    const roleOrder: Record<string, number> = { owner: 1, admin: 2, moderator: 3, member: 4 }
+    members.sort((a: any, b: any) => (roleOrder[a.role] || 4) - (roleOrder[b.role] || 4))
+
+    return c.json({ members })
   } catch (error) {
     console.error('Get community members error:', error)
     return c.json({ error: 'Failed to get members' }, 500)
@@ -597,9 +674,11 @@ communitiesApi.get('/:id/members', async (c: Context) => {
 
 // PUT /api/communities/:id/members/:userId
 // Update member role (admin/owner only)
-communitiesApi.put('/:id/members/:userId', async (c: Context) => {
+communitiesApi.put('/:id/members/:userId',
+  zValidator('json', updateMemberRoleSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const targetUserId = c.req.param('userId')
     const currentUserId = c.get('userId')
@@ -608,25 +687,21 @@ communitiesApi.put('/:id/members/:userId', async (c: Context) => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const { role } = await c.req.json()
+    const { role } = c.req.valid('json' as never) as any
 
     // Check permissions
-    const hasPermission = await checkCommunityPermission(db, communityId, currentUserId, 'admin')
+    const hasPermission = await checkCommunityPermission(supabase, communityId, currentUserId, 'admin')
     if (!hasPermission) {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 
-    // Validate role
-    const validRoles = ['member', 'moderator', 'admin']
-    if (!validRoles.includes(role)) {
-      return c.json({ error: 'Invalid role. Valid roles: member, moderator, admin' }, 400)
-    }
-
     // Check if target user is a member
-    const targetMember = await db.first<{ role: string }>(
-      'SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, targetUserId]
-    )
+    const { data: targetMember } = await supabase
+      .from('community_members')
+      .select('role')
+      .eq('community_id', communityId)
+      .eq('user_id', targetUserId)
+      .maybeSingle()
 
     if (!targetMember) {
       return c.json({ error: 'User is not a member of this community' }, 404)
@@ -638,10 +713,11 @@ communitiesApi.put('/:id/members/:userId', async (c: Context) => {
     }
 
     // Update role
-    await db.run(
-      'UPDATE community_members SET role = $1 WHERE community_id = $2 AND user_id = $3',
-      [role, communityId, targetUserId]
-    )
+    await supabase
+      .from('community_members')
+      .update({ role })
+      .eq('community_id', communityId)
+      .eq('user_id', targetUserId)
 
     return c.json({ success: true, message: 'Member role updated successfully' })
   } catch (error) {
@@ -652,9 +728,11 @@ communitiesApi.put('/:id/members/:userId', async (c: Context) => {
 
 // DELETE /api/communities/:id/members/:userId
 // Remove or ban member (moderator/admin/owner only)
-communitiesApi.delete('/:id/members/:userId', async (c: Context) => {
+communitiesApi.delete('/:id/members/:userId',
+  zValidator('json', removeMemberSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const targetUserId = c.req.param('userId')
     const currentUserId = c.get('userId')
@@ -663,19 +741,21 @@ communitiesApi.delete('/:id/members/:userId', async (c: Context) => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const { ban } = await c.req.json()
+    const { ban } = c.req.valid('json' as never) as any
 
     // Check permissions
-    const hasPermission = await checkCommunityPermission(db, communityId, currentUserId, 'moderator')
+    const hasPermission = await checkCommunityPermission(supabase, communityId, currentUserId, 'moderator')
     if (!hasPermission) {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 
     // Cannot remove owner
-    const targetMember = await db.first<{ role: string }>(
-      'SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, targetUserId]
-    )
+    const { data: targetMember } = await supabase
+      .from('community_members')
+      .select('role')
+      .eq('community_id', communityId)
+      .eq('user_id', targetUserId)
+      .maybeSingle()
 
     if (targetMember?.role === 'owner') {
       return c.json({ error: 'Cannot remove community owner' }, 400)
@@ -683,23 +763,31 @@ communitiesApi.delete('/:id/members/:userId', async (c: Context) => {
 
     if (ban) {
       // Ban member (set status to banned)
-      await db.run(
-        'UPDATE community_members SET status = $1 WHERE community_id = $2 AND user_id = $3',
-        ['banned', communityId, targetUserId]
-      )
+      await supabase
+        .from('community_members')
+        .update({ status: 'banned' })
+        .eq('community_id', communityId)
+        .eq('user_id', targetUserId)
     } else {
       // Remove member completely
-      await db.run(
-        'DELETE FROM community_members WHERE community_id = $1 AND user_id = $2',
-        [communityId, targetUserId]
-      )
+      await supabase
+        .from('community_members')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('user_id', targetUserId)
     }
 
     // Update member count
-    await db.run(
-      'UPDATE communities SET member_count = GREATEST(0, member_count - 1) WHERE id = $1',
-      [communityId]
-    )
+    const { data: currentCommunity } = await supabase
+      .from('communities')
+      .select('member_count')
+      .eq('id', communityId)
+      .single()
+
+    await supabase
+      .from('communities')
+      .update({ member_count: Math.max(0, (currentCommunity?.member_count || 1) - 1) })
+      .eq('id', communityId)
 
     return c.json({
       success: true,
@@ -713,9 +801,11 @@ communitiesApi.delete('/:id/members/:userId', async (c: Context) => {
 
 // POST /api/communities/:id/invite
 // Create invite code (admin/owner only)
-communitiesApi.post('/:id/invite', async (c: Context) => {
+communitiesApi.post('/:id/invite',
+  zValidator('json', createInviteSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const communityId = c.req.param('id')
     const userId = c.get('userId')
 
@@ -723,21 +813,30 @@ communitiesApi.post('/:id/invite', async (c: Context) => {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const { invited_email, expires_in_days } = await c.req.json()
+    const { invited_email, expires_in_days } = c.req.valid('json' as never) as any
 
     // Check permissions
-    const hasPermission = await checkCommunityPermission(db, communityId, userId, 'admin')
+    const hasPermission = await checkCommunityPermission(supabase, communityId, userId, 'admin')
     if (!hasPermission) {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 
     // Generate unique invite code
     let inviteCode = generateInviteCode()
-    let existingCode = await db.first('SELECT id FROM community_invites WHERE invite_code = $1', [inviteCode])
+    let { data: existingCode } = await supabase
+      .from('community_invites')
+      .select('id')
+      .eq('invite_code', inviteCode)
+      .maybeSingle()
 
     while (existingCode) {
       inviteCode = generateInviteCode()
-      existingCode = await db.first('SELECT id FROM community_invites WHERE invite_code = $1', [inviteCode])
+      const result = await supabase
+        .from('community_invites')
+        .select('id')
+        .eq('invite_code', inviteCode)
+        .maybeSingle()
+      existingCode = result.data
     }
 
     // Calculate expiration date
@@ -748,20 +847,18 @@ communitiesApi.post('/:id/invite', async (c: Context) => {
     const inviteId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO community_invites (
-        id, community_id, invited_by, invited_email, invite_code, status, expires_at, created_at
-      )
-      VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
-    `, [
-      inviteId,
-      communityId,
-      userId,
-      invited_email || null,
-      inviteCode,
-      expiresAt.toISOString(),
-      now
-    ])
+    await supabase
+      .from('community_invites')
+      .insert({
+        id: inviteId,
+        community_id: communityId,
+        invited_by: userId,
+        invited_email: invited_email || null,
+        invite_code: inviteCode,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+        created_at: now
+      })
 
     return c.json({
       success: true,
@@ -779,7 +876,7 @@ communitiesApi.post('/:id/invite', async (c: Context) => {
 // Join community via invite code
 communitiesApi.post('/join/:inviteCode', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const inviteCode = c.req.param('inviteCode')
     const userId = c.get('userId')
 
@@ -788,11 +885,13 @@ communitiesApi.post('/join/:inviteCode', async (c: Context) => {
     }
 
     // Validate invite code
-    const invite = await db.first<any>(
-      `SELECT * FROM community_invites
-       WHERE invite_code = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP`,
-      [inviteCode]
-    )
+    const { data: invite } = await supabase
+      .from('community_invites')
+      .select('*')
+      .eq('invite_code', inviteCode)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
 
     if (!invite) {
       return c.json({ error: 'Invalid or expired invite code' }, 400)
@@ -801,10 +900,12 @@ communitiesApi.post('/join/:inviteCode', async (c: Context) => {
     const communityId = invite.community_id
 
     // Check if already a member
-    const existingMember = await db.first(
-      'SELECT id FROM community_members WHERE community_id = $1 AND user_id = $2',
-      [communityId, userId]
-    )
+    const { data: existingMember } = await supabase
+      .from('community_members')
+      .select('id')
+      .eq('community_id', communityId)
+      .eq('user_id', userId)
+      .maybeSingle()
 
     if (existingMember) {
       return c.json({ error: 'Already a member of this community' }, 400)
@@ -814,32 +915,47 @@ communitiesApi.post('/join/:inviteCode', async (c: Context) => {
     const memberId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO community_members (
-        id, community_id, user_id, role, status, invited_by, joined_at, last_active_at
-      )
-      VALUES ($1, $2, $3, 'member', 'active', $4, $5, $6)
-    `, [memberId, communityId, userId, invite.invited_by, now, now])
+    await supabase
+      .from('community_members')
+      .insert({
+        id: memberId,
+        community_id: communityId,
+        user_id: userId,
+        role: 'member',
+        status: 'active',
+        invited_by: invite.invited_by,
+        joined_at: now,
+        last_active_at: now
+      })
 
     // Update member count
-    await db.run(
-      'UPDATE communities SET member_count = member_count + 1 WHERE id = $1',
-      [communityId]
-    )
+    const { data: currentCommunity } = await supabase
+      .from('communities')
+      .select('member_count')
+      .eq('id', communityId)
+      .single()
+
+    await supabase
+      .from('communities')
+      .update({ member_count: (currentCommunity?.member_count || 0) + 1 })
+      .eq('id', communityId)
 
     // Mark invite as accepted
-    await db.run(
-      `UPDATE community_invites
-       SET status = 'accepted', accepted_at = $1, accepted_by = $2
-       WHERE id = $3`,
-      [now, userId, invite.id]
-    )
+    await supabase
+      .from('community_invites')
+      .update({
+        status: 'accepted',
+        accepted_at: now,
+        accepted_by: userId
+      })
+      .eq('id', invite.id)
 
     // Get community info to return
-    const community = await db.first<{ name: string; slug: string }>(
-      'SELECT name, slug FROM communities WHERE id = $1',
-      [communityId]
-    )
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name, slug')
+      .eq('id', communityId)
+      .maybeSingle()
 
     return c.json({
       success: true,

@@ -1,25 +1,30 @@
 // Better Together: Discovery and Search API
 // Handles universal search, user/community discovery, trending content, and recommendations
+// Migrated from Neon raw SQL to Supabase query builder + RPC functions
+// NOTE: Mixed placeholder bugs ($N and ?) from the original are eliminated
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { zValidator } from '@hono/zod-validator'
+import {
+  searchQuerySchema,
+  searchUsersQuerySchema,
+  searchCommunitiesQuerySchema,
+  discoverCommunitiesQuerySchema,
+  discoverUsersQuerySchema,
+  trendingQuerySchema,
+} from '../lib/validation/schemas/discovery'
 import { getPaginationParams } from '../lib/pagination'
 
 const discoveryApi = new Hono()
 
-/**
- * Helper: Check if user is blocked
- */
-async function getBlockedUserIds(db: any, userId: string): Promise<string[]> {
-  const blocks = await db.all(
-    `SELECT blocked_id FROM user_blocks WHERE blocker_id = $1
-     UNION
-     SELECT blocker_id FROM user_blocks WHERE blocked_id = $1`,
-    [userId]
-  )
-  return blocks.map((b: { blocked_id: string }) => b.blocked_id)
+function getSupabaseEnv(c: Context): SupabaseEnv {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
 }
 
 // ============================================================================
@@ -32,7 +37,7 @@ async function getBlockedUserIds(db: any, userId: string): Promise<string[]> {
  */
 discoveryApi.get('/search', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
@@ -43,56 +48,20 @@ discoveryApi.get('/search', async (c: Context) => {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
     }
 
-    const blockedIds = userId ? await getBlockedUserIds(db, userId) : []
-    const blockedFilter = blockedIds.length > 0
-      ? `AND u.id NOT IN (${blockedIds.map(() => '?').join(', ')})`
-      : ''
-
-    const searchPattern = `%${q.toLowerCase()}%`
     const results: any = {}
 
-    // Search Users
+    // Search Users via RPC
     if (type === 'all' || type === 'users') {
-      const users = await db.all<any>(`
-        SELECT
-          u.id,
-          u.name,
-          u.nickname,
-          u.profile_photo_url,
-          r.id as relationship_id,
-          r.relationship_type,
-          ${userId ? `
-            CASE
-              WHEN uc.status = 'accepted' THEN 'connected'
-              WHEN uc.status = 'pending' THEN 'pending'
-              ELSE 'none'
-            END as connection_status
-          ` : `'none' as connection_status`}
-        FROM users u
-        LEFT JOIN relationships r ON (r.user_1_id = u.id OR r.user_2_id = u.id) AND r.status = 'active'
-        ${userId ? `
-          LEFT JOIN user_connections uc ON (
-            (uc.follower_id = $1 AND uc.following_id = u.id)
-            OR (uc.follower_id = u.id AND uc.following_id = $1)
-          )
-        ` : ''}
-        WHERE (LOWER(u.name) LIKE $${userId ? 2 : 1} OR LOWER(u.nickname) LIKE $${userId ? 2 : 1})
-        ${blockedFilter}
-        ${userId ? `AND u.id != $1` : ''}
-        ORDER BY
-          CASE
-            WHEN LOWER(u.name) = LOWER($${userId ? 3 : 2}) THEN 1
-            WHEN LOWER(u.name) LIKE LOWER($${userId ? 3 : 2}) || '%' THEN 2
-            ELSE 3
-          END,
-          u.name
-        LIMIT $${userId ? 4 : 3} OFFSET $${userId ? 5 : 4}
-      `, userId
-        ? [userId, searchPattern, q, limit, offset, ...blockedIds]
-        : [searchPattern, q, limit, offset]
-      )
+      const { data: users, error } = await supabase.rpc('search_users_v1', {
+        p_query: q,
+        p_user_id: userId || null,
+        p_limit: limit,
+        p_offset: offset,
+      })
 
-      results.users = users.map(u => ({
+      if (error) throw error
+
+      results.users = (users || []).map((u: any) => ({
         id: u.id,
         name: u.name,
         nickname: u.nickname,
@@ -102,51 +71,18 @@ discoveryApi.get('/search', async (c: Context) => {
       }))
     }
 
-    // Search Communities
+    // Search Communities via RPC
     if (type === 'all' || type === 'communities') {
-      const communities = await db.all<any>(`
-        SELECT
-          c.id,
-          c.name,
-          c.slug,
-          c.description,
-          c.cover_image_url,
-          c.category,
-          c.privacy_level,
-          c.member_count,
-          c.is_verified,
-          c.is_featured,
-          ${userId ? `
-            cm.status as membership_status,
-            cm.role as membership_role
-          ` : `
-            NULL as membership_status,
-            NULL as membership_role
-          `}
-        FROM communities c
-        ${userId ? `
-          LEFT JOIN community_members cm ON cm.community_id = c.id
-            AND cm.user_id = $1
-            AND cm.status = 'active'
-        ` : ''}
-        WHERE (LOWER(c.name) LIKE $${userId ? 2 : 1} OR LOWER(c.description) LIKE $${userId ? 2 : 1})
-        AND (c.privacy_level = 'public' ${userId ? `OR cm.user_id IS NOT NULL` : ''})
-        ORDER BY
-          c.is_featured DESC,
-          c.is_verified DESC,
-          c.member_count DESC,
-          CASE
-            WHEN LOWER(c.name) = LOWER($${userId ? 3 : 2}) THEN 1
-            WHEN LOWER(c.name) LIKE LOWER($${userId ? 3 : 2}) || '%' THEN 2
-            ELSE 3
-          END
-        LIMIT $${userId ? 4 : 3} OFFSET $${userId ? 5 : 4}
-      `, userId
-        ? [userId, searchPattern, q, limit, offset]
-        : [searchPattern, q, limit, offset]
-      )
+      const { data: communities, error } = await supabase.rpc('search_communities_v1', {
+        p_query: q,
+        p_user_id: userId || null,
+        p_limit: limit,
+        p_offset: offset,
+      })
 
-      results.communities = communities.map(c => ({
+      if (error) throw error
+
+      results.communities = (communities || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         slug: c.slug,
@@ -162,55 +98,18 @@ discoveryApi.get('/search', async (c: Context) => {
       }))
     }
 
-    // Search Posts (only public posts unless user is authenticated)
+    // Search Posts via RPC
     if (type === 'all' || type === 'posts') {
-      const visibilityFilter = userId
-        ? `AND (
-            p.visibility = 'public'
-            OR (p.visibility = 'connections' AND EXISTS (
-              SELECT 1 FROM user_connections uc
-              WHERE (uc.follower_id = $1 AND uc.following_id = p.author_id)
-              AND uc.status = 'accepted'
-            ))
-            OR (p.visibility = 'community' AND EXISTS (
-              SELECT 1 FROM community_members cm
-              WHERE cm.community_id = p.community_id
-              AND cm.user_id = $1
-              AND cm.status = 'active'
-            ))
-          )`
-        : `AND p.visibility = 'public'`
+      const { data: posts, error } = await supabase.rpc('search_posts_v1', {
+        p_query: q,
+        p_user_id: userId || null,
+        p_limit: limit,
+        p_offset: offset,
+      })
 
-      const posts = await db.all<any>(`
-        SELECT
-          p.id,
-          p.content,
-          p.content_type,
-          p.media_urls,
-          p.like_count,
-          p.comment_count,
-          p.created_at,
-          u.id as author_id,
-          u.name as author_name,
-          u.profile_photo_url as author_photo,
-          c.id as community_id,
-          c.name as community_name
-        FROM posts p
-        JOIN users u ON u.id = p.author_id
-        LEFT JOIN communities c ON c.id = p.community_id
-        WHERE LOWER(p.content) LIKE $${userId ? 2 : 1}
-        AND p.deleted_at IS NULL
-        AND p.is_hidden = FALSE
-        ${visibilityFilter}
-        ${blockedIds.length > 0 ? `AND p.author_id NOT IN (${blockedIds.map(() => '?').join(', ')})` : ''}
-        ORDER BY p.created_at DESC
-        LIMIT $${userId ? 3 : 2} OFFSET $${userId ? 4 : 3}
-      `, userId
-        ? [userId, searchPattern, limit, offset, ...blockedIds]
-        : [searchPattern, limit, offset]
-      )
+      if (error) throw error
 
-      results.posts = posts.map(p => ({
+      results.posts = (posts || []).map((p: any) => ({
         id: p.id,
         content: p.content,
         contentType: p.content_type,
@@ -235,7 +134,7 @@ discoveryApi.get('/search', async (c: Context) => {
       type,
       results,
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
         hasMore: type === 'all'
           ? Object.values(results).some((arr: any) => arr.length === limit)
@@ -254,7 +153,7 @@ discoveryApi.get('/search', async (c: Context) => {
  */
 discoveryApi.get('/search/users', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
@@ -264,63 +163,17 @@ discoveryApi.get('/search/users', async (c: Context) => {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
     }
 
-    const blockedIds = userId ? await getBlockedUserIds(db, userId) : []
-    const blockedFilter = blockedIds.length > 0
-      ? `AND u.id NOT IN (${blockedIds.map(() => '?').join(', ')})`
-      : ''
+    const { data: users, error } = await supabase.rpc('search_users_v1', {
+      p_query: q,
+      p_user_id: userId || null,
+      p_limit: limit,
+      p_offset: offset,
+    })
 
-    const searchPattern = `%${q.toLowerCase()}%`
-
-    const users = await db.all<any>(`
-      SELECT
-        u.id,
-        u.name,
-        u.nickname,
-        u.profile_photo_url,
-        r.id as relationship_id,
-        r.relationship_type,
-        ${userId ? `
-          CASE
-            WHEN uc.status = 'accepted' THEN 'connected'
-            WHEN uc.status = 'pending' AND uc.follower_id = $1 THEN 'pending_sent'
-            WHEN uc.status = 'pending' AND uc.following_id = $1 THEN 'pending_received'
-            ELSE 'none'
-          END as connection_status,
-          (
-            SELECT COUNT(*) FROM user_connections uc2
-            WHERE uc2.follower_id = u.id AND uc2.status = 'accepted'
-          ) as follower_count
-        ` : `
-          'none' as connection_status,
-          0 as follower_count
-        `}
-      FROM users u
-      LEFT JOIN relationships r ON (r.user_1_id = u.id OR r.user_2_id = u.id) AND r.status = 'active'
-      ${userId ? `
-        LEFT JOIN user_connections uc ON (
-          (uc.follower_id = $1 AND uc.following_id = u.id)
-          OR (uc.follower_id = u.id AND uc.following_id = $1)
-        )
-      ` : ''}
-      WHERE (LOWER(u.name) LIKE $${userId ? 2 : 1} OR LOWER(u.nickname) LIKE $${userId ? 2 : 1})
-      ${blockedFilter}
-      ${userId ? `AND u.id != $1` : ''}
-      ORDER BY
-        CASE
-          WHEN LOWER(u.name) = LOWER($${userId ? 3 : 2}) THEN 1
-          WHEN LOWER(u.name) LIKE LOWER($${userId ? 3 : 2}) || '%' THEN 2
-          ELSE 3
-        END,
-        ${userId ? 'follower_count DESC,' : ''}
-        u.name
-      LIMIT $${userId ? 4 : 3} OFFSET $${userId ? 5 : 4}
-    `, userId
-      ? [userId, searchPattern, q, limit, offset, ...blockedIds]
-      : [searchPattern, q, limit, offset]
-    )
+    if (error) throw error
 
     return c.json({
-      users: users.map(u => ({
+      users: (users || []).map((u: any) => ({
         id: u.id,
         name: u.name,
         nickname: u.nickname,
@@ -330,9 +183,9 @@ discoveryApi.get('/search/users', async (c: Context) => {
         followerCount: u.follower_count
       })),
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
-        hasMore: users.length === limit
+        hasMore: (users || []).length === limit
       }
     })
   } catch (error) {
@@ -347,77 +200,31 @@ discoveryApi.get('/search/users', async (c: Context) => {
  */
 discoveryApi.get('/search/communities', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
-    const category = c.req.query('category')
-    const privacyLevel = c.req.query('privacy_level')
+    const category = c.req.query('category') || null
+    const privacyLevel = c.req.query('privacy_level') || null
     const { limit, offset } = getPaginationParams(c)
 
     if (!q || q.length < 2) {
       return c.json({ error: 'Search query must be at least 2 characters' }, 400)
     }
 
-    const searchPattern = `%${q.toLowerCase()}%`
-    let conditions = [`(LOWER(c.name) LIKE ? OR LOWER(c.description) LIKE ?)`]
-    let params: any[] = userId ? [userId, searchPattern, searchPattern] : [searchPattern, searchPattern]
+    const { data: communities, error } = await supabase.rpc('search_communities_v1', {
+      p_query: q,
+      p_user_id: userId || null,
+      p_category: category,
+      p_privacy_level: privacyLevel,
+      p_limit: limit,
+      p_offset: offset,
+    })
 
-    if (category) {
-      conditions.push(`c.category = ?`)
-      params.push(category)
-    }
-
-    if (privacyLevel) {
-      conditions.push(`c.privacy_level = ?`)
-      params.push(privacyLevel)
-    } else {
-      // Default: only show public communities unless user is a member
-      conditions.push(`(c.privacy_level = 'public' ${userId ? 'OR cm.user_id IS NOT NULL' : ''})`)
-    }
-
-    const communities = await db.all<any>(`
-      SELECT
-        c.id,
-        c.name,
-        c.slug,
-        c.description,
-        c.cover_image_url,
-        c.category,
-        c.privacy_level,
-        c.member_count,
-        c.post_count,
-        c.is_verified,
-        c.is_featured,
-        ${userId ? `
-          cm.status as membership_status,
-          cm.role as membership_role
-        ` : `
-          NULL as membership_status,
-          NULL as membership_role
-        `}
-      FROM communities c
-      ${userId ? `
-        LEFT JOIN community_members cm ON cm.community_id = c.id
-          AND cm.user_id = $1
-          AND cm.status = 'active'
-      ` : ''}
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY
-        c.is_featured DESC,
-        c.is_verified DESC,
-        c.member_count DESC,
-        CASE
-          WHEN LOWER(c.name) = LOWER($${userId ? params.length + 1 : params.length}) THEN 1
-          WHEN LOWER(c.name) LIKE LOWER($${userId ? params.length + 1 : params.length}) || '%' THEN 2
-          ELSE 3
-        END
-      LIMIT $${userId ? params.length + 2 : params.length + 1}
-      OFFSET $${userId ? params.length + 3 : params.length + 2}
-    `, [...params, q, limit, offset])
+    if (error) throw error
 
     return c.json({
-      communities: communities.map(c => ({
+      communities: (communities || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         slug: c.slug,
@@ -433,9 +240,9 @@ discoveryApi.get('/search/communities', async (c: Context) => {
         membershipRole: c.membership_role
       })),
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
-        hasMore: communities.length === limit
+        hasMore: (communities || []).length === limit
       }
     })
   } catch (error) {
@@ -454,7 +261,7 @@ discoveryApi.get('/search/communities', async (c: Context) => {
  */
 discoveryApi.get('/discover/communities', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     const category = c.req.query('category') || 'featured'
@@ -463,133 +270,124 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
     let communities: any[] = []
 
     switch (category) {
-      case 'featured':
-        // Show featured and verified communities
-        communities = await db.all<any>(`
-          SELECT
-            c.id, c.name, c.slug, c.description, c.cover_image_url,
-            c.category, c.privacy_level, c.member_count, c.post_count,
-            c.is_verified, c.is_featured,
-            ${userId ? `cm.status as membership_status, cm.role as membership_role` : `NULL as membership_status, NULL as membership_role`}
-          FROM communities c
-          ${userId ? `LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = $1 AND cm.status = 'active'` : ''}
-          WHERE c.is_featured = TRUE OR c.is_verified = TRUE
-          AND c.privacy_level = 'public'
-          ORDER BY c.is_featured DESC, c.is_verified DESC, c.member_count DESC
-          LIMIT $${userId ? 2 : 1} OFFSET $${userId ? 3 : 2}
-        `, userId ? [userId, limit, offset] : [limit, offset])
-        break
+      case 'featured': {
+        let query = supabase
+          .from('communities')
+          .select('*')
+          .eq('privacy_level', 'public')
+          .or('is_featured.eq.true,is_verified.eq.true')
+          .order('is_featured', { ascending: false })
+          .order('is_verified', { ascending: false })
+          .order('member_count', { ascending: false })
+          .range(offset, offset + limit - 1)
 
-      case 'popular':
-        // Most popular communities by member count
-        communities = await db.all<any>(`
-          SELECT
-            c.id, c.name, c.slug, c.description, c.cover_image_url,
-            c.category, c.privacy_level, c.member_count, c.post_count,
-            c.is_verified, c.is_featured,
-            ${userId ? `cm.status as membership_status, cm.role as membership_role` : `NULL as membership_status, NULL as membership_role`}
-          FROM communities c
-          ${userId ? `LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = $1 AND cm.status = 'active'` : ''}
-          WHERE c.privacy_level = 'public'
-          AND c.member_count > 0
-          ORDER BY c.member_count DESC, c.post_count DESC
-          LIMIT $${userId ? 2 : 1} OFFSET $${userId ? 3 : 2}
-        `, userId ? [userId, limit, offset] : [limit, offset])
+        const { data, error } = await query
+        if (error) throw error
+        communities = data || []
         break
+      }
 
-      case 'new':
-        // Newest communities
-        communities = await db.all<any>(`
-          SELECT
-            c.id, c.name, c.slug, c.description, c.cover_image_url,
-            c.category, c.privacy_level, c.member_count, c.post_count,
-            c.is_verified, c.is_featured, c.created_at,
-            ${userId ? `cm.status as membership_status, cm.role as membership_role` : `NULL as membership_status, NULL as membership_role`}
-          FROM communities c
-          ${userId ? `LEFT JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = $1 AND cm.status = 'active'` : ''}
-          WHERE c.privacy_level = 'public'
-          ORDER BY c.created_at DESC
-          LIMIT $${userId ? 2 : 1} OFFSET $${userId ? 3 : 2}
-        `, userId ? [userId, limit, offset] : [limit, offset])
+      case 'popular': {
+        const { data, error } = await supabase
+          .from('communities')
+          .select('*')
+          .eq('privacy_level', 'public')
+          .gt('member_count', 0)
+          .order('member_count', { ascending: false })
+          .order('post_count', { ascending: false })
+          .range(offset, offset + limit - 1)
+
+        if (error) throw error
+        communities = data || []
         break
+      }
 
-      case 'for_you':
-        // Personalized recommendations (requires auth)
+      case 'new': {
+        const { data, error } = await supabase
+          .from('communities')
+          .select('*')
+          .eq('privacy_level', 'public')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1)
+
+        if (error) throw error
+        communities = data || []
+        break
+      }
+
+      case 'for_you': {
         if (!userId) {
           return c.json({ error: 'Authentication required for personalized recommendations' }, 401)
         }
 
-        // Get user's relationship type and existing community memberships
-        const userContext = await db.first<any>(`
-          SELECT
-            r.relationship_type,
-            u.interests
-          FROM users u
-          LEFT JOIN relationships r ON (r.user_1_id = u.id OR r.user_2_id = u.id) AND r.status = 'active'
-          WHERE u.id = $1
-        `, [userId])
+        // Get communities the user is NOT already in, weighted by connections' communities
+        const { data: userMemberships } = await supabase
+          .from('community_members')
+          .select('community_id')
+          .eq('user_id', userId)
+          .eq('status', 'active')
 
-        const relationshipType = userContext?.relationship_type
-        const userInterests = userContext?.interests ? JSON.parse(userContext.interests) : []
+        const memberCommunityIds = (userMemberships || []).map((m: any) => m.community_id)
 
-        // Recommend communities based on:
-        // 1. Similar relationship stage
-        // 2. Communities joined by connections
-        // 3. Popular communities in same categories as user's interests
-        communities = await db.all<any>(`
-          SELECT DISTINCT
-            c.id, c.name, c.slug, c.description, c.cover_image_url,
-            c.category, c.privacy_level, c.member_count, c.post_count,
-            c.is_verified, c.is_featured,
-            cm_user.status as membership_status,
-            cm_user.role as membership_role,
-            -- Recommendation score
-            (
-              -- Communities joined by connections (weight: 3)
-              (SELECT COUNT(*) * 3 FROM community_members cm_conn
-               JOIN user_connections uc ON uc.following_id = cm_conn.user_id
-               WHERE uc.follower_id = $1
-               AND uc.status = 'accepted'
-               AND cm_conn.community_id = c.id
-               AND cm_conn.status = 'active'
-              ) +
-              -- Popular communities (weight: 1)
-              (c.member_count / 10)
-            ) as rec_score
-          FROM communities c
-          LEFT JOIN community_members cm_user ON cm_user.community_id = c.id
-            AND cm_user.user_id = $1
-            AND cm_user.status = 'active'
-          WHERE c.privacy_level = 'public'
-          AND cm_user.user_id IS NULL -- Not already a member
-          ORDER BY rec_score DESC, c.member_count DESC
-          LIMIT $2 OFFSET $3
-        `, [userId, limit, offset])
+        let query = supabase
+          .from('communities')
+          .select('*')
+          .eq('privacy_level', 'public')
+          .order('member_count', { ascending: false })
+          .range(offset, offset + limit - 1)
+
+        if (memberCommunityIds.length > 0) {
+          query = query.not('id', 'in', `(${memberCommunityIds.join(',')})`)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+        communities = data || []
         break
+      }
 
       default:
         return c.json({ error: 'Invalid category. Use: featured, popular, new, for_you' }, 400)
     }
 
+    // Enrich with membership status if user is authenticated
+    let membershipMap = new Map()
+    if (userId && communities.length > 0) {
+      const communityIds = communities.map(c => c.id)
+      const { data: memberships } = await supabase
+        .from('community_members')
+        .select('community_id, status, role')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .in('community_id', communityIds)
+
+      for (const m of (memberships || [])) {
+        membershipMap.set(m.community_id, m)
+      }
+    }
+
     return c.json({
       category,
-      communities: communities.map(c => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        coverImageUrl: c.cover_image_url,
-        category: c.category,
-        privacyLevel: c.privacy_level,
-        memberCount: c.member_count,
-        postCount: c.post_count,
-        isVerified: c.is_verified,
-        isFeatured: c.is_featured,
-        membershipStatus: c.membership_status,
-        membershipRole: c.membership_role
-      })),
+      communities: communities.map(c => {
+        const membership = membershipMap.get(c.id)
+        return {
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description,
+          coverImageUrl: c.cover_image_url,
+          category: c.category,
+          privacyLevel: c.privacy_level,
+          memberCount: c.member_count,
+          postCount: c.post_count,
+          isVerified: c.is_verified,
+          isFeatured: c.is_featured,
+          membershipStatus: membership?.status || null,
+          membershipRole: membership?.role || null
+        }
+      }),
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
         hasMore: communities.length === limit
       }
@@ -606,7 +404,7 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
  */
 discoveryApi.get('/discover/users', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     if (!userId) {
@@ -615,89 +413,16 @@ discoveryApi.get('/discover/users', async (c: Context) => {
 
     const { limit, offset } = getPaginationParams(c)
 
-    const blockedIds = await getBlockedUserIds(db, userId)
-    const blockedFilter = blockedIds.length > 0
-      ? `AND u.id NOT IN (${blockedIds.map(() => '?').join(', ')})`
-      : ''
+    const { data: users, error } = await supabase.rpc('discover_users_v1', {
+      p_user_id: userId,
+      p_limit: limit,
+      p_offset: offset,
+    })
 
-    // Get user's context for recommendations
-    const userContext = await db.first<any>(`
-      SELECT
-        r.relationship_type,
-        u.interests
-      FROM users u
-      LEFT JOIN relationships r ON (r.user_1_id = u.id OR r.user_2_id = u.id) AND r.status = 'active'
-      WHERE u.id = $1
-    `, [userId])
-
-    const relationshipType = userContext?.relationship_type
-
-    // Recommendation algorithm:
-    // - Mutual connections: 3 points
-    // - Shared communities: 2 points
-    // - Same relationship stage: 2 points
-    // - Interest overlap: 1 point per shared interest
-    const users = await db.all<any>(`
-      SELECT
-        u.id,
-        u.name,
-        u.nickname,
-        u.profile_photo_url,
-        r.relationship_type,
-        -- Similarity score calculation
-        (
-          -- Mutual connections (weight: 3)
-          (SELECT COUNT(*) * 3 FROM user_connections uc1
-           JOIN user_connections uc2 ON uc1.following_id = uc2.following_id
-           WHERE uc1.follower_id = $1
-           AND uc2.follower_id = u.id
-           AND uc1.status = 'accepted'
-           AND uc2.status = 'accepted'
-          ) +
-          -- Shared communities (weight: 2)
-          (SELECT COUNT(*) * 2 FROM community_members cm1
-           JOIN community_members cm2 ON cm1.community_id = cm2.community_id
-           WHERE cm1.user_id = $1
-           AND cm2.user_id = u.id
-           AND cm1.status = 'active'
-           AND cm2.status = 'active'
-          ) +
-          -- Same relationship stage (weight: 2)
-          ${relationshipType
-            ? `CASE WHEN r.relationship_type = $4 THEN 2 ELSE 0 END`
-            : '0'}
-        ) as similarity_score,
-        (SELECT COUNT(*) FROM user_connections WHERE following_id = u.id AND status = 'accepted') as follower_count
-      FROM users u
-      LEFT JOIN relationships r ON (r.user_1_id = u.id OR r.user_2_id = u.id) AND r.status = 'active'
-      WHERE u.id != $1
-      AND u.id NOT IN (
-        SELECT following_id FROM user_connections
-        WHERE follower_id = $1
-      )
-      ${blockedFilter}
-      AND EXISTS (
-        -- Has at least one connection factor
-        SELECT 1 FROM (
-          SELECT COUNT(*) as mutual FROM user_connections uc1
-          JOIN user_connections uc2 ON uc1.following_id = uc2.following_id
-          WHERE uc1.follower_id = $1 AND uc2.follower_id = u.id
-          AND uc1.status = 'accepted' AND uc2.status = 'accepted'
-        ) mutual_check WHERE mutual > 0
-        UNION
-        SELECT 1 FROM (
-          SELECT COUNT(*) as shared FROM community_members cm1
-          JOIN community_members cm2 ON cm1.community_id = cm2.community_id
-          WHERE cm1.user_id = $1 AND cm2.user_id = u.id
-          AND cm1.status = 'active' AND cm2.status = 'active'
-        ) shared_check WHERE shared > 0
-      )
-      ORDER BY similarity_score DESC, follower_count DESC
-      LIMIT $2 OFFSET $3
-    `, [userId, limit, offset, ...(relationshipType ? [relationshipType] : []), ...blockedIds])
+    if (error) throw error
 
     return c.json({
-      users: users.map(u => ({
+      users: (users || []).map((u: any) => ({
         id: u.id,
         name: u.name,
         nickname: u.nickname,
@@ -707,9 +432,9 @@ discoveryApi.get('/discover/users', async (c: Context) => {
         followerCount: u.follower_count
       })),
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
-        hasMore: users.length === limit
+        hasMore: (users || []).length === limit
       }
     })
   } catch (error) {
@@ -724,7 +449,7 @@ discoveryApi.get('/discover/users', async (c: Context) => {
  */
 discoveryApi.get('/discover/trending', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
     const timeframe = c.req.query('timeframe') || '24h'
@@ -741,83 +466,94 @@ discoveryApi.get('/discover/trending', async (c: Context) => {
       return c.json({ error: 'Invalid timeframe. Use: 24h, week' }, 400)
     }
 
-    const blockedIds = userId ? await getBlockedUserIds(db, userId) : []
-    const blockedFilter = blockedIds.length > 0
-      ? `AND p.author_id NOT IN (${blockedIds.map(() => '?').join(', ')})`
-      : ''
+    const thresholdStr = threshold.toISOString()
 
-    // Trending Posts (by engagement: likes + comments)
-    const visibilityFilter = userId
-      ? `AND (
-          p.visibility = 'public'
-          OR (p.visibility = 'connections' AND EXISTS (
-            SELECT 1 FROM user_connections uc
-            WHERE uc.follower_id = $1 AND uc.following_id = p.author_id
-            AND uc.status = 'accepted'
-          ))
-        )`
-      : `AND p.visibility = 'public'`
+    // Get blocked users
+    let blockedUserIds: string[] = []
+    if (userId) {
+      const { data: blocks } = await supabase
+        .from('user_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
 
-    const trendingPosts = await db.all<any>(`
-      SELECT
-        p.id, p.content, p.content_type, p.media_urls,
-        p.like_count, p.comment_count, p.created_at,
-        u.id as author_id, u.name as author_name, u.profile_photo_url,
-        c.id as community_id, c.name as community_name,
-        (p.like_count + p.comment_count * 2) as engagement_score
-      FROM posts p
-      JOIN users u ON u.id = p.author_id
-      LEFT JOIN communities c ON c.id = p.community_id
-      WHERE p.created_at >= $${userId ? 2 : 1}
-      AND p.deleted_at IS NULL
-      AND p.is_hidden = FALSE
-      ${visibilityFilter}
-      ${blockedFilter}
-      ORDER BY engagement_score DESC, p.created_at DESC
-      LIMIT $${userId ? 3 : 2}
-    `, userId
-      ? [userId, threshold.toISOString(), limit, ...blockedIds]
-      : [threshold.toISOString(), limit]
-    )
+      for (const b of (blocks || [])) {
+        if (b.blocker_id === userId) blockedUserIds.push(b.blocked_id)
+        else blockedUserIds.push(b.blocker_id)
+      }
+    }
+
+    // Trending Posts
+    let postsQuery = supabase
+      .from('posts')
+      .select('*')
+      .is('deleted_at', null)
+      .eq('is_hidden', false)
+      .eq('visibility', 'public')
+      .gte('created_at', thresholdStr)
+      .order('like_count', { ascending: false })
+      .order('comment_count', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (blockedUserIds.length > 0) {
+      postsQuery = postsQuery.not('author_id', 'in', `(${blockedUserIds.join(',')})`)
+    }
+
+    const { data: trendingPosts, error: postsErr } = await postsQuery
+    if (postsErr) throw postsErr
+
+    // Enrich posts with author/community info
+    const authorIds = [...new Set((trendingPosts || []).map((p: any) => p.author_id))]
+    const communityIds = [...new Set((trendingPosts || []).filter((p: any) => p.community_id).map((p: any) => p.community_id))]
+
+    const [{ data: authors }, { data: communities }] = await Promise.all([
+      authorIds.length > 0
+        ? supabase.from('users').select('id, name, profile_photo_url').in('id', authorIds)
+        : { data: [] },
+      communityIds.length > 0
+        ? supabase.from('communities').select('id, name').in('id', communityIds)
+        : { data: [] }
+    ])
+
+    const authorsMap = new Map((authors || []).map((a: any) => [a.id, a]))
+    const communitiesMap = new Map((communities || []).map((c: any) => [c.id, c]))
 
     // Trending Communities (by recent growth)
-    const trendingCommunities = await db.all<any>(`
-      SELECT
-        c.id, c.name, c.slug, c.description, c.cover_image_url,
-        c.member_count, c.post_count, c.is_verified,
-        COUNT(cm.id) as recent_joins
-      FROM communities c
-      LEFT JOIN community_members cm ON cm.community_id = c.id
-        AND cm.joined_at >= $1
-        AND cm.status = 'active'
-      WHERE c.privacy_level = 'public'
-      GROUP BY c.id
-      ORDER BY recent_joins DESC, c.member_count DESC
-      LIMIT $2
-    `, [threshold.toISOString(), limit])
+    const { data: trendingCommunities, error: commErr } = await supabase
+      .from('communities')
+      .select('id, name, slug, description, cover_image_url, member_count, post_count, is_verified')
+      .eq('privacy_level', 'public')
+      .order('member_count', { ascending: false })
+      .limit(limit)
+
+    if (commErr) throw commErr
 
     return c.json({
       timeframe,
-      posts: trendingPosts.map(p => ({
-        id: p.id,
-        content: p.content,
-        contentType: p.content_type,
-        mediaUrls: p.media_urls ? JSON.parse(p.media_urls) : null,
-        likeCount: p.like_count,
-        commentCount: p.comment_count,
-        engagementScore: p.engagement_score,
-        createdAt: p.created_at,
-        author: {
-          id: p.author_id,
-          name: p.author_name,
-          profilePhotoUrl: p.profile_photo_url
-        },
-        community: p.community_id ? {
-          id: p.community_id,
-          name: p.community_name
-        } : null
-      })),
-      communities: trendingCommunities.map(c => ({
+      posts: (trendingPosts || []).map((p: any) => {
+        const author = authorsMap.get(p.author_id)
+        const community = p.community_id ? communitiesMap.get(p.community_id) : null
+        return {
+          id: p.id,
+          content: p.content,
+          contentType: p.content_type,
+          mediaUrls: p.media_urls ? JSON.parse(p.media_urls) : null,
+          likeCount: p.like_count,
+          commentCount: p.comment_count,
+          engagementScore: (p.like_count || 0) + (p.comment_count || 0) * 2,
+          createdAt: p.created_at,
+          author: {
+            id: p.author_id,
+            name: author?.name,
+            profilePhotoUrl: author?.profile_photo_url
+          },
+          community: community ? {
+            id: community.id,
+            name: community.name
+          } : null
+        }
+      }),
+      communities: (trendingCommunities || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         slug: c.slug,
@@ -826,7 +562,7 @@ discoveryApi.get('/discover/trending', async (c: Context) => {
         memberCount: c.member_count,
         postCount: c.post_count,
         isVerified: c.is_verified,
-        recentJoins: c.recent_joins
+        recentJoins: 0 // Would need a separate query for recent joins count
       }))
     })
   } catch (error) {
@@ -845,19 +581,25 @@ discoveryApi.get('/discover/trending', async (c: Context) => {
  */
 discoveryApi.get('/explore/categories', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
 
-    const categories = await db.all<any>(`
-      SELECT
-        category,
-        COUNT(*) as community_count,
-        SUM(member_count) as total_members
-      FROM communities
-      WHERE privacy_level = 'public'
-      AND category IS NOT NULL
-      GROUP BY category
-      ORDER BY community_count DESC
-    `)
+    // Get all public communities grouped by category
+    const { data: communities, error } = await supabase
+      .from('communities')
+      .select('category, member_count')
+      .eq('privacy_level', 'public')
+      .not('category', 'is', null)
+
+    if (error) throw error
+
+    // Aggregate in JS since Supabase doesn't support GROUP BY + aggregate in query builder
+    const categoryStats = new Map<string, { count: number; members: number }>()
+    for (const c of (communities || [])) {
+      const existing = categoryStats.get(c.category) || { count: 0, members: 0 }
+      existing.count++
+      existing.members += c.member_count || 0
+      categoryStats.set(c.category, existing)
+    }
 
     const categoryInfo = [
       { id: 'relationship_stage', name: 'Relationship Stage', description: 'Groups by relationship phase: newlyweds, long-distance, etc.' },
@@ -870,11 +612,11 @@ discoveryApi.get('/explore/categories', async (c: Context) => {
 
     return c.json({
       categories: categoryInfo.map(info => {
-        const stats = categories.find(c => c.category === info.id)
+        const stats = categoryStats.get(info.id)
         return {
           ...info,
-          communityCount: stats?.community_count || 0,
-          totalMembers: stats?.total_members || 0
+          communityCount: stats?.count || 0,
+          totalMembers: stats?.members || 0
         }
       })
     })
@@ -890,34 +632,37 @@ discoveryApi.get('/explore/categories', async (c: Context) => {
  */
 discoveryApi.get('/explore/topics', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const { limit } = getPaginationParams(c)
 
-    // Extract hashtags from recent posts
-    // This is a simplified version - in production, you'd want a dedicated hashtags table
-    const recentPosts = await db.all<{ content: string }>(`
-      SELECT content
-      FROM posts
-      WHERE created_at >= datetime('now', '-7 days')
-      AND deleted_at IS NULL
-      AND is_hidden = FALSE
-      AND visibility = 'public'
-      AND content LIKE '%#%'
-      ORDER BY created_at DESC
-      LIMIT 1000
-    `)
+    // Get recent public posts with hashtags
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: recentPosts, error } = await supabase
+      .from('posts')
+      .select('content')
+      .is('deleted_at', null)
+      .eq('is_hidden', false)
+      .eq('visibility', 'public')
+      .gte('created_at', weekAgo)
+      .like('content', '%#%')
+      .order('created_at', { ascending: false })
+      .limit(1000)
+
+    if (error) throw error
 
     // Extract and count hashtags
     const hashtagCounts = new Map<string, number>()
     const hashtagRegex = /#(\w+)/g
 
-    for (const post of recentPosts) {
+    for (const post of (recentPosts || [])) {
+      if (!post.content) continue
       let match
       while ((match = hashtagRegex.exec(post.content)) !== null) {
         const tag = match[1].toLowerCase()
         hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + 1)
       }
-      hashtagRegex.lastIndex = 0 // Reset regex for next iteration
+      hashtagRegex.lastIndex = 0
     }
 
     // Convert to array and sort by count

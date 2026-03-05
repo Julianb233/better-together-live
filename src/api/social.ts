@@ -1,13 +1,33 @@
 // Better Together: Social Interactions API
 // Handles reactions, comments, connections, blocks, and reports
+// Migrated from Neon raw SQL to Supabase client
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { zValidator } from '@hono/zod-validator'
+import { createAdminClient } from '../lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateId, getCurrentDateTime } from '../utils'
 import { getPaginationParams } from '../lib/pagination'
 import { sanitizeTextInput } from '../lib/sanitize'
+import {
+  createReactionSchema,
+  createCommentSchema,
+  updateCommentSchema,
+  friendRequestActionSchema,
+  createBlockSchema,
+  createReportSchema,
+  commentsQuerySchema,
+  connectionsQuerySchema
+} from '../lib/validation/schemas/social'
+
+function getSupabaseEnv(c: Context) {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
+}
 
 const socialApi = new Hono()
 
@@ -19,49 +39,50 @@ const socialApi = new Hono()
  * POST /api/posts/:postId/reactions
  * React to a post (upsert: create or update reaction)
  */
-socialApi.post('/posts/:postId/reactions', async (c: Context) => {
+socialApi.post('/posts/:postId/reactions',
+  zValidator('json', createReactionSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('postId')
     const userId = c.get('userId')
-    const { reaction_type } = await c.req.json()
-
-    // Validate reaction type
-    const validReactions = ['like', 'love', 'celebrate', 'support', 'insightful']
-    if (!reaction_type || !validReactions.includes(reaction_type)) {
-      return c.json({ error: 'Invalid reaction type' }, 400)
-    }
+    const { reaction_type } = c.req.valid('json' as never) as any
 
     // Check if post exists and user isn't blocked
-    const post = await db.first<{ author_id: string }>(
-      'SELECT author_id FROM posts WHERE id = $1 AND deleted_at IS NULL',
-      [postId]
-    )
+    const { data: post } = await supabase
+      .from('posts')
+      .select('author_id')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!post) {
       return c.json({ error: 'Post not found' }, 404)
     }
 
     // Check if user is blocked
-    const isBlocked = await checkIfBlocked(db, userId, post.author_id)
-    if (isBlocked) {
+    const blocked = await checkIfBlocked(supabase, userId, post.author_id)
+    if (blocked) {
       return c.json({ error: 'Cannot react to this post' }, 403)
     }
 
     // Check for existing reaction
-    const existingReaction = await db.first<{ id: string }>(
-      'SELECT id FROM reactions WHERE user_id = $1 AND target_type = $2 AND target_id = $3',
-      [userId, 'post', postId]
-    )
+    const { data: existingReaction } = await supabase
+      .from('reactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('target_type', 'post')
+      .eq('target_id', postId)
+      .maybeSingle()
 
     const now = getCurrentDateTime()
 
     if (existingReaction) {
       // Update existing reaction
-      await db.run(
-        'UPDATE reactions SET reaction_type = $1 WHERE id = $2',
-        [reaction_type, existingReaction.id]
-      )
+      await supabase
+        .from('reactions')
+        .update({ reaction_type })
+        .eq('id', existingReaction.id)
 
       return c.json({
         success: true,
@@ -71,10 +92,16 @@ socialApi.post('/posts/:postId/reactions', async (c: Context) => {
     } else {
       // Create new reaction
       const reactionId = generateId()
-      await db.run(`
-        INSERT INTO reactions (id, user_id, target_type, target_id, reaction_type, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [reactionId, userId, 'post', postId, reaction_type, now])
+      await supabase
+        .from('reactions')
+        .insert({
+          id: reactionId,
+          user_id: userId,
+          target_type: 'post',
+          target_id: postId,
+          reaction_type,
+          created_at: now
+        })
 
       return c.json({
         success: true,
@@ -94,14 +121,16 @@ socialApi.post('/posts/:postId/reactions', async (c: Context) => {
  */
 socialApi.delete('/posts/:postId/reactions', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('postId')
     const userId = c.get('userId')
 
-    await db.run(
-      'DELETE FROM reactions WHERE user_id = $1 AND target_type = $2 AND target_id = $3',
-      [userId, 'post', postId]
-    )
+    await supabase
+      .from('reactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('target_type', 'post')
+      .eq('target_id', postId)
 
     return c.json({ success: true, message: 'Reaction removed' })
   } catch (error) {
@@ -116,38 +145,49 @@ socialApi.delete('/posts/:postId/reactions', async (c: Context) => {
  */
 socialApi.get('/posts/:postId/reactions', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('postId')
     const typeFilter = c.req.query('type')
 
-    let query = `
-      SELECT r.reaction_type, r.user_id, r.created_at,
-             u.name, u.profile_photo_url
-      FROM reactions r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.target_type = 'post' AND r.target_id = $1
-    `
-    const params: any[] = [postId]
+    // Fetch reactions
+    let query = supabase
+      .from('reactions')
+      .select('reaction_type, user_id, created_at')
+      .eq('target_type', 'post')
+      .eq('target_id', postId)
 
     if (typeFilter) {
-      query += ' AND r.reaction_type = $2'
-      params.push(typeFilter)
+      query = query.eq('reaction_type', typeFilter)
     }
 
-    query += ' ORDER BY r.created_at DESC'
+    query = query.order('created_at', { ascending: false })
 
-    const reactions = await db.all<any>(query, params)
+    const { data: reactionsRaw } = await query
+
+    if (!reactionsRaw || reactionsRaw.length === 0) {
+      return c.json({ reactions: {}, total: 0 })
+    }
+
+    // Fetch user details for reactors
+    const userIds = [...new Set(reactionsRaw.map(r => r.user_id))]
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, profile_photo_url')
+      .in('id', userIds)
+
+    const usersMap = new Map((users || []).map(u => [u.id, u]))
 
     // Group by reaction type
-    const grouped = reactions.reduce((acc: any, r: any) => {
+    const grouped = reactionsRaw.reduce((acc: any, r: any) => {
       if (!acc[r.reaction_type]) {
         acc[r.reaction_type] = { count: 0, users: [] }
       }
       acc[r.reaction_type].count++
+      const user = usersMap.get(r.user_id)
       acc[r.reaction_type].users.push({
         user_id: r.user_id,
-        name: r.name,
-        profile_photo_url: r.profile_photo_url,
+        name: user?.name || null,
+        profile_photo_url: user?.profile_photo_url || null,
         reacted_at: r.created_at
       })
       return acc
@@ -155,7 +195,7 @@ socialApi.get('/posts/:postId/reactions', async (c: Context) => {
 
     return c.json({
       reactions: grouped,
-      total: reactions.length
+      total: reactionsRaw.length
     })
   } catch (error) {
     console.error('Get post reactions error:', error)
@@ -167,47 +207,49 @@ socialApi.get('/posts/:postId/reactions', async (c: Context) => {
  * POST /api/comments/:commentId/reactions
  * React to a comment
  */
-socialApi.post('/comments/:commentId/reactions', async (c: Context) => {
+socialApi.post('/comments/:commentId/reactions',
+  zValidator('json', createReactionSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const commentId = c.req.param('commentId')
     const userId = c.get('userId')
-    const { reaction_type } = await c.req.json()
-
-    const validReactions = ['like', 'love', 'celebrate', 'support', 'insightful']
-    if (!reaction_type || !validReactions.includes(reaction_type)) {
-      return c.json({ error: 'Invalid reaction type' }, 400)
-    }
+    const { reaction_type } = c.req.valid('json' as never) as any
 
     // Check if comment exists
-    const comment = await db.first<{ author_id: string }>(
-      'SELECT author_id FROM comments WHERE id = $1 AND deleted_at IS NULL',
-      [commentId]
-    )
+    const { data: comment } = await supabase
+      .from('comments')
+      .select('author_id')
+      .eq('id', commentId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!comment) {
       return c.json({ error: 'Comment not found' }, 404)
     }
 
     // Check if user is blocked
-    const isBlocked = await checkIfBlocked(db, userId, comment.author_id)
-    if (isBlocked) {
+    const blocked = await checkIfBlocked(supabase, userId, comment.author_id)
+    if (blocked) {
       return c.json({ error: 'Cannot react to this comment' }, 403)
     }
 
     // Upsert reaction
-    const existingReaction = await db.first<{ id: string }>(
-      'SELECT id FROM reactions WHERE user_id = $1 AND target_type = $2 AND target_id = $3',
-      [userId, 'comment', commentId]
-    )
+    const { data: existingReaction } = await supabase
+      .from('reactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('target_type', 'comment')
+      .eq('target_id', commentId)
+      .maybeSingle()
 
     const now = getCurrentDateTime()
 
     if (existingReaction) {
-      await db.run(
-        'UPDATE reactions SET reaction_type = $1 WHERE id = $2',
-        [reaction_type, existingReaction.id]
-      )
+      await supabase
+        .from('reactions')
+        .update({ reaction_type })
+        .eq('id', existingReaction.id)
 
       return c.json({
         success: true,
@@ -216,10 +258,16 @@ socialApi.post('/comments/:commentId/reactions', async (c: Context) => {
       })
     } else {
       const reactionId = generateId()
-      await db.run(`
-        INSERT INTO reactions (id, user_id, target_type, target_id, reaction_type, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [reactionId, userId, 'comment', commentId, reaction_type, now])
+      await supabase
+        .from('reactions')
+        .insert({
+          id: reactionId,
+          user_id: userId,
+          target_type: 'comment',
+          target_id: commentId,
+          reaction_type,
+          created_at: now
+        })
 
       return c.json({
         success: true,
@@ -239,14 +287,16 @@ socialApi.post('/comments/:commentId/reactions', async (c: Context) => {
  */
 socialApi.delete('/comments/:commentId/reactions', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const commentId = c.req.param('commentId')
     const userId = c.get('userId')
 
-    await db.run(
-      'DELETE FROM reactions WHERE user_id = $1 AND target_type = $2 AND target_id = $3',
-      [userId, 'comment', commentId]
-    )
+    await supabase
+      .from('reactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('target_type', 'comment')
+      .eq('target_id', commentId)
 
     return c.json({ success: true, message: 'Reaction removed' })
   } catch (error) {
@@ -263,65 +313,131 @@ socialApi.delete('/comments/:commentId/reactions', async (c: Context) => {
  * GET /api/posts/:postId/comments
  * Get comments on a post (with nested replies)
  */
-socialApi.get('/posts/:postId/comments', async (c: Context) => {
+socialApi.get('/posts/:postId/comments',
+  zValidator('query', commentsQuerySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('postId')
+    const { sort } = c.req.valid('query' as never) as any
     const { limit, offset } = getPaginationParams(c)
-    const sort = c.req.query('sort') || 'newest' // newest, oldest, popular
     const userId = c.get('userId') // May be null if not authenticated
 
-    // Build sort clause
-    let sortClause = 'c.created_at DESC'
-    if (sort === 'oldest') sortClause = 'c.created_at ASC'
-    if (sort === 'popular') sortClause = 'c.like_count DESC, c.created_at DESC'
+    // Build sort for top-level comments
+    let sortColumn = 'created_at'
+    let ascending = false
+    if (sort === 'oldest') { ascending = true }
+    if (sort === 'popular') { sortColumn = 'like_count' }
 
     // Get top-level comments (no parent)
-    const comments = await db.all<any>(`
-      SELECT c.*,
-             u.name as author_name,
-             u.profile_photo_url as author_photo,
-             (SELECT COUNT(*) FROM comments WHERE parent_comment_id = c.id AND deleted_at IS NULL) as reply_count
-      FROM comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.post_id = $1
-        AND c.parent_comment_id IS NULL
-        AND c.deleted_at IS NULL
-      ORDER BY ${sortClause}
-      LIMIT $2 OFFSET $3
-    `, [postId, limit, offset])
+    let commentsQuery = supabase
+      .from('comments')
+      .select('*')
+      .eq('post_id', postId)
+      .is('parent_comment_id', null)
+      .is('deleted_at', null)
+      .order(sortColumn, { ascending })
+
+    if (sort === 'popular') {
+      commentsQuery = commentsQuery.order('created_at', { ascending: false })
+    }
+
+    commentsQuery = commentsQuery.range(offset, offset + limit - 1)
+
+    const { data: commentsRaw } = await commentsQuery
+
+    if (!commentsRaw || commentsRaw.length === 0) {
+      // Get total count even if no comments on this page
+      const { count: totalCount } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId)
+        .is('parent_comment_id', null)
+        .is('deleted_at', null)
+
+      return c.json({
+        comments: [],
+        pagination: {
+          page: Math.floor(offset / limit) + 1,
+          limit,
+          total: totalCount || 0,
+          has_more: false
+        }
+      })
+    }
+
+    // Fetch author details
+    const authorIds = [...new Set(commentsRaw.map(c => c.author_id))]
+    const { data: authors } = await supabase
+      .from('users')
+      .select('id, name, profile_photo_url')
+      .in('id', authorIds)
+
+    const authorsMap = new Map((authors || []).map(a => [a.id, a]))
+
+    // Get reply counts for each comment
+    const commentIds = commentsRaw.map(c => c.id)
+    const { data: replyCounts } = await supabase
+      .from('comments')
+      .select('parent_comment_id')
+      .in('parent_comment_id', commentIds)
+      .is('deleted_at', null)
+
+    const replyCountMap = new Map<string, number>()
+    if (replyCounts) {
+      for (const r of replyCounts) {
+        const count = replyCountMap.get(r.parent_comment_id) || 0
+        replyCountMap.set(r.parent_comment_id, count + 1)
+      }
+    }
+
+    // Build enriched comments
+    let comments: any[] = commentsRaw.map(c => {
+      const author = authorsMap.get(c.author_id)
+      return {
+        ...c,
+        author_name: author?.name || null,
+        author_photo: author?.profile_photo_url || null,
+        reply_count: replyCountMap.get(c.id) || 0,
+        user_reaction: null
+      }
+    })
 
     // Get user's reactions if authenticated
-    if (userId) {
-      const commentIds = comments.map(c => c.id)
-      if (commentIds.length > 0) {
-        const userReactions = await db.all<any>(
-          `SELECT target_id, reaction_type
-           FROM reactions
-           WHERE user_id = $1 AND target_type = 'comment' AND target_id = ANY($2)`,
-          [userId, commentIds]
-        )
+    if (userId && commentIds.length > 0) {
+      const { data: userReactions } = await supabase
+        .from('reactions')
+        .select('target_id, reaction_type')
+        .eq('user_id', userId)
+        .eq('target_type', 'comment')
+        .in('target_id', commentIds)
 
+      if (userReactions) {
         const reactionsMap = new Map(userReactions.map(r => [r.target_id, r.reaction_type]))
-        comments.forEach(c => {
-          c.user_reaction = reactionsMap.get(c.id) || null
-        })
+        comments = comments.map(c => ({
+          ...c,
+          user_reaction: reactionsMap.get(c.id) || null
+        }))
       }
     }
 
     // Get total count
-    const countResult = await db.first<{ count: number }>(
-      'SELECT COUNT(*) as count FROM comments WHERE post_id = $1 AND parent_comment_id IS NULL AND deleted_at IS NULL',
-      [postId]
-    )
+    const { count: totalCount } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId)
+      .is('parent_comment_id', null)
+      .is('deleted_at', null)
+
+    const total = totalCount || 0
 
     return c.json({
       comments,
       pagination: {
-        page,
+        page: Math.floor(offset / limit) + 1,
         limit,
-        total: countResult?.count || 0,
-        has_more: offset + comments.length < (countResult?.count || 0)
+        total,
+        has_more: offset + comments.length < total
       }
     })
   } catch (error) {
@@ -334,44 +450,42 @@ socialApi.get('/posts/:postId/comments', async (c: Context) => {
  * POST /api/posts/:postId/comments
  * Create a new comment or reply
  */
-socialApi.post('/posts/:postId/comments', async (c: Context) => {
+socialApi.post('/posts/:postId/comments',
+  zValidator('json', createCommentSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const postId = c.req.param('postId')
     const userId = c.get('userId')
-    const { content, parent_comment_id } = await c.req.json()
-
-    // Validate content
-    if (!content || content.trim().length === 0) {
-      return c.json({ error: 'Comment content is required' }, 400)
-    }
-
-    if (content.length > 2000) {
-      return c.json({ error: 'Comment is too long (max 2000 characters)' }, 400)
-    }
+    const { content, parent_comment_id } = c.req.valid('json' as never) as any
 
     // Check if post exists
-    const post = await db.first<{ author_id: string }>(
-      'SELECT author_id FROM posts WHERE id = $1 AND deleted_at IS NULL',
-      [postId]
-    )
+    const { data: post } = await supabase
+      .from('posts')
+      .select('author_id')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!post) {
       return c.json({ error: 'Post not found' }, 404)
     }
 
     // Check if user is blocked
-    const isBlocked = await checkIfBlocked(db, userId, post.author_id)
-    if (isBlocked) {
+    const blocked = await checkIfBlocked(supabase, userId, post.author_id)
+    if (blocked) {
       return c.json({ error: 'Cannot comment on this post' }, 403)
     }
 
     // If replying to a comment, check nesting depth
     if (parent_comment_id) {
-      const parentComment = await db.first<{ parent_comment_id: string | null }>(
-        'SELECT parent_comment_id FROM comments WHERE id = $1 AND post_id = $2 AND deleted_at IS NULL',
-        [parent_comment_id, postId]
-      )
+      const { data: parentComment } = await supabase
+        .from('comments')
+        .select('parent_comment_id')
+        .eq('id', parent_comment_id)
+        .eq('post_id', postId)
+        .is('deleted_at', null)
+        .maybeSingle()
 
       if (!parentComment) {
         return c.json({ error: 'Parent comment not found' }, 404)
@@ -387,23 +501,40 @@ socialApi.post('/posts/:postId/comments', async (c: Context) => {
     const commentId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO comments (id, post_id, author_id, parent_comment_id, content, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [commentId, postId, userId, parent_comment_id || null, sanitizeTextInput(content), now, now])
+    await supabase
+      .from('comments')
+      .insert({
+        id: commentId,
+        post_id: postId,
+        author_id: userId,
+        parent_comment_id: parent_comment_id || null,
+        content: sanitizeTextInput(content),
+        created_at: now,
+        updated_at: now
+      })
 
     // Get comment with author info
-    const comment = await db.first<any>(`
-      SELECT c.*, u.name as author_name, u.profile_photo_url as author_photo
-      FROM comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.id = $1
-    `, [commentId])
+    const { data: createdComment } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('id', commentId)
+      .single()
+
+    // Fetch author info
+    const { data: author } = await supabase
+      .from('users')
+      .select('name, profile_photo_url')
+      .eq('id', userId)
+      .maybeSingle()
 
     return c.json({
       success: true,
       message: 'Comment created',
-      comment
+      comment: {
+        ...createdComment,
+        author_name: author?.name || null,
+        author_photo: author?.profile_photo_url || null
+      }
     }, 201)
   } catch (error) {
     console.error('Create comment error:', error)
@@ -415,26 +546,22 @@ socialApi.post('/posts/:postId/comments', async (c: Context) => {
  * PUT /api/comments/:id
  * Update a comment (only author can update)
  */
-socialApi.put('/comments/:id', async (c: Context) => {
+socialApi.put('/comments/:id',
+  zValidator('json', updateCommentSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const commentId = c.req.param('id')
     const userId = c.get('userId')
-    const { content } = await c.req.json()
-
-    if (!content || content.trim().length === 0) {
-      return c.json({ error: 'Comment content is required' }, 400)
-    }
-
-    if (content.length > 2000) {
-      return c.json({ error: 'Comment is too long (max 2000 characters)' }, 400)
-    }
+    const { content } = c.req.valid('json' as never) as any
 
     // Check if comment exists and user is author
-    const comment = await db.first<{ author_id: string }>(
-      'SELECT author_id FROM comments WHERE id = $1 AND deleted_at IS NULL',
-      [commentId]
-    )
+    const { data: comment } = await supabase
+      .from('comments')
+      .select('author_id')
+      .eq('id', commentId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!comment) {
       return c.json({ error: 'Comment not found' }, 404)
@@ -446,15 +573,17 @@ socialApi.put('/comments/:id', async (c: Context) => {
 
     // Update comment
     const now = getCurrentDateTime()
-    await db.run(
-      'UPDATE comments SET content = $1, updated_at = $2 WHERE id = $3',
-      [sanitizeTextInput(content), now, commentId]
-    )
+    const sanitizedContent = sanitizeTextInput(content)
+
+    await supabase
+      .from('comments')
+      .update({ content: sanitizedContent, updated_at: now })
+      .eq('id', commentId)
 
     return c.json({
       success: true,
       message: 'Comment updated',
-      comment: { id: commentId, content: sanitizeTextInput(content), updated_at: now }
+      comment: { id: commentId, content: sanitizedContent, updated_at: now }
     })
   } catch (error) {
     console.error('Update comment error:', error)
@@ -468,25 +597,28 @@ socialApi.put('/comments/:id', async (c: Context) => {
  */
 socialApi.delete('/comments/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const commentId = c.req.param('id')
     const userId = c.get('userId')
 
     // Get comment with post info
-    const comment = await db.first<{ author_id: string; post_id: string }>(
-      'SELECT author_id, post_id FROM comments WHERE id = $1 AND deleted_at IS NULL',
-      [commentId]
-    )
+    const { data: comment } = await supabase
+      .from('comments')
+      .select('author_id, post_id')
+      .eq('id', commentId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!comment) {
       return c.json({ error: 'Comment not found' }, 404)
     }
 
     // Check if user is comment author or post author
-    const post = await db.first<{ author_id: string }>(
-      'SELECT author_id FROM posts WHERE id = $1',
-      [comment.post_id]
-    )
+    const { data: post } = await supabase
+      .from('posts')
+      .select('author_id')
+      .eq('id', comment.post_id)
+      .maybeSingle()
 
     const canDelete = comment.author_id === userId || post?.author_id === userId
 
@@ -496,10 +628,10 @@ socialApi.delete('/comments/:id', async (c: Context) => {
 
     // Soft delete
     const now = getCurrentDateTime()
-    await db.run(
-      'UPDATE comments SET deleted_at = $1 WHERE id = $2',
-      [now, commentId]
-    )
+    await supabase
+      .from('comments')
+      .update({ deleted_at: now })
+      .eq('id', commentId)
 
     return c.json({
       success: true,
@@ -519,54 +651,118 @@ socialApi.delete('/comments/:id', async (c: Context) => {
  * GET /api/connections
  * Get user's connections (followers, following, friends)
  */
-socialApi.get('/connections', async (c: Context) => {
+socialApi.get('/connections',
+  zValidator('query', connectionsQuerySchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
-    const type = c.req.query('type') // followers, following, friends
-    const status = c.req.query('status') || 'accepted'
+    const { type, status } = c.req.valid('query' as never) as any
     const { limit, offset } = getPaginationParams(c)
 
-    let query = ''
-    let params: any[] = []
+    let connectionsRaw: any[] = []
 
     if (type === 'followers') {
-      query = `
-        SELECT uc.*, u.id as user_id, u.name, u.nickname, u.profile_photo_url, uc.created_at as connected_at
-        FROM user_connections uc
-        JOIN users u ON uc.follower_id = u.id
-        WHERE uc.following_id = $1 AND uc.status = $2
-        ORDER BY uc.created_at DESC
-        LIMIT $3 OFFSET $4
-      `
-      params = [userId, status, limit, offset]
+      // Users who follow me
+      const { data } = await supabase
+        .from('user_connections')
+        .select('*, follower_id')
+        .eq('following_id', userId)
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      connectionsRaw = data || []
+
+      // Fetch user details for followers
+      if (connectionsRaw.length > 0) {
+        const userIds = connectionsRaw.map(c => c.follower_id)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', userIds)
+
+        const usersMap = new Map((users || []).map(u => [u.id, u]))
+        connectionsRaw = connectionsRaw.map(c => {
+          const user = usersMap.get(c.follower_id)
+          return {
+            ...c,
+            user_id: c.follower_id,
+            name: user?.name || null,
+            nickname: user?.nickname || null,
+            profile_photo_url: user?.profile_photo_url || null,
+            connected_at: c.created_at
+          }
+        })
+      }
     } else if (type === 'following') {
-      query = `
-        SELECT uc.*, u.id as user_id, u.name, u.nickname, u.profile_photo_url, uc.created_at as connected_at
-        FROM user_connections uc
-        JOIN users u ON uc.following_id = u.id
-        WHERE uc.follower_id = $1 AND uc.status = $2
-        ORDER BY uc.created_at DESC
-        LIMIT $3 OFFSET $4
-      `
-      params = [userId, status, limit, offset]
+      // Users I follow
+      const { data } = await supabase
+        .from('user_connections')
+        .select('*, following_id')
+        .eq('follower_id', userId)
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      connectionsRaw = data || []
+
+      if (connectionsRaw.length > 0) {
+        const userIds = connectionsRaw.map(c => c.following_id)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', userIds)
+
+        const usersMap = new Map((users || []).map(u => [u.id, u]))
+        connectionsRaw = connectionsRaw.map(c => {
+          const user = usersMap.get(c.following_id)
+          return {
+            ...c,
+            user_id: c.following_id,
+            name: user?.name || null,
+            nickname: user?.nickname || null,
+            profile_photo_url: user?.profile_photo_url || null,
+            connected_at: c.created_at
+          }
+        })
+      }
     } else if (type === 'friends') {
-      query = `
-        SELECT uc.*, u.id as user_id, u.name, u.nickname, u.profile_photo_url, uc.created_at as connected_at
-        FROM user_connections uc
-        JOIN users u ON uc.following_id = u.id
-        WHERE uc.follower_id = $1 AND uc.connection_type = 'friend' AND uc.status = $2
-        ORDER BY uc.created_at DESC
-        LIMIT $3 OFFSET $4
-      `
-      params = [userId, status, limit, offset]
-    } else {
-      return c.json({ error: 'Invalid type. Use: followers, following, or friends' }, 400)
+      // My friends
+      const { data } = await supabase
+        .from('user_connections')
+        .select('*, following_id')
+        .eq('follower_id', userId)
+        .eq('connection_type', 'friend')
+        .eq('status', status)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      connectionsRaw = data || []
+
+      if (connectionsRaw.length > 0) {
+        const userIds = connectionsRaw.map(c => c.following_id)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', userIds)
+
+        const usersMap = new Map((users || []).map(u => [u.id, u]))
+        connectionsRaw = connectionsRaw.map(c => {
+          const user = usersMap.get(c.following_id)
+          return {
+            ...c,
+            user_id: c.following_id,
+            name: user?.name || null,
+            nickname: user?.nickname || null,
+            profile_photo_url: user?.profile_photo_url || null,
+            connected_at: c.created_at
+          }
+        })
+      }
     }
 
-    const connections = await db.all<any>(query, params)
-
-    return c.json({ connections })
+    return c.json({ connections: connectionsRaw })
   } catch (error) {
     console.error('Get connections error:', error)
     return c.json({ error: 'Failed to get connections' }, 500)
@@ -579,7 +775,7 @@ socialApi.get('/connections', async (c: Context) => {
  */
 socialApi.post('/connections/:userId/follow', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const targetUserId = c.req.param('userId')
 
@@ -588,46 +784,56 @@ socialApi.post('/connections/:userId/follow', async (c: Context) => {
     }
 
     // Check if target user exists
-    const targetUser = await db.first<{ id: string }>(
-      'SELECT id FROM users WHERE id = $1',
-      [targetUserId]
-    )
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', targetUserId)
+      .maybeSingle()
 
     if (!targetUser) {
       return c.json({ error: 'User not found' }, 404)
     }
 
     // Check if blocked
-    const isBlocked = await checkIfBlocked(db, currentUserId, targetUserId)
-    if (isBlocked) {
+    const blocked = await checkIfBlocked(supabase, currentUserId, targetUserId)
+    if (blocked) {
       return c.json({ error: 'Cannot follow this user' }, 403)
     }
 
     // Check if already following
-    const existing = await db.first<{ id: string, status: string }>(
-      'SELECT id, status FROM user_connections WHERE follower_id = $1 AND following_id = $2',
-      [currentUserId, targetUserId]
-    )
+    const { data: existing } = await supabase
+      .from('user_connections')
+      .select('id, status')
+      .eq('follower_id', currentUserId)
+      .eq('following_id', targetUserId)
+      .maybeSingle()
 
     if (existing && existing.status === 'accepted') {
       return c.json({ error: 'Already following this user' }, 400)
     }
 
-    const connectionId = generateId()
     const now = getCurrentDateTime()
 
     if (existing) {
       // Update existing connection
-      await db.run(
-        'UPDATE user_connections SET status = $1, connection_type = $2, updated_at = $3 WHERE id = $4',
-        ['accepted', 'follow', now, existing.id]
-      )
+      await supabase
+        .from('user_connections')
+        .update({ status: 'accepted', connection_type: 'follow', updated_at: now })
+        .eq('id', existing.id)
     } else {
       // Create new connection
-      await db.run(`
-        INSERT INTO user_connections (id, follower_id, following_id, connection_type, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [connectionId, currentUserId, targetUserId, 'follow', 'accepted', now, now])
+      const connectionId = generateId()
+      await supabase
+        .from('user_connections')
+        .insert({
+          id: connectionId,
+          follower_id: currentUserId,
+          following_id: targetUserId,
+          connection_type: 'follow',
+          status: 'accepted',
+          created_at: now,
+          updated_at: now
+        })
     }
 
     return c.json({
@@ -646,14 +852,15 @@ socialApi.post('/connections/:userId/follow', async (c: Context) => {
  */
 socialApi.delete('/connections/:userId/unfollow', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const targetUserId = c.req.param('userId')
 
-    await db.run(
-      'DELETE FROM user_connections WHERE follower_id = $1 AND following_id = $2',
-      [currentUserId, targetUserId]
-    )
+    await supabase
+      .from('user_connections')
+      .delete()
+      .eq('follower_id', currentUserId)
+      .eq('following_id', targetUserId)
 
     return c.json({
       success: true,
@@ -671,7 +878,7 @@ socialApi.delete('/connections/:userId/unfollow', async (c: Context) => {
  */
 socialApi.post('/connections/:userId/friend', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const targetUserId = c.req.param('userId')
 
@@ -680,26 +887,29 @@ socialApi.post('/connections/:userId/friend', async (c: Context) => {
     }
 
     // Check if target user exists
-    const targetUser = await db.first<{ id: string }>(
-      'SELECT id FROM users WHERE id = $1',
-      [targetUserId]
-    )
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', targetUserId)
+      .maybeSingle()
 
     if (!targetUser) {
       return c.json({ error: 'User not found' }, 404)
     }
 
     // Check if blocked
-    const isBlocked = await checkIfBlocked(db, currentUserId, targetUserId)
-    if (isBlocked) {
+    const blocked = await checkIfBlocked(supabase, currentUserId, targetUserId)
+    if (blocked) {
       return c.json({ error: 'Cannot send friend request to this user' }, 403)
     }
 
     // Check for existing connection
-    const existing = await db.first<{ id: string, status: string }>(
-      'SELECT id, status FROM user_connections WHERE follower_id = $1 AND following_id = $2',
-      [currentUserId, targetUserId]
-    )
+    const { data: existing } = await supabase
+      .from('user_connections')
+      .select('id, status')
+      .eq('follower_id', currentUserId)
+      .eq('following_id', targetUserId)
+      .maybeSingle()
 
     if (existing && existing.status === 'accepted') {
       return c.json({ error: 'Already friends with this user' }, 400)
@@ -709,21 +919,28 @@ socialApi.post('/connections/:userId/friend', async (c: Context) => {
       return c.json({ error: 'Friend request already pending' }, 400)
     }
 
-    const connectionId = generateId()
     const now = getCurrentDateTime()
 
     if (existing) {
       // Update existing
-      await db.run(
-        'UPDATE user_connections SET status = $1, connection_type = $2, updated_at = $3 WHERE id = $4',
-        ['pending', 'friend', now, existing.id]
-      )
+      await supabase
+        .from('user_connections')
+        .update({ status: 'pending', connection_type: 'friend', updated_at: now })
+        .eq('id', existing.id)
     } else {
       // Create new friend request
-      await db.run(`
-        INSERT INTO user_connections (id, follower_id, following_id, connection_type, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [connectionId, currentUserId, targetUserId, 'friend', 'pending', now, now])
+      const connectionId = generateId()
+      await supabase
+        .from('user_connections')
+        .insert({
+          id: connectionId,
+          follower_id: currentUserId,
+          following_id: targetUserId,
+          connection_type: 'friend',
+          status: 'pending',
+          created_at: now,
+          updated_at: now
+        })
     }
 
     return c.json({
@@ -740,24 +957,24 @@ socialApi.post('/connections/:userId/friend', async (c: Context) => {
  * PUT /api/connections/:userId/friend
  * Accept or reject friend request
  */
-socialApi.put('/connections/:userId/friend', async (c: Context) => {
+socialApi.put('/connections/:userId/friend',
+  zValidator('json', friendRequestActionSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const requesterId = c.req.param('userId')
-    const { action } = await c.req.json() // 'accept' or 'reject'
-
-    if (!action || !['accept', 'reject'].includes(action)) {
-      return c.json({ error: 'Invalid action. Use: accept or reject' }, 400)
-    }
+    const { action } = c.req.valid('json' as never) as any
 
     // Find the friend request
-    const request = await db.first<{ id: string }>(
-      `SELECT id FROM user_connections
-       WHERE follower_id = $1 AND following_id = $2
-       AND connection_type = 'friend' AND status = 'pending'`,
-      [requesterId, currentUserId]
-    )
+    const { data: request } = await supabase
+      .from('user_connections')
+      .select('id')
+      .eq('follower_id', requesterId)
+      .eq('following_id', currentUserId)
+      .eq('connection_type', 'friend')
+      .eq('status', 'pending')
+      .maybeSingle()
 
     if (!request) {
       return c.json({ error: 'Friend request not found' }, 404)
@@ -767,18 +984,34 @@ socialApi.put('/connections/:userId/friend', async (c: Context) => {
 
     if (action === 'accept') {
       // Accept request
-      await db.run(
-        'UPDATE user_connections SET status = $1, updated_at = $2 WHERE id = $3',
-        ['accepted', now, request.id]
-      )
+      await supabase
+        .from('user_connections')
+        .update({ status: 'accepted', updated_at: now })
+        .eq('id', request.id)
 
       // Create reciprocal connection
       const reciprocalId = generateId()
-      await db.run(`
-        INSERT INTO user_connections (id, follower_id, following_id, connection_type, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT DO NOTHING
-      `, [reciprocalId, currentUserId, requesterId, 'friend', 'accepted', now, now])
+      // Check if reciprocal already exists
+      const { data: existingReciprocal } = await supabase
+        .from('user_connections')
+        .select('id')
+        .eq('follower_id', currentUserId)
+        .eq('following_id', requesterId)
+        .maybeSingle()
+
+      if (!existingReciprocal) {
+        await supabase
+          .from('user_connections')
+          .insert({
+            id: reciprocalId,
+            follower_id: currentUserId,
+            following_id: requesterId,
+            connection_type: 'friend',
+            status: 'accepted',
+            created_at: now,
+            updated_at: now
+          })
+      }
 
       return c.json({
         success: true,
@@ -786,10 +1019,10 @@ socialApi.put('/connections/:userId/friend', async (c: Context) => {
       })
     } else {
       // Reject request
-      await db.run(
-        'UPDATE user_connections SET status = $1, updated_at = $2 WHERE id = $3',
-        ['rejected', now, request.id]
-      )
+      await supabase
+        .from('user_connections')
+        .update({ status: 'rejected', updated_at: now })
+        .eq('id', request.id)
 
       return c.json({
         success: true,
@@ -808,33 +1041,89 @@ socialApi.put('/connections/:userId/friend', async (c: Context) => {
  */
 socialApi.get('/connections/suggestions', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     const { limit } = getPaginationParams(c)
 
-    // Get users with mutual connections, excluding already connected and blocked users
-    const suggestions = await db.all<any>(`
-      SELECT DISTINCT u.id, u.name, u.nickname, u.profile_photo_url,
-             COUNT(DISTINCT uc2.follower_id) as mutual_connections
-      FROM users u
-      LEFT JOIN user_connections uc2 ON uc2.following_id = u.id
-      WHERE u.id != $1
-        AND u.id NOT IN (
-          SELECT following_id FROM user_connections WHERE follower_id = $1
-        )
-        AND u.id NOT IN (
-          SELECT blocked_id FROM user_blocks WHERE blocker_id = $1
-        )
-        AND u.id NOT IN (
-          SELECT blocker_id FROM user_blocks WHERE blocked_id = $1
-        )
-        AND uc2.follower_id IN (
-          SELECT following_id FROM user_connections WHERE follower_id = $1 AND status = 'accepted'
-        )
-      GROUP BY u.id, u.name, u.nickname, u.profile_photo_url
-      ORDER BY mutual_connections DESC, RANDOM()
-      LIMIT $2
-    `, [userId, limit])
+    // Get user's current connections
+    const { data: myConnections } = await supabase
+      .from('user_connections')
+      .select('following_id')
+      .eq('follower_id', userId)
+      .eq('status', 'accepted')
+
+    const connectedIds = (myConnections || []).map(c => c.following_id)
+
+    // Get blocked users (both directions)
+    const { data: blockedOut } = await supabase
+      .from('user_blocks')
+      .select('blocked_id')
+      .eq('blocker_id', userId)
+
+    const { data: blockedIn } = await supabase
+      .from('user_blocks')
+      .select('blocker_id')
+      .eq('blocked_id', userId)
+
+    const blockedIds = [
+      ...(blockedOut || []).map(b => b.blocked_id),
+      ...(blockedIn || []).map(b => b.blocker_id)
+    ]
+
+    const excludeIds = [...new Set([userId, ...connectedIds, ...blockedIds])]
+
+    if (connectedIds.length === 0) {
+      // No connections yet - return empty suggestions
+      return c.json({ suggestions: [] })
+    }
+
+    // Find users followed by people I follow (mutual connections approach)
+    const { data: mutualFollows } = await supabase
+      .from('user_connections')
+      .select('following_id, follower_id')
+      .in('follower_id', connectedIds)
+      .eq('status', 'accepted')
+      .not('following_id', 'in', `(${excludeIds.join(',')})`)
+
+    if (!mutualFollows || mutualFollows.length === 0) {
+      return c.json({ suggestions: [] })
+    }
+
+    // Count mutual connections per suggested user
+    const mutualCountMap = new Map<string, number>()
+    for (const f of mutualFollows) {
+      const count = mutualCountMap.get(f.following_id) || 0
+      mutualCountMap.set(f.following_id, count + 1)
+    }
+
+    // Sort by mutual count descending and take top N
+    const sortedSuggestionIds = [...mutualCountMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => id)
+
+    if (sortedSuggestionIds.length === 0) {
+      return c.json({ suggestions: [] })
+    }
+
+    // Fetch user details
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, nickname, profile_photo_url')
+      .in('id', sortedSuggestionIds)
+
+    const usersMap = new Map((users || []).map(u => [u.id, u]))
+
+    const suggestions = sortedSuggestionIds
+      .map(id => {
+        const user = usersMap.get(id)
+        if (!user) return null
+        return {
+          ...user,
+          mutual_connections: mutualCountMap.get(id) || 0
+        }
+      })
+      .filter(Boolean)
 
     return c.json({ suggestions })
   } catch (error) {
@@ -851,22 +1140,26 @@ socialApi.get('/connections/suggestions', async (c: Context) => {
  * POST /api/blocks/:userId
  * Block a user
  */
-socialApi.post('/blocks/:userId', async (c: Context) => {
+socialApi.post('/blocks/:userId',
+  zValidator('json', createBlockSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const targetUserId = c.req.param('userId')
-    const { reason, notes } = await c.req.json()
+    const { reason, notes } = c.req.valid('json' as never) as any
 
     if (currentUserId === targetUserId) {
       return c.json({ error: 'Cannot block yourself' }, 400)
     }
 
     // Check if already blocked
-    const existing = await db.first<{ id: string }>(
-      'SELECT id FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2',
-      [currentUserId, targetUserId]
-    )
+    const { data: existing } = await supabase
+      .from('user_blocks')
+      .select('id')
+      .eq('blocker_id', currentUserId)
+      .eq('blocked_id', targetUserId)
+      .maybeSingle()
 
     if (existing) {
       return c.json({ error: 'User already blocked' }, 400)
@@ -876,26 +1169,53 @@ socialApi.post('/blocks/:userId', async (c: Context) => {
     const now = getCurrentDateTime()
 
     // Create block
-    await db.run(`
-      INSERT INTO user_blocks (id, blocker_id, blocked_id, reason, notes, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [blockId, currentUserId, targetUserId, reason || null, notes || null, now])
+    await supabase
+      .from('user_blocks')
+      .insert({
+        id: blockId,
+        blocker_id: currentUserId,
+        blocked_id: targetUserId,
+        reason: reason || null,
+        notes: notes || null,
+        created_at: now
+      })
 
     // Remove connections in both directions
-    await db.run(
-      'DELETE FROM user_connections WHERE (follower_id = $1 AND following_id = $2) OR (follower_id = $2 AND following_id = $1)',
-      [currentUserId, targetUserId]
-    )
+    await supabase
+      .from('user_connections')
+      .delete()
+      .or(`and(follower_id.eq.${currentUserId},following_id.eq.${targetUserId}),and(follower_id.eq.${targetUserId},following_id.eq.${currentUserId})`)
 
     // Remove from conversations (mark as left)
-    await db.run(`
-      UPDATE conversation_participants
-      SET left_at = $1
-      WHERE user_id = $2
-        AND conversation_id IN (
-          SELECT conversation_id FROM conversation_participants WHERE user_id = $3
-        )
-    `, [now, currentUserId, targetUserId])
+    // First get shared conversations
+    const { data: myConvs } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', currentUserId)
+      .is('left_at', null)
+
+    if (myConvs && myConvs.length > 0) {
+      const myConvIds = myConvs.map(c => c.conversation_id)
+
+      // Find conversations where the blocked user also participates
+      const { data: sharedConvs } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', targetUserId)
+        .in('conversation_id', myConvIds)
+        .is('left_at', null)
+
+      if (sharedConvs && sharedConvs.length > 0) {
+        const sharedConvIds = sharedConvs.map(c => c.conversation_id)
+
+        // Mark current user as left from shared conversations
+        await supabase
+          .from('conversation_participants')
+          .update({ left_at: now })
+          .eq('user_id', currentUserId)
+          .in('conversation_id', sharedConvIds)
+      }
+    }
 
     return c.json({
       success: true,
@@ -913,14 +1233,15 @@ socialApi.post('/blocks/:userId', async (c: Context) => {
  */
 socialApi.delete('/blocks/:userId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const currentUserId = c.get('userId')
     const targetUserId = c.req.param('userId')
 
-    await db.run(
-      'DELETE FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2',
-      [currentUserId, targetUserId]
-    )
+    await supabase
+      .from('user_blocks')
+      .delete()
+      .eq('blocker_id', currentUserId)
+      .eq('blocked_id', targetUserId)
 
     return c.json({
       success: true,
@@ -938,17 +1259,41 @@ socialApi.delete('/blocks/:userId', async (c: Context) => {
  */
 socialApi.get('/blocks', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
 
-    const blocked = await db.all<any>(`
-      SELECT ub.id, ub.blocked_id, ub.reason, ub.created_at,
-             u.name, u.nickname, u.profile_photo_url
-      FROM user_blocks ub
-      JOIN users u ON ub.blocked_id = u.id
-      WHERE ub.blocker_id = $1
-      ORDER BY ub.created_at DESC
-    `, [userId])
+    // Fetch blocks
+    const { data: blocksRaw } = await supabase
+      .from('user_blocks')
+      .select('id, blocked_id, reason, created_at')
+      .eq('blocker_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (!blocksRaw || blocksRaw.length === 0) {
+      return c.json({ blocked: [] })
+    }
+
+    // Fetch user details
+    const blockedIds = blocksRaw.map(b => b.blocked_id)
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, nickname, profile_photo_url')
+      .in('id', blockedIds)
+
+    const usersMap = new Map((users || []).map(u => [u.id, u]))
+
+    const blocked = blocksRaw.map(b => {
+      const user = usersMap.get(b.blocked_id)
+      return {
+        id: b.id,
+        blocked_id: b.blocked_id,
+        reason: b.reason,
+        created_at: b.created_at,
+        name: user?.name || null,
+        nickname: user?.nickname || null,
+        profile_photo_url: user?.profile_photo_url || null
+      }
+    })
 
     return c.json({ blocked })
   } catch (error) {
@@ -965,36 +1310,25 @@ socialApi.get('/blocks', async (c: Context) => {
  * POST /api/reports
  * Report content for moderation
  */
-socialApi.post('/reports', async (c: Context) => {
+socialApi.post('/reports',
+  zValidator('json', createReportSchema),
+  async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
-    const { target_type, target_id, reason, description } = await c.req.json()
-
-    // Validate target_type
-    const validTargetTypes = ['post', 'comment', 'message', 'user', 'community']
-    if (!target_type || !validTargetTypes.includes(target_type)) {
-      return c.json({ error: 'Invalid target type' }, 400)
-    }
-
-    // Validate reason
-    const validReasons = ['spam', 'harassment', 'hate_speech', 'violence', 'inappropriate', 'misinformation', 'copyright', 'other']
-    if (!reason || !validReasons.includes(reason)) {
-      return c.json({ error: 'Invalid reason' }, 400)
-    }
-
-    if (!target_id) {
-      return c.json({ error: 'Target ID is required' }, 400)
-    }
+    const { target_type, target_id, reason, description } = c.req.valid('json' as never) as any
 
     // Check for duplicate reports (same user, same target, within 24 hours)
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const existingReport = await db.first<{ id: string }>(
-      `SELECT id FROM content_reports
-       WHERE reporter_id = $1 AND target_type = $2 AND target_id = $3
-       AND created_at > $4`,
-      [userId, target_type, target_id, twentyFourHoursAgo]
-    )
+
+    const { data: existingReport } = await supabase
+      .from('content_reports')
+      .select('id')
+      .eq('reporter_id', userId)
+      .eq('target_type', target_type)
+      .eq('target_id', target_id)
+      .gt('created_at', twentyFourHoursAgo)
+      .maybeSingle()
 
     if (existingReport) {
       return c.json({ error: 'You have already reported this content recently' }, 400)
@@ -1004,13 +1338,19 @@ socialApi.post('/reports', async (c: Context) => {
     const reportId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO content_reports (
-        id, reporter_id, target_type, target_id, reason, description,
-        status, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [reportId, userId, target_type, target_id, reason, description ? sanitizeTextInput(description) : null, 'pending', now, now])
+    await supabase
+      .from('content_reports')
+      .insert({
+        id: reportId,
+        reporter_id: userId,
+        target_type,
+        target_id,
+        reason,
+        description: description ? sanitizeTextInput(description) : null,
+        status: 'pending',
+        created_at: now,
+        updated_at: now
+      })
 
     return c.json({
       success: true,
@@ -1030,13 +1370,12 @@ socialApi.post('/reports', async (c: Context) => {
 /**
  * Check if one user has blocked another (in either direction)
  */
-async function checkIfBlocked(db: any, userId1: string, userId2: string): Promise<boolean> {
-  const block = await db.first<{ id: string }>(
-    `SELECT id FROM user_blocks
-     WHERE (blocker_id = $1 AND blocked_id = $2)
-        OR (blocker_id = $2 AND blocked_id = $1)`,
-    [userId1, userId2]
-  )
+async function checkIfBlocked(supabase: SupabaseClient, userId1: string, userId2: string): Promise<boolean> {
+  const { data: block } = await supabase
+    .from('user_blocks')
+    .select('id')
+    .or(`and(blocker_id.eq.${userId1},blocked_id.eq.${userId2}),and(blocker_id.eq.${userId2},blocked_id.eq.${userId1})`)
+    .maybeSingle()
 
   return block !== null
 }

@@ -1,51 +1,77 @@
 // Better Together: Messaging & DM System API
 // Handles direct messages, group conversations, and real-time messaging
+// Migrated from Neon raw SQL to Supabase query builder
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { zValidator } from '@hono/zod-validator'
+import {
+  createConversationSchema,
+  sendMessageSchema,
+  editMessageSchema,
+  muteConversationSchema,
+  addParticipantsSchema,
+} from '../lib/validation/schemas/messaging'
 import { getPaginationParams } from '../lib/pagination'
 import { sanitizeTextInput } from '../lib/sanitize'
 
 const messagingApi = new Hono()
 
-// Helper function to check if user is blocked
-async function isBlocked(db: any, userId: string, otherUserId: string): Promise<boolean> {
-  const block = await db.first<{ id: string }>(`
-    SELECT id FROM user_blocks
-    WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
-  `, [userId, otherUserId])
-  return !!block
+function getSupabaseEnv(c: Context): SupabaseEnv {
+  return {
+    SUPABASE_URL: c.env?.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+    SUPABASE_SERVICE_ROLE_KEY: c.env?.SUPABASE_SERVICE_ROLE_KEY
+  }
 }
 
-// Helper function to verify conversation participant
-async function isParticipant(db: any, conversationId: string, userId: string): Promise<boolean> {
-  const participant = await db.first<{ id: string }>(`
-    SELECT id FROM conversation_participants
-    WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
-  `, [conversationId, userId])
-  return !!participant
+// Helper: Check if user is blocked
+async function isBlocked(supabase: any, userId: string, otherUserId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_blocks')
+    .select('id')
+    .or(`and(blocker_id.eq.${userId},blocked_id.eq.${otherUserId}),and(blocker_id.eq.${otherUserId},blocked_id.eq.${userId})`)
+    .maybeSingle()
+  return !!data
 }
 
-// Helper function to get unread count for a conversation
-async function getUnreadCount(db: any, conversationId: string, userId: string): Promise<number> {
-  const participant = await db.first<{ last_read_at: string | null }>(`
-    SELECT last_read_at FROM conversation_participants
-    WHERE conversation_id = $1 AND user_id = $2
-  `, [conversationId, userId])
+// Helper: Verify conversation participant
+async function isParticipant(supabase: any, conversationId: string, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('conversation_participants')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .is('left_at', null)
+    .maybeSingle()
+  return !!data
+}
+
+// Helper: Get unread count for a conversation
+async function getUnreadCount(supabase: any, conversationId: string, userId: string): Promise<number> {
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('last_read_at')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .maybeSingle()
 
   if (!participant) return 0
 
-  const result = await db.first<{ count: number }>(`
-    SELECT COUNT(*) as count FROM messages
-    WHERE conversation_id = $1
-      AND sender_id != $2
-      AND deleted_at IS NULL
-      AND created_at > COALESCE($3, '1970-01-01')
-  `, [conversationId, userId, participant.last_read_at || null])
+  let query = supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', userId)
+    .is('deleted_at', null)
 
-  return result?.count || 0
+  if (participant.last_read_at) {
+    query = query.gt('created_at', participant.last_read_at)
+  }
+
+  const { count } = await query
+  return count || 0
 }
 
 // ============================================================================
@@ -53,62 +79,81 @@ async function getUnreadCount(db: any, conversationId: string, userId: string): 
 // ============================================================================
 messagingApi.get('/', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const { limit, offset } = getPaginationParams(c)
 
-    // Get conversations where user is a participant
-    const conversations = await db.all<any>(`
-      SELECT
-        c.*,
-        cp.last_read_at,
-        cp.is_muted
-      FROM conversations c
-      INNER JOIN conversation_participants cp ON c.id = cp.conversation_id
-      WHERE cp.user_id = $1 AND cp.left_at IS NULL
-      ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
-      LIMIT $2 OFFSET $3
-    `, [userId, limit, offset])
+    // Get user's conversation IDs
+    const { data: participations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, last_read_at, is_muted')
+      .eq('user_id', userId)
+      .is('left_at', null)
+
+    if (!participations || participations.length === 0) {
+      return c.json({ conversations: [], page: 1, limit, hasMore: false })
+    }
+
+    const conversationIds = participations.map((p: any) => p.conversation_id)
+    const participationMap = new Map(participations.map((p: any) => [p.conversation_id, p]))
+
+    // Get conversations
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('*')
+      .in('id', conversationIds)
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .range(offset, offset + limit - 1)
 
     // Enrich with participant info and unread counts
-    const enriched = await Promise.all(conversations.map(async (conv) => {
+    const enriched = await Promise.all((conversations || []).map(async (conv: any) => {
+      const participation = participationMap.get(conv.id)
+
       // Get other participants
-      const participants = await db.all<any>(`
-        SELECT
-          u.id,
-          u.name,
-          u.nickname,
-          u.profile_photo_url,
-          cp.role
-        FROM conversation_participants cp
-        INNER JOIN users u ON cp.user_id = u.id
-        WHERE cp.conversation_id = $1 AND cp.left_at IS NULL AND u.id != $2
-      `, [conv.id, userId])
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select('user_id, role')
+        .eq('conversation_id', conv.id)
+        .is('left_at', null)
+        .neq('user_id', userId)
+
+      const participantUserIds = (participants || []).map((p: any) => p.user_id)
+      let participantUsers: any[] = []
+      if (participantUserIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', participantUserIds)
+        participantUsers = (users || []).map((u: any) => {
+          const p = participants?.find((p: any) => p.user_id === u.id)
+          return { ...u, role: p?.role }
+        })
+      }
 
       // Get unread count
-      const unreadCount = await getUnreadCount(db, conv.id, userId)
+      const unreadCount = await getUnreadCount(supabase, conv.id, userId)
 
       return {
         id: conv.id,
         type: conv.type,
         name: conv.name,
         avatar_url: conv.avatar_url,
-        participants,
+        participants: participantUsers,
         last_message_at: conv.last_message_at,
         last_message_preview: conv.last_message_preview,
         unread_count: unreadCount,
-        is_muted: conv.is_muted,
+        is_muted: participation?.is_muted,
         created_at: conv.created_at
       }
     }))
 
     return c.json({
       conversations: enriched,
-      page,
+      page: Math.floor(offset / limit) + 1,
       limit,
-      hasMore: conversations.length === limit
+      hasMore: (conversations || []).length === limit
     })
   } catch (error) {
     console.error('List conversations error:', error)
@@ -119,218 +164,241 @@ messagingApi.get('/', async (c: Context) => {
 // ============================================================================
 // 2. POST /api/conversations - Create/get conversation
 // ============================================================================
-messagingApi.post('/', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.get('userId')
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+messagingApi.post(
+  '/',
+  zValidator('json', createConversationSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const userId = c.get('userId')
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { participant_id, participant_ids, name, type } = await c.req.json()
-
-    // Determine conversation type
-    const conversationType = type || (participant_ids ? 'group' : 'direct')
-
-    if (conversationType === 'direct') {
-      // Direct message - must have exactly one other participant
-      if (!participant_id) {
-        return c.json({ error: 'participant_id required for direct messages' }, 400)
+      const body = c.req.valid('json' as never) as {
+        participant_id?: string
+        participant_ids?: string[]
+        name?: string
+        type?: string
       }
 
-      // Check if blocked
-      if (await isBlocked(db, userId, participant_id)) {
-        return c.json({ error: 'Cannot message this user' }, 403)
-      }
+      const conversationType = body.type || (body.participant_ids ? 'group' : 'direct')
 
-      // Check if conversation already exists
-      const existing = await db.first<any>(`
-        SELECT c.* FROM conversations c
-        INNER JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = $1
-        INNER JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id = $2
-        WHERE c.type = 'direct'
-          AND cp1.left_at IS NULL
-          AND cp2.left_at IS NULL
-      `, [userId, participant_id])
+      if (conversationType === 'direct') {
+        if (!body.participant_id) {
+          return c.json({ error: 'participant_id required for direct messages' }, 400)
+        }
 
-      if (existing) {
-        // Return existing conversation with participants
-        const participants = await db.all<any>(`
-          SELECT
-            u.id,
-            u.name,
-            u.nickname,
-            u.profile_photo_url,
-            cp.role,
-            cp.last_read_at
-          FROM conversation_participants cp
-          INNER JOIN users u ON cp.user_id = u.id
-          WHERE cp.conversation_id = $1 AND cp.left_at IS NULL
-        `, [existing.id])
+        // Check if blocked
+        if (await isBlocked(supabase, userId, body.participant_id)) {
+          return c.json({ error: 'Cannot message this user' }, 403)
+        }
+
+        // Check if conversation already exists between these two users
+        const { data: userConvs } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', userId)
+          .is('left_at', null)
+
+        const userConvIds = (userConvs || []).map((uc: any) => uc.conversation_id)
+
+        let existingConv = null
+        if (userConvIds.length > 0) {
+          const { data: partnerConvs } = await supabase
+            .from('conversation_participants')
+            .select('conversation_id')
+            .eq('user_id', body.participant_id)
+            .is('left_at', null)
+            .in('conversation_id', userConvIds)
+
+          if (partnerConvs && partnerConvs.length > 0) {
+            // Check if any of these are direct conversations
+            const sharedConvIds = partnerConvs.map((pc: any) => pc.conversation_id)
+            const { data: directConvs } = await supabase
+              .from('conversations')
+              .select('*')
+              .in('id', sharedConvIds)
+              .eq('type', 'direct')
+              .maybeSingle()
+
+            existingConv = directConvs
+          }
+        }
+
+        if (existingConv) {
+          // Return existing conversation with participants
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select('user_id, role, last_read_at')
+            .eq('conversation_id', existingConv.id)
+            .is('left_at', null)
+
+          const participantUserIds = (participants || []).map((p: any) => p.user_id)
+          const { data: users } = await supabase
+            .from('users')
+            .select('id, name, nickname, profile_photo_url')
+            .in('id', participantUserIds)
+
+          return c.json({
+            conversation: {
+              ...existingConv,
+              participants: (users || []).map((u: any) => {
+                const p = participants?.find((p: any) => p.user_id === u.id)
+                return { ...u, role: p?.role, last_read_at: p?.last_read_at }
+              })
+            },
+            isNew: false
+          })
+        }
+
+        // Create new direct conversation
+        const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        const now = new Date().toISOString()
+
+        await supabase.from('conversations').insert({
+          id: conversationId, type: 'direct', created_by: userId,
+          created_at: now, updated_at: now,
+        })
+
+        // Add participants
+        const p1Id = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        const p2Id = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}_2`
+
+        await supabase.from('conversation_participants').insert([
+          { id: p1Id, conversation_id: conversationId, user_id: userId, role: 'member', joined_at: now },
+          { id: p2Id, conversation_id: conversationId, user_id: body.participant_id, role: 'member', joined_at: now },
+        ])
+
+        // Get participants for response
+        const { data: newParticipants } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', [userId, body.participant_id])
+
+        const { data: conversation } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', conversationId)
+          .single()
 
         return c.json({
-          conversation: {
-            ...existing,
-            participants
-          },
-          isNew: false
-        })
-      }
+          conversation: { ...conversation, participants: newParticipants || [] },
+          isNew: true
+        }, 201)
 
-      // Create new direct conversation
-      const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-      await db.run(`
-        INSERT INTO conversations (id, type, created_by, created_at, updated_at)
-        VALUES ($1, 'direct', $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `, [conversationId, userId])
-
-      // Add participants
-      const participant1Id = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      const participant2Id = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}_2`
-
-      await db.run(`
-        INSERT INTO conversation_participants (id, conversation_id, user_id, role, joined_at)
-        VALUES
-          ($1, $2, $3, 'member', CURRENT_TIMESTAMP),
-          ($4, $2, $5, 'member', CURRENT_TIMESTAMP)
-      `, [participant1Id, conversationId, userId, participant2Id, participant_id])
-
-      // Get participants for response
-      const participants = await db.all<any>(`
-        SELECT
-          u.id,
-          u.name,
-          u.nickname,
-          u.profile_photo_url
-        FROM conversation_participants cp
-        INNER JOIN users u ON cp.user_id = u.id
-        WHERE cp.conversation_id = $1
-      `, [conversationId])
-
-      const conversation = await db.first(`
-        SELECT * FROM conversations WHERE id = $1
-      `, [conversationId])
-
-      return c.json({
-        conversation: {
-          ...conversation,
-          participants
-        },
-        isNew: true
-      }, 201)
-
-    } else {
-      // Group conversation
-      if (!participant_ids || participant_ids.length < 2) {
-        return c.json({ error: 'At least 2 participants required for group chat' }, 400)
-      }
-
-      if (!name) {
-        return c.json({ error: 'Group name required' }, 400)
-      }
-
-      // Create group conversation
-      const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-      await db.run(`
-        INSERT INTO conversations (id, type, name, created_by, created_at, updated_at)
-        VALUES ($1, 'group', $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `, [conversationId, name, userId])
-
-      // Add creator as owner
-      const creatorParticipantId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      await db.run(`
-        INSERT INTO conversation_participants (id, conversation_id, user_id, role, joined_at)
-        VALUES ($1, $2, $3, 'owner', CURRENT_TIMESTAMP)
-      `, [creatorParticipantId, conversationId, userId])
-
-      // Add other participants as members
-      for (const participantId of participant_ids) {
-        if (participantId !== userId) {
-          const cpId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
-          await db.run(`
-            INSERT INTO conversation_participants (id, conversation_id, user_id, role, joined_at)
-            VALUES ($1, $2, $3, 'member', CURRENT_TIMESTAMP)
-          `, [cpId, conversationId, participantId])
+      } else {
+        // Group conversation
+        if (!body.participant_ids || body.participant_ids.length < 2) {
+          return c.json({ error: 'At least 2 participants required for group chat' }, 400)
         }
+        if (!body.name) {
+          return c.json({ error: 'Group name required' }, 400)
+        }
+
+        const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        const now = new Date().toISOString()
+
+        await supabase.from('conversations').insert({
+          id: conversationId, type: 'group', name: body.name, created_by: userId,
+          created_at: now, updated_at: now,
+        })
+
+        // Add creator as owner
+        const creatorCpId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        const participantInserts = [
+          { id: creatorCpId, conversation_id: conversationId, user_id: userId, role: 'owner', joined_at: now }
+        ]
+
+        for (const participantId of body.participant_ids) {
+          if (participantId !== userId) {
+            const cpId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}_${participantId.slice(-4)}`
+            participantInserts.push({
+              id: cpId, conversation_id: conversationId, user_id: participantId, role: 'member', joined_at: now
+            })
+          }
+        }
+
+        await supabase.from('conversation_participants').insert(participantInserts)
+
+        // Get participants for response
+        const allUserIds = [userId, ...body.participant_ids.filter(id => id !== userId)]
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, nickname, profile_photo_url')
+          .in('id', allUserIds)
+
+        const { data: conversation } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('id', conversationId)
+          .single()
+
+        return c.json({
+          conversation: { ...conversation, participants: users || [] },
+          isNew: true
+        }, 201)
       }
-
-      // Get participants for response
-      const participants = await db.all<any>(`
-        SELECT
-          u.id,
-          u.name,
-          u.nickname,
-          u.profile_photo_url,
-          cp.role
-        FROM conversation_participants cp
-        INNER JOIN users u ON cp.user_id = u.id
-        WHERE cp.conversation_id = $1
-      `, [conversationId])
-
-      const conversation = await db.first(`
-        SELECT * FROM conversations WHERE id = $1
-      `, [conversationId])
-
-      return c.json({
-        conversation: {
-          ...conversation,
-          participants
-        },
-        isNew: true
-      }, 201)
+    } catch (error) {
+      console.error('Create conversation error:', error)
+      return c.json({ error: 'Failed to create conversation' }, 500)
     }
-  } catch (error) {
-    console.error('Create conversation error:', error)
-    return c.json({ error: 'Failed to create conversation' }, 500)
   }
-})
+)
 
 // ============================================================================
 // 3. GET /api/conversations/:id - Get conversation details
 // ============================================================================
 messagingApi.get('/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const conversationId = c.req.param('id')
 
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
+    if (!await isParticipant(supabase, conversationId, userId)) {
       return c.json({ error: 'Not authorized to view this conversation' }, 403)
     }
 
-    // Get conversation details
-    const conversation = await db.first<any>(`
-      SELECT c.*, cp.last_read_at, cp.is_muted, cp.role
-      FROM conversations c
-      INNER JOIN conversation_participants cp ON c.id = cp.conversation_id AND cp.user_id = $1
-      WHERE c.id = $2
-    `, [userId, conversationId])
+    // Get conversation + user's participation details
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', conversationId)
+      .maybeSingle()
 
     if (!conversation) {
       return c.json({ error: 'Conversation not found' }, 404)
     }
 
+    const { data: userParticipation } = await supabase
+      .from('conversation_participants')
+      .select('last_read_at, is_muted, role')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
     // Get all participants
-    const participants = await db.all<any>(`
-      SELECT
-        u.id,
-        u.name,
-        u.nickname,
-        u.profile_photo_url,
-        cp.role,
-        cp.joined_at
-      FROM conversation_participants cp
-      INNER JOIN users u ON cp.user_id = u.id
-      WHERE cp.conversation_id = $1 AND cp.left_at IS NULL
-    `, [conversationId])
+    const { data: participants } = await supabase
+      .from('conversation_participants')
+      .select('user_id, role, joined_at')
+      .eq('conversation_id', conversationId)
+      .is('left_at', null)
+
+    const participantUserIds = (participants || []).map((p: any) => p.user_id)
+    const { data: users } = participantUserIds.length > 0
+      ? await supabase.from('users').select('id, name, nickname, profile_photo_url').in('id', participantUserIds)
+      : { data: [] }
 
     return c.json({
       conversation: {
         ...conversation,
-        participants
+        last_read_at: userParticipation?.last_read_at,
+        is_muted: userParticipation?.is_muted,
+        role: userParticipation?.role,
+        participants: (users || []).map((u: any) => {
+          const p = participants?.find((p: any) => p.user_id === u.id)
+          return { ...u, role: p?.role, joined_at: p?.joined_at }
+        })
       }
     })
   } catch (error) {
@@ -344,14 +412,13 @@ messagingApi.get('/:id', async (c: Context) => {
 // ============================================================================
 messagingApi.get('/:id/messages', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const conversationId = c.req.param('id')
 
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
+    if (!await isParticipant(supabase, conversationId, userId)) {
       return c.json({ error: 'Not authorized to view messages' }, 403)
     }
 
@@ -359,69 +426,74 @@ messagingApi.get('/:id/messages', async (c: Context) => {
     const beforeId = c.req.query('before_id')
     const afterId = c.req.query('after_id')
 
-    let query = `
-      SELECT
-        m.*,
-        u.name as sender_name,
-        u.nickname as sender_nickname,
-        u.profile_photo_url as sender_photo
-      FROM messages m
-      INNER JOIN users u ON m.sender_id = u.id
-      WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
-    `
-    const params: any[] = [conversationId]
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
     if (beforeId) {
-      // Get messages before this ID (pagination backwards)
-      const beforeMessage = await db.first<{ created_at: string }>(`
-        SELECT created_at FROM messages WHERE id = $1
-      `, [beforeId])
+      const { data: beforeMsg } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('id', beforeId)
+        .maybeSingle()
 
-      if (beforeMessage) {
-        query += ` AND m.created_at < $${params.length + 1}`
-        params.push(beforeMessage.created_at)
+      if (beforeMsg) {
+        query = query.lt('created_at', beforeMsg.created_at)
       }
     } else if (afterId) {
-      // Get messages after this ID (pagination forwards)
-      const afterMessage = await db.first<{ created_at: string }>(`
-        SELECT created_at FROM messages WHERE id = $1
-      `, [afterId])
+      const { data: afterMsg } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('id', afterId)
+        .maybeSingle()
 
-      if (afterMessage) {
-        query += ` AND m.created_at > $${params.length + 1}`
-        params.push(afterMessage.created_at)
+      if (afterMsg) {
+        query = query.gt('created_at', afterMsg.created_at)
       }
     }
 
-    query += ` ORDER BY m.created_at DESC LIMIT $${params.length + 1}`
-    params.push(limit)
-
-    const messages = await db.all<any>(query, params)
+    const { data: messages, error } = await query
+    if (error) throw error
 
     // Reverse to show oldest first
-    messages.reverse()
+    const orderedMessages = (messages || []).reverse()
+
+    // Enrich with sender info
+    const senderIds = [...new Set(orderedMessages.map((m: any) => m.sender_id))]
+    const { data: senders } = senderIds.length > 0
+      ? await supabase.from('users').select('id, name, nickname, profile_photo_url').in('id', senderIds)
+      : { data: [] }
+
+    const sendersMap = new Map((senders || []).map((s: any) => [s.id, s]))
 
     return c.json({
-      messages: messages.map(msg => ({
-        id: msg.id,
-        conversation_id: msg.conversation_id,
-        sender: {
-          id: msg.sender_id,
-          name: msg.sender_name,
-          nickname: msg.sender_nickname,
-          profile_photo_url: msg.sender_photo
-        },
-        message_type: msg.message_type,
-        content: msg.content,
-        media_url: msg.media_url,
-        shared_activity_id: msg.shared_activity_id,
-        shared_post_id: msg.shared_post_id,
-        shared_challenge_id: msg.shared_challenge_id,
-        is_edited: msg.is_edited,
-        edited_at: msg.edited_at,
-        created_at: msg.created_at
-      })),
-      hasMore: messages.length === limit
+      messages: orderedMessages.map((msg: any) => {
+        const sender = sendersMap.get(msg.sender_id)
+        return {
+          id: msg.id,
+          conversation_id: msg.conversation_id,
+          sender: {
+            id: msg.sender_id,
+            name: sender?.name,
+            nickname: sender?.nickname,
+            profile_photo_url: sender?.profile_photo_url
+          },
+          message_type: msg.message_type,
+          content: msg.content,
+          media_url: msg.media_url,
+          shared_activity_id: msg.shared_activity_id,
+          shared_post_id: msg.shared_post_id,
+          shared_challenge_id: msg.shared_challenge_id,
+          is_edited: msg.is_edited,
+          edited_at: msg.edited_at,
+          created_at: msg.created_at
+        }
+      }),
+      hasMore: (messages || []).length === limit
     })
   } catch (error) {
     console.error('Get messages error:', error)
@@ -432,223 +504,189 @@ messagingApi.get('/:id/messages', async (c: Context) => {
 // ============================================================================
 // 5. POST /api/conversations/:id/messages - Send message
 // ============================================================================
-messagingApi.post('/:id/messages', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.get('userId')
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+messagingApi.post(
+  '/:id/messages',
+  zValidator('json', sendMessageSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const userId = c.get('userId')
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const conversationId = c.req.param('id')
+      const conversationId = c.req.param('id')
 
-    // Rate limiting handled globally by Upstash Redis middleware in index.tsx
-
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
-      return c.json({ error: 'Not authorized to send messages' }, 403)
-    }
-
-    const {
-      content,
-      media_url,
-      message_type = 'text',
-      shared_activity_id,
-      shared_post_id,
-      shared_challenge_id
-    } = await c.req.json()
-
-    // Validate content
-    if (!content && !media_url && !shared_activity_id && !shared_post_id && !shared_challenge_id) {
-      return c.json({ error: 'Message content, media, or shared content required' }, 400)
-    }
-
-    // Sanitize content (XSS prevention + length cap)
-    const sanitizedContent = content ? sanitizeTextInput(content).substring(0, 5000) : null // Max 5000 chars
-
-    // Create message
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`
-
-    await db.run(`
-      INSERT INTO messages (
-        id,
-        conversation_id,
-        sender_id,
-        message_type,
-        content,
-        media_url,
-        shared_activity_id,
-        shared_post_id,
-        shared_challenge_id,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-    `, [
-      messageId,
-      conversationId,
-      userId,
-      message_type,
-      sanitizedContent || null,
-      media_url || null,
-      shared_activity_id || null,
-      shared_post_id || null,
-      shared_challenge_id || null
-    ])
-
-    // Update conversation last_message_at and preview (done by trigger, but doing manually for consistency)
-    await db.run(`
-      UPDATE conversations
-      SET
-        last_message_at = CURRENT_TIMESTAMP,
-        last_message_preview = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [sanitizedContent?.substring(0, 100) || '[Media]', conversationId])
-
-    // Get created message with sender info
-    const message = await db.first<any>(`
-      SELECT
-        m.*,
-        u.name as sender_name,
-        u.nickname as sender_nickname,
-        u.profile_photo_url as sender_photo
-      FROM messages m
-      INNER JOIN users u ON m.sender_id = u.id
-      WHERE m.id = $1
-    `, [messageId])
-
-    return c.json({
-      message: {
-        id: message.id,
-        conversation_id: message.conversation_id,
-        sender: {
-          id: message.sender_id,
-          name: message.sender_name,
-          nickname: message.sender_nickname,
-          profile_photo_url: message.sender_photo
-        },
-        message_type: message.message_type,
-        content: message.content,
-        media_url: message.media_url,
-        shared_activity_id: message.shared_activity_id,
-        shared_post_id: message.shared_post_id,
-        shared_challenge_id: message.shared_challenge_id,
-        created_at: message.created_at
+      if (!await isParticipant(supabase, conversationId, userId)) {
+        return c.json({ error: 'Not authorized to send messages' }, 403)
       }
-    }, 201)
-  } catch (error) {
-    console.error('Send message error:', error)
-    return c.json({ error: 'Failed to send message' }, 500)
+
+      const body = c.req.valid('json' as never) as {
+        content?: string
+        media_url?: string
+        message_type?: string
+        shared_activity_id?: string
+        shared_post_id?: string
+        shared_challenge_id?: string
+      }
+
+      const sanitizedContent = body.content ? sanitizeTextInput(body.content).substring(0, 5000) : null
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const now = new Date().toISOString()
+
+      const { error: insertErr } = await supabase
+        .from('messages')
+        .insert({
+          id: messageId,
+          conversation_id: conversationId,
+          sender_id: userId,
+          message_type: body.message_type || 'text',
+          content: sanitizedContent || null,
+          media_url: body.media_url || null,
+          shared_activity_id: body.shared_activity_id || null,
+          shared_post_id: body.shared_post_id || null,
+          shared_challenge_id: body.shared_challenge_id || null,
+          created_at: now,
+        })
+
+      if (insertErr) throw insertErr
+
+      // Update conversation last_message_at and preview
+      await supabase
+        .from('conversations')
+        .update({
+          last_message_at: now,
+          last_message_preview: sanitizedContent?.substring(0, 100) || '[Media]',
+          updated_at: now,
+        })
+        .eq('id', conversationId)
+
+      // Get sender info
+      const { data: sender } = await supabase
+        .from('users')
+        .select('name, nickname, profile_photo_url')
+        .eq('id', userId)
+        .maybeSingle()
+
+      return c.json({
+        message: {
+          id: messageId,
+          conversation_id: conversationId,
+          sender: {
+            id: userId,
+            name: sender?.name,
+            nickname: sender?.nickname,
+            profile_photo_url: sender?.profile_photo_url
+          },
+          message_type: body.message_type || 'text',
+          content: sanitizedContent,
+          media_url: body.media_url || null,
+          shared_activity_id: body.shared_activity_id || null,
+          shared_post_id: body.shared_post_id || null,
+          shared_challenge_id: body.shared_challenge_id || null,
+          created_at: now
+        }
+      }, 201)
+    } catch (error) {
+      console.error('Send message error:', error)
+      return c.json({ error: 'Failed to send message' }, 500)
+    }
   }
-})
+)
 
 // ============================================================================
 // 6. PUT /api/conversations/:id/messages/:messageId - Edit message
 // ============================================================================
-messagingApi.put('/:id/messages/:messageId', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.get('userId')
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+messagingApi.put(
+  '/:id/messages/:messageId',
+  zValidator('json', editMessageSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const userId = c.get('userId')
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const conversationId = c.req.param('id')
-    const messageId = c.req.param('messageId')
+      const conversationId = c.req.param('id')
+      const messageId = c.req.param('messageId')
+      const { content } = c.req.valid('json' as never) as { content: string }
 
-    const { content } = await c.req.json()
+      // Get message
+      const { data: message } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('id', messageId)
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .maybeSingle()
 
-    if (!content) {
-      return c.json({ error: 'Content required' }, 400)
-    }
-
-    // Get message
-    const message = await db.first<any>(`
-      SELECT * FROM messages WHERE id = $1 AND conversation_id = $2 AND deleted_at IS NULL
-    `, [messageId, conversationId])
-
-    if (!message) {
-      return c.json({ error: 'Message not found' }, 404)
-    }
-
-    // Verify sender
-    if (message.sender_id !== userId) {
-      return c.json({ error: 'Only sender can edit message' }, 403)
-    }
-
-    // Check time window (15 minutes)
-    const messageAge = Date.now() - new Date(message.created_at).getTime()
-    const fifteenMinutes = 15 * 60 * 1000
-
-    if (messageAge > fifteenMinutes) {
-      return c.json({ error: 'Messages can only be edited within 15 minutes' }, 403)
-    }
-
-    // Sanitize content (XSS prevention + length cap)
-    const sanitizedContent = sanitizeTextInput(content).substring(0, 5000)
-
-    // Update message
-    await db.run(`
-      UPDATE messages
-      SET
-        content = $1,
-        is_edited = true,
-        edited_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [sanitizedContent, messageId])
-
-    // Get updated message
-    const updated = await db.first<any>(`
-      SELECT
-        m.*,
-        u.name as sender_name,
-        u.nickname as sender_nickname,
-        u.profile_photo_url as sender_photo
-      FROM messages m
-      INNER JOIN users u ON m.sender_id = u.id
-      WHERE m.id = $1
-    `, [messageId])
-
-    return c.json({
-      message: {
-        id: updated.id,
-        content: updated.content,
-        is_edited: updated.is_edited,
-        edited_at: updated.edited_at,
-        created_at: updated.created_at
+      if (!message) {
+        return c.json({ error: 'Message not found' }, 404)
       }
-    })
-  } catch (error) {
-    console.error('Edit message error:', error)
-    return c.json({ error: 'Failed to edit message' }, 500)
+
+      if (message.sender_id !== userId) {
+        return c.json({ error: 'Only sender can edit message' }, 403)
+      }
+
+      // Check time window (15 minutes)
+      const messageAge = Date.now() - new Date(message.created_at).getTime()
+      if (messageAge > 15 * 60 * 1000) {
+        return c.json({ error: 'Messages can only be edited within 15 minutes' }, 403)
+      }
+
+      const sanitizedContent = sanitizeTextInput(content).substring(0, 5000)
+      const now = new Date().toISOString()
+
+      await supabase
+        .from('messages')
+        .update({ content: sanitizedContent, is_edited: true, edited_at: now })
+        .eq('id', messageId)
+
+      return c.json({
+        message: {
+          id: messageId,
+          content: sanitizedContent,
+          is_edited: true,
+          edited_at: now,
+          created_at: message.created_at
+        }
+      })
+    } catch (error) {
+      console.error('Edit message error:', error)
+      return c.json({ error: 'Failed to edit message' }, 500)
+    }
   }
-})
+)
 
 // ============================================================================
 // 7. DELETE /api/conversations/:id/messages/:messageId - Delete message
 // ============================================================================
 messagingApi.delete('/:id/messages/:messageId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const conversationId = c.req.param('id')
     const messageId = c.req.param('messageId')
+    const conversationId = c.req.param('id')
 
-    // Get message
-    const message = await db.first<any>(`
-      SELECT * FROM messages WHERE id = $1 AND conversation_id = $2 AND deleted_at IS NULL
-    `, [messageId, conversationId])
+    const { data: message } = await supabase
+      .from('messages')
+      .select('sender_id')
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (!message) {
       return c.json({ error: 'Message not found' }, 404)
     }
 
-    // Verify sender
     if (message.sender_id !== userId) {
       return c.json({ error: 'Only sender can delete message' }, 403)
     }
 
-    // Soft delete
-    await db.run(`
-      UPDATE messages SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1
-    `, [messageId])
+    await supabase
+      .from('messages')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', messageId)
 
     return c.json({ success: true, message: 'Message deleted' })
   } catch (error) {
@@ -662,23 +700,21 @@ messagingApi.delete('/:id/messages/:messageId', async (c: Context) => {
 // ============================================================================
 messagingApi.post('/:id/read', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const conversationId = c.req.param('id')
 
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
+    if (!await isParticipant(supabase, conversationId, userId)) {
       return c.json({ error: 'Not authorized' }, 403)
     }
 
-    // Update last_read_at
-    await db.run(`
-      UPDATE conversation_participants
-      SET last_read_at = CURRENT_TIMESTAMP
-      WHERE conversation_id = $1 AND user_id = $2
-    `, [conversationId, userId])
+    await supabase
+      .from('conversation_participants')
+      .update({ last_read_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
 
     return c.json({ success: true, message: 'Marked as read' })
   } catch (error) {
@@ -690,74 +726,74 @@ messagingApi.post('/:id/read', async (c: Context) => {
 // ============================================================================
 // 9. PUT /api/conversations/:id/mute - Mute/unmute conversation
 // ============================================================================
-messagingApi.put('/:id/mute', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.get('userId')
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+messagingApi.put(
+  '/:id/mute',
+  zValidator('json', muteConversationSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const userId = c.get('userId')
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const conversationId = c.req.param('id')
-    const { is_muted } = await c.req.json()
+      const conversationId = c.req.param('id')
+      const { is_muted } = c.req.valid('json' as never) as { is_muted: boolean }
 
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
-      return c.json({ error: 'Not authorized' }, 403)
+      if (!await isParticipant(supabase, conversationId, userId)) {
+        return c.json({ error: 'Not authorized' }, 403)
+      }
+
+      await supabase
+        .from('conversation_participants')
+        .update({ is_muted })
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+
+      return c.json({
+        success: true,
+        is_muted,
+        message: is_muted ? 'Conversation muted' : 'Conversation unmuted'
+      })
+    } catch (error) {
+      console.error('Mute conversation error:', error)
+      return c.json({ error: 'Failed to update mute status' }, 500)
     }
-
-    // Update mute status
-    await db.run(`
-      UPDATE conversation_participants
-      SET is_muted = $1
-      WHERE conversation_id = $2 AND user_id = $3
-    `, [is_muted, conversationId, userId])
-
-    return c.json({
-      success: true,
-      is_muted,
-      message: is_muted ? 'Conversation muted' : 'Conversation unmuted'
-    })
-  } catch (error) {
-    console.error('Mute conversation error:', error)
-    return c.json({ error: 'Failed to update mute status' }, 500)
   }
-})
+)
 
 // ============================================================================
 // 10. POST /api/conversations/:id/leave - Leave group conversation
 // ============================================================================
 messagingApi.post('/:id/leave', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(getSupabaseEnv(c))
     const userId = c.get('userId')
     if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
     const conversationId = c.req.param('id')
 
-    // Get conversation
-    const conversation = await db.first<any>(`
-      SELECT * FROM conversations WHERE id = $1
-    `, [conversationId])
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('type')
+      .eq('id', conversationId)
+      .maybeSingle()
 
     if (!conversation) {
       return c.json({ error: 'Conversation not found' }, 404)
     }
 
-    // Can only leave group conversations
     if (conversation.type !== 'group') {
       return c.json({ error: 'Cannot leave direct conversations' }, 400)
     }
 
-    // Verify user is participant
-    if (!await isParticipant(db, conversationId, userId)) {
+    if (!await isParticipant(supabase, conversationId, userId)) {
       return c.json({ error: 'Not a participant' }, 403)
     }
 
-    // Mark as left
-    await db.run(`
-      UPDATE conversation_participants
-      SET left_at = CURRENT_TIMESTAMP
-      WHERE conversation_id = $1 AND user_id = $2
-    `, [conversationId, userId])
+    await supabase
+      .from('conversation_participants')
+      .update({ left_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
 
     return c.json({ success: true, message: 'Left conversation' })
   } catch (error) {
@@ -769,71 +805,78 @@ messagingApi.post('/:id/leave', async (c: Context) => {
 // ============================================================================
 // 11. POST /api/conversations/:id/participants - Add participants (group only)
 // ============================================================================
-messagingApi.post('/:id/participants', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.get('userId')
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+messagingApi.post(
+  '/:id/participants',
+  zValidator('json', addParticipantsSchema),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(getSupabaseEnv(c))
+      const userId = c.get('userId')
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-    const conversationId = c.req.param('id')
-    const { participant_ids } = await c.req.json()
+      const conversationId = c.req.param('id')
+      const { participant_ids } = c.req.valid('json' as never) as { participant_ids: string[] }
 
-    if (!participant_ids || !Array.isArray(participant_ids) || participant_ids.length === 0) {
-      return c.json({ error: 'participant_ids array required' }, 400)
-    }
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('type')
+        .eq('id', conversationId)
+        .maybeSingle()
 
-    // Get conversation
-    const conversation = await db.first<any>(`
-      SELECT * FROM conversations WHERE id = $1
-    `, [conversationId])
-
-    if (!conversation) {
-      return c.json({ error: 'Conversation not found' }, 404)
-    }
-
-    // Can only add to group conversations
-    if (conversation.type !== 'group') {
-      return c.json({ error: 'Can only add participants to group conversations' }, 400)
-    }
-
-    // Check if user is admin/owner
-    const participant = await db.first<any>(`
-      SELECT * FROM conversation_participants
-      WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
-    `, [conversationId, userId])
-
-    if (!participant || !['owner', 'admin'].includes(participant.role)) {
-      return c.json({ error: 'Only admins can add participants' }, 403)
-    }
-
-    // Add new participants
-    const added = []
-    for (const newParticipantId of participant_ids) {
-      // Check if already a participant
-      const existing = await db.first<{ id: string }>(`
-        SELECT id FROM conversation_participants
-        WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
-      `, [conversationId, newParticipantId])
-
-      if (!existing) {
-        const cpId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
-        await db.run(`
-          INSERT INTO conversation_participants (id, conversation_id, user_id, role, joined_at)
-          VALUES ($1, $2, $3, 'member', CURRENT_TIMESTAMP)
-        `, [cpId, conversationId, newParticipantId])
-        added.push(newParticipantId)
+      if (!conversation) {
+        return c.json({ error: 'Conversation not found' }, 404)
       }
-    }
 
-    return c.json({
-      success: true,
-      added_count: added.length,
-      message: `Added ${added.length} participant(s)`
-    })
-  } catch (error) {
-    console.error('Add participants error:', error)
-    return c.json({ error: 'Failed to add participants' }, 500)
+      if (conversation.type !== 'group') {
+        return c.json({ error: 'Can only add participants to group conversations' }, 400)
+      }
+
+      // Check if user is admin/owner
+      const { data: participant } = await supabase
+        .from('conversation_participants')
+        .select('role')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .is('left_at', null)
+        .maybeSingle()
+
+      if (!participant || !['owner', 'admin'].includes(participant.role)) {
+        return c.json({ error: 'Only admins can add participants' }, 403)
+      }
+
+      // Add new participants
+      const added: string[] = []
+      const now = new Date().toISOString()
+
+      for (const newParticipantId of participant_ids) {
+        const { data: existing } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .eq('user_id', newParticipantId)
+          .is('left_at', null)
+          .maybeSingle()
+
+        if (!existing) {
+          const cpId = `cp_${Date.now()}_${Math.random().toString(36).substring(7)}`
+          await supabase.from('conversation_participants').insert({
+            id: cpId, conversation_id: conversationId, user_id: newParticipantId,
+            role: 'member', joined_at: now,
+          })
+          added.push(newParticipantId)
+        }
+      }
+
+      return c.json({
+        success: true,
+        added_count: added.length,
+        message: `Added ${added.length} participant(s)`
+      })
+    } catch (error) {
+      console.error('Add participants error:', error)
+      return c.json({ error: 'Failed to add participants' }, 500)
+    }
   }
-})
+)
 
 export default messagingApi
