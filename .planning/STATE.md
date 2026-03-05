@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 3 of 10 (Database Consolidation)
-Plan: 3 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-03-05 -- Completed 03-03-PLAN.md (Tier 2 API Migration)
+Last activity: 2026-03-05 -- Completed 03-04-PLAN.md (Tier 3+4 API Migration)
 
-Progress: [█████████░░] 31% (11/35)
+Progress: [███████████░] 34% (12/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: ~3.6 minutes
-- Total execution time: ~43.5 minutes
+- Total plans completed: 12
+- Average duration: ~3.8 minutes
+- Total execution time: ~51.5 minutes
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [█████████░░] 31% (11/35)
 |-------|-------|-------|----------|
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
-| 3 - Database Consolidation | 3/5 | ~16m | ~5.3m |
+| 3 - Database Consolidation | 4/5 | ~24m | ~6.0m |
 
 ## Accumulated Context
 
@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - [03-02] Inline Zod schemas for files without pre-existing schema files
 - [03-03] Fetch-then-aggregate for analytics (Supabase query builder lacks GROUP BY/AVG)
 - [03-03] Created validation schemas for sponsors and push-notifications (missing from 03-01)
+- [03-04] Use supabase.rpc() for discovery search queries (complex SQL not expressible in query builder)
+- [03-04] Fetch-then-enrich pattern for all JOIN queries across API files
+- [03-04] Read-then-update for counter increments (Supabase lacks SQL increment)
+- [03-04] JS aggregation replaces SQL GROUP BY in analytics
 
 ### Pending Todos
 
@@ -90,5 +94,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 03-03-PLAN.md (Tier 2 API Migration)
+Stopped at: Completed 03-04-PLAN.md (Tier 3+4 API Migration)
 Resume file: None
