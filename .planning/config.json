@@ -1,0 +1,13 @@
+{
+  "project": "better-together-live",
+  "created": "2026-03-05",
+  "workflow": {
+    "mode": "interactive",
+    "depth": "comprehensive",
+    "parallelization": true
+  },
+  "milestone": {
+    "current": null,
+    "version": "1.0.0"
+  }
+}
