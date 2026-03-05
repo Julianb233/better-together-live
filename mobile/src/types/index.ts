@@ -224,8 +224,11 @@ export interface DashboardData {
 }
 
 // Mobile-specific types
+import type { Session } from '@supabase/supabase-js'
+
 export interface AuthState {
   user: User | null
+  session: Session | null
   isAuthenticated: boolean
   isLoading: boolean
 }

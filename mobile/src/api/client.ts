@@ -1,6 +1,7 @@
-// Better Together Mobile: API Client
+// Better Together Mobile: API Client (Supabase Auth)
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { supabase } from '../lib/supabase'
 import type { ApiError, ApiResponse } from '../types'
 
 // API Configuration
@@ -9,7 +10,6 @@ const API_BASE_URL = __DEV__
   : 'https://better-together.live/api'
 
 const STORAGE_KEYS = {
-  USER_ID: '@better_together:user_id',
   USER_DATA: '@better_together:user_data',
 }
 
@@ -25,12 +25,12 @@ class ApiClient {
       },
     })
 
-    // Request interceptor for adding auth tokens if needed
+    // Request interceptor: attach Bearer token from Supabase session
     this.client.interceptors.request.use(
       async (config) => {
-        const userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID)
-        if (userId) {
-          config.headers['X-User-ID'] = userId
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          config.headers['Authorization'] = `Bearer ${session.access_token}`
         }
         return config
       },
@@ -66,10 +66,6 @@ class ApiClient {
   }
 
   // User endpoints
-  async createUser(userData: any): Promise<ApiResponse<{ user: any }>> {
-    return this.request('post', '/users', userData)
-  }
-
   async getUser(userId: string): Promise<ApiResponse<{ user: any }>> {
     return this.request('get', `/users/${userId}`)
   }
@@ -296,15 +292,7 @@ class ApiClient {
     return this.request('get', `/ai-coach/history/${relationshipId}`)
   }
 
-  // Storage helpers
-  async storeUserId(userId: string) {
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userId)
-  }
-
-  async getUserId(): Promise<string | null> {
-    return await AsyncStorage.getItem(STORAGE_KEYS.USER_ID)
-  }
-
+  // Profile cache helpers (not auth tokens -- Supabase handles those)
   async storeUserData(userData: any) {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData))
   }
@@ -315,7 +303,7 @@ class ApiClient {
   }
 
   async clearAuth() {
-    await AsyncStorage.multiRemove([STORAGE_KEYS.USER_ID, STORAGE_KEYS.USER_DATA])
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA)
   }
 }
 
