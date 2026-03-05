@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
+import { verifyStripeSignature } from '../lib/stripe'
 
 const paymentsApi = new Hono()
 
@@ -104,8 +105,16 @@ paymentsApi.post('/webhook', async (c: Context) => {
     const signature = c.req.header('stripe-signature')
     const webhookSecret = (c.env as any)?.STRIPE_WEBHOOK_SECRET
 
-    // In production, verify webhook signature
-    // For now, parse the event directly
+    if (!signature || !webhookSecret) {
+      return c.json({ error: 'Missing signature or webhook secret' }, 400)
+    }
+
+    const isValid = await verifyStripeSignature(body, signature, webhookSecret)
+    if (!isValid) {
+      console.error('Stripe webhook signature verification failed')
+      return c.json({ error: 'Invalid signature' }, 401)
+    }
+
     const event = JSON.parse(body)
 
     const db = createDatabase(c.env as Env)
