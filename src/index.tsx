@@ -4,6 +4,7 @@ import { except } from 'hono/combine'
 import { requireAuth, requireAdmin, supabaseCookieRelay, clearLegacyCookies } from './lib/supabase/middleware'
 import { rateLimitMiddleware } from './lib/rate-limit'
 import { checkOwnership, forbiddenResponse } from './lib/security'
+import { requireTier } from './lib/subscription-gate'
 // Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
@@ -477,6 +478,11 @@ app.route('/api/important-dates', datesApi)
 
 // Challenges API Routes
 app.route('/api/challenges', challengesApi)
+
+// Premium-gated routes (require active subscription)
+app.use('/api/ai-coach/*', requireTier('try-it-out'))
+app.use('/api/video/*', requireTier('try-it-out'))
+app.use('/api/intimacy/*', requireTier('try-it-out'))
 
 // AI Coach API Routes
 app.route('/api/ai-coach', aiCoachApi)
