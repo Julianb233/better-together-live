@@ -80,7 +80,7 @@ paymentsApi.post('/create-checkout-session',
         url: session.url,
       })
     } catch (error) {
-      console.error('Checkout error:', error)
+      c.var.logger.error({ err: error }, 'Checkout error')
       return c.json({ error: 'Failed to create checkout session' }, 500)
     }
   }
@@ -215,7 +215,7 @@ paymentsApi.post('/webhook', async (c: Context) => {
 
     return c.json({ received: true })
   } catch (error) {
-    console.error('Webhook error:', error)
+    c.var.logger.error({ err: error }, 'Webhook error')
     return c.json({ error: 'Webhook processing failed' }, 400)
   }
 })
@@ -254,7 +254,7 @@ paymentsApi.post('/create-portal-session',
 
       return c.json({ url: portalSession.url })
     } catch (error) {
-      console.error('Portal session error:', error)
+      c.var.logger.error({ err: error }, 'Portal session error')
       return c.json({ error: 'Failed to create portal session' }, 500)
     }
   }
@@ -299,7 +299,7 @@ paymentsApi.get('/subscription-status', async (c: Context) => {
       createdAt: subscription.created_at,
     })
   } catch (error) {
-    console.error('Status error:', error)
+    c.var.logger.error({ err: error }, 'Status error')
     return c.json({ error: 'Failed to get subscription status' }, 500)
   }
 })
@@ -344,7 +344,7 @@ paymentsApi.post('/cancel-subscription',
         message: 'Subscription will be canceled at end of billing period',
       })
     } catch (error) {
-      console.error('Cancel error:', error)
+      c.var.logger.error({ err: error }, 'Cancel error')
       return c.json({ error: 'Failed to cancel subscription' }, 500)
     }
   }
@@ -401,7 +401,7 @@ paymentsApi.post('/create-gift-checkout',
         url: session.url,
       })
     } catch (error) {
-      console.error('Gift checkout error:', error)
+      c.var.logger.error({ err: error }, 'Gift checkout error')
       return c.json({ error: 'Failed to create gift checkout' }, 500)
     }
   }

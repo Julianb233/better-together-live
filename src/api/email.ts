@@ -5,6 +5,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { zodErrorHandler } from '../lib/validation'
+import { logger } from '../lib/logger'
 import {
   invitePartnerEmailSchema,
   subscriptionConfirmationEmailSchema,
@@ -38,21 +39,9 @@ function simulateEmail(request: EmailRequest): { success: boolean; messageId: st
   const timestamp = new Date().toISOString()
   const simulatedId = `dev_email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-  console.log('\n📧 [DEV MODE] Email Simulated')
-  console.log('═'.repeat(50))
-  console.log(`To:      ${request.to}`)
-  console.log(`Subject: ${request.subject}`)
-  console.log(`─`.repeat(50))
-  console.log('HTML Body Preview:')
-  // Strip HTML tags for console preview
+  // Strip HTML tags for preview
   const textPreview = request.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200)
-  console.log(`${textPreview}...`)
-  console.log(`─`.repeat(50))
-  console.log(`Simulated ID: ${simulatedId}`)
-  console.log(`Timestamp:    ${timestamp}`)
-  console.log('═'.repeat(50))
-  console.log('⚠️  In production, configure RESEND_API_KEY')
-  console.log('')
+  logger.info({ to: request.to, subject: request.subject, simulatedId, timestamp, preview: textPreview }, '[DEV MODE] Email simulated')
 
   return { success: true, messageId: simulatedId, simulated: true }
 }

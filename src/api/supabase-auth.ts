@@ -63,7 +63,7 @@ supabaseAuth.post('/signup', zValidator('json', signupSchema, zodErrorHandler), 
     })
 
     if (error) {
-      console.error('Supabase signup error:', error)
+      c.var.logger.error({ err: error }, 'Supabase signup error')
       return c.json({ error: error.message }, 400)
     }
 
@@ -108,7 +108,7 @@ supabaseAuth.post('/signup', zValidator('json', signupSchema, zodErrorHandler), 
       confirmationRequired: true
     }, 201)
   } catch (error) {
-    console.error('Signup error:', error)
+    c.var.logger.error({ err: error }, 'Signup error')
     return c.json({ error: 'Failed to create account' }, 500)
   }
 })
@@ -130,7 +130,7 @@ supabaseAuth.post('/login', zValidator('json', loginSchema, zodErrorHandler), as
     })
 
     if (error) {
-      console.error('Supabase login error:', error)
+      c.var.logger.error({ err: error }, 'Supabase login error')
       return c.json({ error: 'Invalid email or password' }, 401)
     }
 
@@ -164,7 +164,7 @@ supabaseAuth.post('/login', zValidator('json', loginSchema, zodErrorHandler), as
       token: data.session.access_token
     })
   } catch (error) {
-    console.error('Login error:', error)
+    c.var.logger.error({ err: error }, 'Login error')
     return c.json({ error: 'Failed to login' }, 500)
   }
 })
@@ -183,7 +183,7 @@ supabaseAuth.post('/logout', async (c: Context) => {
 
     return c.json({ success: true, message: 'Logged out successfully' })
   } catch (error) {
-    console.error('Logout error:', error)
+    c.var.logger.error({ err: error }, 'Logout error')
     // Clear cookies anyway
     clearSupabaseAuthCookies(c)
     return c.json({ success: true, message: 'Logged out' })
@@ -207,7 +207,7 @@ supabaseAuth.post('/forgot-password', zValidator('json', forgotPasswordSchema, z
 
     // Always return success to prevent email enumeration
     if (error) {
-      console.error('Password reset error:', error)
+      c.var.logger.error({ err: error }, 'Password reset error')
     }
 
     return c.json({
@@ -215,7 +215,7 @@ supabaseAuth.post('/forgot-password', zValidator('json', forgotPasswordSchema, z
       message: 'If an account exists with this email, you will receive a password reset link.'
     })
   } catch (error) {
-    console.error('Forgot password error:', error)
+    c.var.logger.error({ err: error }, 'Forgot password error')
     return c.json({
       success: true,
       message: 'If an account exists with this email, you will receive a password reset link.'
@@ -247,7 +247,7 @@ supabaseAuth.get('/callback', async (c: Context) => {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error || !data.session) {
-      console.error('Code exchange error:', error)
+      c.var.logger.error({ err: error }, 'Code exchange error')
       return c.redirect('/login?error=invalid_link')
     }
 
@@ -271,7 +271,7 @@ supabaseAuth.get('/callback', async (c: Context) => {
 
     return c.redirect('/login?verified=true')
   } catch (error) {
-    console.error('Auth callback error:', error)
+    c.var.logger.error({ err: error }, 'Auth callback error')
     return c.redirect('/login?error=invalid_link')
   }
 })
@@ -298,7 +298,7 @@ supabaseAuth.post('/reset-password', zValidator('json', resetPasswordSchema, zod
     })
 
     if (sessionError) {
-      console.error('Session restoration error:', sessionError)
+      c.var.logger.error({ err: sessionError }, 'Session restoration error')
       return c.json({ error: 'Invalid or expired reset link. Please request a new one.' }, 400)
     }
 
@@ -308,7 +308,7 @@ supabaseAuth.post('/reset-password', zValidator('json', resetPasswordSchema, zod
     })
 
     if (error) {
-      console.error('Password update error:', error)
+      c.var.logger.error({ err: error }, 'Password update error')
       return c.json({ error: 'Failed to update password' }, 400)
     }
 
@@ -328,7 +328,7 @@ supabaseAuth.post('/reset-password', zValidator('json', resetPasswordSchema, zod
       message: 'Password has been reset successfully'
     })
   } catch (error) {
-    console.error('Reset password error:', error)
+    c.var.logger.error({ err: error }, 'Reset password error')
     return c.json({ error: 'Failed to reset password' }, 500)
   }
 })
@@ -369,7 +369,7 @@ supabaseAuth.post('/refresh', zValidator('json', refreshTokenSchema, zodErrorHan
       }
     })
   } catch (error) {
-    console.error('Token refresh error:', error)
+    c.var.logger.error({ err: error }, 'Token refresh error')
     return c.json({ error: 'Failed to refresh token' }, 500)
   }
 })
@@ -411,7 +411,7 @@ supabaseAuth.get('/me', async (c: Context) => {
       }
     })
   } catch (error) {
-    console.error('Get user error:', error)
+    c.var.logger.error({ err: error }, 'Get user error')
     return c.json({ error: 'Failed to get user info' }, 500)
   }
 })
@@ -433,7 +433,7 @@ supabaseAuth.post('/oauth/google', async (c: Context) => {
     })
 
     if (error) {
-      console.error('Google OAuth error:', error)
+      c.var.logger.error({ err: error }, 'Google OAuth error')
       return c.json({ error: 'Failed to initiate Google login' }, 500)
     }
 
@@ -442,7 +442,7 @@ supabaseAuth.post('/oauth/google', async (c: Context) => {
       url: data.url
     })
   } catch (error) {
-    console.error('Google OAuth error:', error)
+    c.var.logger.error({ err: error }, 'Google OAuth error')
     return c.json({ error: 'Failed to initiate Google login' }, 500)
   }
 })
@@ -464,7 +464,7 @@ supabaseAuth.post('/oauth/facebook', async (c: Context) => {
     })
 
     if (error) {
-      console.error('Facebook OAuth error:', error)
+      c.var.logger.error({ err: error }, 'Facebook OAuth error')
       return c.json({ error: 'Failed to initiate Facebook login' }, 500)
     }
 
@@ -473,7 +473,7 @@ supabaseAuth.post('/oauth/facebook', async (c: Context) => {
       url: data.url
     })
   } catch (error) {
-    console.error('Facebook OAuth error:', error)
+    c.var.logger.error({ err: error }, 'Facebook OAuth error')
     return c.json({ error: 'Failed to initiate Facebook login' }, 500)
   }
 })
@@ -507,7 +507,7 @@ supabaseAuth.post('/update-profile', zValidator('json', updateProfileSchema, zod
     })
 
     if (updateError) {
-      console.error('Profile update error:', updateError)
+      c.var.logger.error({ err: updateError }, 'Profile update error')
       return c.json({ error: 'Failed to update profile' }, 500)
     }
 
@@ -522,7 +522,7 @@ supabaseAuth.post('/update-profile', zValidator('json', updateProfileSchema, zod
       .eq('id', user.id)
 
     if (dbError) {
-      console.error('Database profile update error:', dbError)
+      c.var.logger.error({ err: dbError }, 'Database profile update error')
       // Don't fail the request, auth metadata was updated
     }
 
@@ -531,7 +531,7 @@ supabaseAuth.post('/update-profile', zValidator('json', updateProfileSchema, zod
       message: 'Profile updated successfully'
     })
   } catch (error) {
-    console.error('Update profile error:', error)
+    c.var.logger.error({ err: error }, 'Update profile error')
     return c.json({ error: 'Failed to update profile' }, 500)
   }
 })

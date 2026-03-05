@@ -128,7 +128,7 @@ communitiesApi.get('/',
     const { data: communities, error } = await query
 
     if (error) {
-      console.error('Get communities query error:', error)
+      c.var.logger.error({ err: error }, 'Get communities query error')
       return c.json({ error: 'Failed to get communities' }, 500)
     }
 
@@ -153,7 +153,7 @@ communitiesApi.get('/',
       }
     })
   } catch (error) {
-    console.error('Get communities error:', error)
+    c.var.logger.error({ err: error }, 'Get communities error')
     return c.json({ error: 'Failed to get communities' }, 500)
   }
 })
@@ -235,7 +235,7 @@ communitiesApi.get('/:id', async (c: Context) => {
       recent_posts: recentPosts
     })
   } catch (error) {
-    console.error('Get community error:', error)
+    c.var.logger.error({ err: error }, 'Get community error')
     return c.json({ error: 'Failed to get community' }, 500)
   }
 })
@@ -291,7 +291,7 @@ communitiesApi.post('/',
       })
 
     if (insertError) {
-      console.error('Create community insert error:', insertError)
+      c.var.logger.error({ err: insertError }, 'Create community insert error')
       return c.json({ error: 'Failed to create community' }, 500)
     }
 
@@ -321,7 +321,7 @@ communitiesApi.post('/',
       }
     }, 201)
   } catch (error) {
-    console.error('Create community error:', error)
+    c.var.logger.error({ err: error }, 'Create community error')
     return c.json({ error: 'Failed to create community' }, 500)
   }
 })
@@ -379,13 +379,13 @@ communitiesApi.put('/:id',
       .eq('id', communityId)
 
     if (updateError) {
-      console.error('Update community error:', updateError)
+      c.var.logger.error({ err: updateError }, 'Update community error')
       return c.json({ error: 'Failed to update community' }, 500)
     }
 
     return c.json({ success: true, message: 'Community updated successfully' })
   } catch (error) {
-    console.error('Update community error:', error)
+    c.var.logger.error({ err: error }, 'Update community error')
     return c.json({ error: 'Failed to update community' }, 500)
   }
 })
@@ -415,13 +415,13 @@ communitiesApi.delete('/:id', async (c: Context) => {
       .eq('id', communityId)
 
     if (deleteError) {
-      console.error('Delete community error:', deleteError)
+      c.var.logger.error({ err: deleteError }, 'Delete community error')
       return c.json({ error: 'Failed to delete community' }, 500)
     }
 
     return c.json({ success: true, message: 'Community deleted successfully' })
   } catch (error) {
-    console.error('Delete community error:', error)
+    c.var.logger.error({ err: error }, 'Delete community error')
     return c.json({ error: 'Failed to delete community' }, 500)
   }
 })
@@ -535,7 +535,7 @@ communitiesApi.post('/:id/join',
       membership_id: memberId
     })
   } catch (error) {
-    console.error('Join community error:', error)
+    c.var.logger.error({ err: error }, 'Join community error')
     return c.json({ error: 'Failed to join community' }, 500)
   }
 })
@@ -592,7 +592,7 @@ communitiesApi.post('/:id/leave', async (c: Context) => {
 
     return c.json({ success: true, message: 'Successfully left community' })
   } catch (error) {
-    console.error('Leave community error:', error)
+    c.var.logger.error({ err: error }, 'Leave community error')
     return c.json({ error: 'Failed to leave community' }, 500)
   }
 })
@@ -667,7 +667,7 @@ communitiesApi.get('/:id/members',
 
     return c.json({ members })
   } catch (error) {
-    console.error('Get community members error:', error)
+    c.var.logger.error({ err: error }, 'Get community members error')
     return c.json({ error: 'Failed to get members' }, 500)
   }
 })
@@ -721,7 +721,7 @@ communitiesApi.put('/:id/members/:userId',
 
     return c.json({ success: true, message: 'Member role updated successfully' })
   } catch (error) {
-    console.error('Update member role error:', error)
+    c.var.logger.error({ err: error }, 'Update member role error')
     return c.json({ error: 'Failed to update member role' }, 500)
   }
 })
@@ -794,7 +794,7 @@ communitiesApi.delete('/:id/members/:userId',
       message: ban ? 'Member banned successfully' : 'Member removed successfully'
     })
   } catch (error) {
-    console.error('Remove member error:', error)
+    c.var.logger.error({ err: error }, 'Remove member error')
     return c.json({ error: 'Failed to remove member' }, 500)
   }
 })
@@ -867,7 +867,7 @@ communitiesApi.post('/:id/invite',
       invite_id: inviteId
     })
   } catch (error) {
-    console.error('Create invite error:', error)
+    c.var.logger.error({ err: error }, 'Create invite error')
     return c.json({ error: 'Failed to create invite' }, 500)
   }
 })
@@ -967,7 +967,7 @@ communitiesApi.post('/join/:inviteCode', async (c: Context) => {
       }
     })
   } catch (error) {
-    console.error('Join via invite error:', error)
+    c.var.logger.error({ err: error }, 'Join via invite error')
     return c.json({ error: 'Failed to join community' }, 500)
   }
 })

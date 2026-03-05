@@ -73,7 +73,7 @@ inlineApi.post('/api/users', async (c) => {
     const user = await getUserById(c.env, userId)
     return c.json({ user }, 201)
   } catch (error) {
-    console.error('Create user error:', error)
+    c.var.logger.error({ err: error }, 'Create user error')
     return c.json({ error: 'Failed to create user' }, 500)
   }
 })
@@ -95,7 +95,7 @@ inlineApi.get('/api/users/:userId', async (c) => {
 
     return c.json({ user })
   } catch (error) {
-    console.error('Get user error:', error)
+    c.var.logger.error({ err: error }, 'Get user error')
     return c.json({ error: 'Failed to get user' }, 500)
   }
 })
@@ -143,7 +143,7 @@ inlineApi.put('/api/users/:userId', async (c) => {
     const updatedUser = await getUserById(c.env, userId)
     return c.json({ user: updatedUser })
   } catch (error) {
-    console.error('Update user error:', error)
+    c.var.logger.error({ err: error }, 'Update user error')
     return c.json({ error: 'Failed to update user' }, 500)
   }
 })
@@ -218,7 +218,7 @@ inlineApi.post('/api/invite-partner', async (c) => {
       })
     }
   } catch (error) {
-    console.error('Invite partner error:', error)
+    c.var.logger.error({ err: error }, 'Invite partner error')
     return c.json({ error: 'Failed to invite partner' }, 500)
   }
 })
@@ -247,7 +247,7 @@ inlineApi.get('/api/relationships/:userId', async (c) => {
       partner
     })
   } catch (error) {
-    console.error('Get relationship error:', error)
+    c.var.logger.error({ err: error }, 'Get relationship error')
     return c.json({ error: 'Failed to get relationship' }, 500)
   }
 })
