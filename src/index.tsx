@@ -1622,17 +1622,6 @@ app.get('/', (c) => {
               <p className="text-gray-400 leading-relaxed">
                 Transforming relationships through intelligent connection tracking and shared growth experiences.
               </p>
-              <div className="flex space-x-4">
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  <i className="fab fa-twitter"></i>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  <i className="fab fa-facebook"></i>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  <i className="fab fa-instagram"></i>
-                </a>
-              </div>
             </div>
             
             <div>
@@ -1640,18 +1629,18 @@ app.get('/', (c) => {
               <ul className="space-y-2">
                 <li><a href="#features" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
                 <li><a href="#pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="/paywall" className="text-gray-400 hover:text-white transition-colors">Premium</a></li>
                 <li><a href="/api" className="text-gray-400 hover:text-white transition-colors">API Docs</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Changelog</a></li>
               </ul>
             </div>
             
             <div>
-              <h5 className="font-semibold text-white mb-4">Support</h5>
+              <h5 className="font-semibold text-white mb-4">Account</h5>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact Us</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+                <li><a href="/login" className="text-gray-400 hover:text-white transition-colors">Login</a></li>
+                <li><a href="/portal" className="text-gray-400 hover:text-white transition-colors">Dashboard</a></li>
+                <li><a href="/subscription" className="text-gray-400 hover:text-white transition-colors">Subscription</a></li>
+                <li><a href="/email-preferences" className="text-gray-400 hover:text-white transition-colors">Email Preferences</a></li>
               </ul>
             </div>
             
@@ -1659,9 +1648,8 @@ app.get('/', (c) => {
               <h5 className="font-semibold text-white mb-4">Business</h5>
               <ul className="space-y-2">
                 <li><a href="/become-sponsor.html" className="text-gray-400 hover:text-white transition-colors">Become a Partner</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Partner Portal</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
+                <li><a href="/gift-subscription" className="text-gray-400 hover:text-white transition-colors">Gift a Subscription</a></li>
+                <li><a href="/bundles" className="text-gray-400 hover:text-white transition-colors">Shop Bundles</a></li>
               </ul>
             </div>
           </div>
@@ -1818,21 +1806,6 @@ app.get('/', (c) => {
               }
             });
 
-            // Add loading states to CTA buttons
-            const ctaButtons = document.querySelectorAll('button[class*="bg-gradient"]');
-            ctaButtons.forEach(button => {
-              button.addEventListener('click', function() {
-                const originalText = this.innerHTML;
-                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Getting Started...';
-                this.disabled = true;
-                
-                // Simulate loading (remove in production)
-                setTimeout(() => {
-                  this.innerHTML = originalText;
-                  this.disabled = false;
-                }, 2000);
-              });
-            });
           });
           
           // Add CSS for ripple effect
