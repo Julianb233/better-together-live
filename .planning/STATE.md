@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 1 of 10 (Security Hardening)
-Plan: 1 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-03-05 — Completed 01-01-PLAN.md (Global Auth Middleware)
+Last activity: 2026-03-05 — Completed 01-03-PLAN.md (Stripe Webhook Verification)
 
-Progress: [█░░░░░░░░░] 3% (1/35)
+Progress: [██░░░░░░░░] 6% (2/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: ~3 minutes
-- Total execution time: ~3 minutes
+- Total plans completed: 2
+- Average duration: ~2.5 minutes
+- Total execution time: ~5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 - Security | 1/5 | ~3m | ~3m |
+| 1 - Security | 2/5 | ~5m | ~2.5m |
 
 ## Accumulated Context
 
@@ -43,6 +43,7 @@ Recent decisions affecting current work:
 - Freemium model with unified pricing
 - [01-01] Read Supabase env from c.env at request time (Vercel per-request injection)
 - [01-01] Use hono/combine except() for public route whitelist
+- [01-03] Web Crypto API for Stripe signature verification (no SDK needed)
 
 ### Pending Todos
 
@@ -58,5 +59,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 01-01-PLAN.md (Global Auth Middleware)
+Stopped at: Completed 01-03-PLAN.md (Stripe Webhook Verification)
 Resume file: None
