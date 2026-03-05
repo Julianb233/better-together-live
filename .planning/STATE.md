@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 6 (AI Coach) -- COMPLETE
+**Current focus:** Phase 7 (Analytics & Performance) -- COMPLETE
 
 ## Current Position
 
-Phase: 6 of 10 (AI Coach)
-Plan: 3 of 3 in current phase
+Phase: 7 of 10 (Analytics & Performance)
+Plan: 2 of 2 in current phase
 Status: Phase complete
-Last activity: 2026-03-05 -- Completed 06-03-PLAN.md (Rate Limiting & Response Caching)
+Last activity: 2026-03-05 -- Completed 07-01-PLAN.md and 07-02-PLAN.md (parallel execution)
 
-Progress: [███████████████████░] 54% (19/35)
+Progress: [████████████████████░] 60% (21/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 19
-- Average duration: ~4.0 minutes
-- Total execution time: ~77.6 minutes
+- Total plans completed: 21
+- Average duration: ~3.9 minutes
+- Total execution time: ~81.4 minutes
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: [███████████████████░] 54% (19
 | 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
 | 4 - Product Integrity | 3/3 | ~13.6m | ~4.5m |
 | 6 - AI Coach | 3/3 | ~7m | ~2.3m |
+| 7 - Analytics & Performance | 2/2 | ~3.8m | ~1.9m |
 
 ## Accumulated Context
 
@@ -88,6 +89,12 @@ Recent decisions affecting current work:
 - [06-02] Heuristic question classification (word count + keywords, no LLM call)
 - [06-02] Static fallback message when both AI providers fail
 - [06-03] In-memory rate limiting and caching (not Redis) -- acceptable for serverless cold starts
+- [07-01] Return null for metrics with no data source (CLV, repeat rate, session duration)
+- [07-01] Calculate real revenue growth from current vs previous month sponsor data
+- [07-01] sessionsGrowth returns N/A (no historical session data to compare)
+- [07-02] Batch unread counts using oldest last_read_at as floor + in-memory filtering
+- [07-02] JS fallback for trending topics RPC with reduced 500-row limit
+- [07-02] Response field renamed from postCount to post_count for RPC consistency
 
 ### Pending Todos
 
@@ -97,6 +104,7 @@ Recent decisions affecting current work:
 - Reconcile TypeScript type column names (user_1_id) with actual DB schema (user1_id)
 - Run migration 0006_ai_coach_messages.sql against Supabase (creates ai_coach_messages + ai_coach_rate_limits tables)
 - Set ANTHROPIC_API_KEY and OPENAI_API_KEY in Vercel dashboard
+- Run migration `migrations/0010_extract_trending_topics.sql` on Supabase to enable trending topics RPC
 
 ### Blockers/Concerns
 
@@ -105,15 +113,15 @@ Recent decisions affecting current work:
 - Phase 1 (security) complete -- all 5 plans executed
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
 - Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
-- Phase 4 plan 1 complete -- all homepage CTA buttons fixed, fake spinner removed, dead links cleaned up
-- Phase 4 plan 2 complete -- all fake social proof, false encryption claims, and exposed business metrics removed from every page
 - Phase 4 COMPLETE -- all 3 plans executed: CTA fixes, fake content removal, pricing unification
 - Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
+- Phase 7 COMPLETE -- all 2 plans executed: mock analytics removed, N+1 fixed, trending topics RPC created
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
+- Trending topics RPC function needs migration run on Supabase (JS fallback active until then)
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 06-03-PLAN.md (Rate Limiting & Response Caching) -- Phase 6 complete
+Stopped at: Completed 07-01-PLAN.md and 07-02-PLAN.md -- Phase 7 complete
 Resume file: None
