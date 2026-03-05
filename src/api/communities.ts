@@ -644,7 +644,7 @@ communitiesApi.get('/:id/members',
     const usersMap = new Map((users || []).map(u => [u.id, u]))
 
     // Combine members with user info
-    let members = membersRaw
+    const members = membersRaw
       .map(m => {
         const user = usersMap.get(m.user_id)
         if (!user) return null // user was filtered out by search

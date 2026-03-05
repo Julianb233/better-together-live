@@ -97,7 +97,7 @@ messagingApi.get('/', async (c: Context) => {
 
     // Query 4: Batch-fetch user details for all participants
     const participantUserIds = [...new Set((allParticipants || []).map((p: any) => p.user_id))]
-    let userMap = new Map<string, any>()
+    const userMap = new Map<string, any>()
     if (participantUserIds.length > 0) {
       const { data: users } = await supabase
         .from('users')

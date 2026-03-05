@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare Pages
+name: Deploy to Vercel
 
 on:
   push:
@@ -8,15 +8,13 @@ on:
   pull_request:
     branches:
       - main
-      - staging
-  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'
 
 jobs:
   lint-and-test:
-    name: Lint and Test
+    name: Lint, Typecheck, Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,8 +29,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Run linting
+        run: npm run lint
+
       - name: Run type checking
-        run: npx tsc --noEmit || echo "Type checking completed with warnings"
+        # TODO: Remove continue-on-error once pre-existing type errors are fixed (1121 lines as of Phase 8)
+        continue-on-error: true
+        run: npx tsc --noEmit
 
       - name: Build application
         run: npm run build
@@ -44,8 +47,10 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
-      deployments: write
       pull-requests: write
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -59,26 +64,30 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build application
-        run: npm run build
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
 
-      - name: Deploy to Cloudflare Pages (Preview)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=better-together
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (Preview)
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
 
       - name: Comment Preview URL
         uses: actions/github-script@v7
         with:
           script: |
-            const previewUrl = `https://better-together-${context.sha.substring(0, 8)}.pages.dev`;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 **Preview Deployment Ready!**\n\n🔗 Preview URL: ${previewUrl}\n\n_Deployment will be available in ~1 minute_`
+              body: `**Preview Deployment Ready**\n\nURL: ${{ steps.deploy.outputs.url }}\n\nCommit: ${context.sha.substring(0, 8)}`
             });
 
   deploy-staging:
@@ -88,10 +97,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     environment:
       name: staging
-      url: https://staging.better-together.app
-    permissions:
-      contents: read
-      deployments: write
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -105,38 +113,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build application
-        run: npm run build
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
 
-      - name: Deploy to Cloudflare Pages (Staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=better-together --branch=staging
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Run database migrations (Staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply better-together-staging
-        continue-on-error: true
+      - name: Build Project
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Create staging deployment summary
-        run: |
-          echo "## 🚀 Staging Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://staging.better-together.app" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployed at:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Verification Steps" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Test homepage loading" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Verify API endpoints responding" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Check database connectivity" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Test core features" >> $GITHUB_STEP_SUMMARY
+      - name: Deploy to Vercel (Staging)
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
 
   deploy-production:
     name: Deploy to Production
@@ -145,10 +132,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://better-together.app
-    permissions:
-      contents: read
-      deployments: write
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -162,55 +148,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build application
-        run: npm run build
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
 
-      - name: Deploy to Cloudflare Pages (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=better-together --branch=main
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Run database migrations
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply better-together-production
-        continue-on-error: true
+      - name: Build Project
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Create deployment summary
-        run: |
-          echo "## 🚀 Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://better-together.app" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployed at:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Verification Steps" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Test homepage loading" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Verify API endpoints responding" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Check database connectivity" >> $GITHUB_STEP_SUMMARY
-          echo "- [ ] Confirm SSL certificate active" >> $GITHUB_STEP_SUMMARY
-
-  notify-failure:
-    name: Notify on Failure
-    runs-on: ubuntu-latest
-    needs: [lint-and-test]
-    if: failure() && github.event_name == 'push'
-    steps:
-      - name: Create failure issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const branchName = context.ref.split('/').pop();
-            const environmentName = branchName === 'main' ? 'Production' : 'Staging';
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🚨 ${environmentName} Deployment Failed - ${context.sha.substring(0, 8)}`,
-              body: `${environmentName} deployment failed for commit ${context.sha}\n\n**Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n**Branch:** ${context.ref}\n**Triggered by:** ${context.actor}`,
-              labels: ['deployment', 'bug', 'high-priority']
-            });
+      - name: Deploy to Vercel (Production)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}

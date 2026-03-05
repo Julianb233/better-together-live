@@ -271,7 +271,7 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
 
     switch (category) {
       case 'featured': {
-        let query = supabase
+        const query = supabase
           .from('communities')
           .select('*')
           .eq('privacy_level', 'public')
@@ -351,7 +351,7 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
     }
 
     // Enrich with membership status if user is authenticated
-    let membershipMap = new Map()
+    const membershipMap = new Map()
     if (userId && communities.length > 0) {
       const communityIds = communities.map(c => c.id)
       const { data: memberships } = await supabase
@@ -469,7 +469,7 @@ discoveryApi.get('/discover/trending', async (c: Context) => {
     const thresholdStr = threshold.toISOString()
 
     // Get blocked users
-    let blockedUserIds: string[] = []
+    const blockedUserIds: string[] = []
     if (userId) {
       const { data: blocks } = await supabase
         .from('user_blocks')

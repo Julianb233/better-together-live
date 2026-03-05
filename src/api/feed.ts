@@ -161,7 +161,7 @@ feedApi.get('/', async (c: Context) => {
 
     // Get user reactions
     const postIds = (posts || []).map((p: any) => p.id)
-    let reactionsMap = new Map()
+    const reactionsMap = new Map()
     if (postIds.length > 0) {
       const { data: reactions } = await supabase
         .from('reactions')
@@ -259,7 +259,7 @@ feedApi.get('/trending', async (c: Context) => {
     ])
 
     // Get user reactions
-    let reactionsMap = new Map()
+    const reactionsMap = new Map()
     if (userId && posts && posts.length > 0) {
       const postIds = posts.map((p: any) => p.id)
       const { data: reactions } = await supabase
@@ -385,7 +385,7 @@ feedApi.get('/community/:communityId', async (c: Context) => {
       : { data: [] }
 
     // Get user reactions
-    let reactionsMap = new Map()
+    const reactionsMap = new Map()
     if (userId && posts && posts.length > 0) {
       const postIds = posts.map((p: any) => p.id)
       const { data: reactions } = await supabase
@@ -479,7 +479,7 @@ feedApi.get('/user/:targetUserId', async (c: Context) => {
       }
     }
 
-    let query = supabase
+    const query = supabase
       .from('posts')
       .select('*')
       .eq('author_id', targetUserId)
@@ -499,7 +499,7 @@ feedApi.get('/user/:targetUserId', async (c: Context) => {
       : { data: [] }
 
     // Get user reactions
-    let reactionsMap = new Map()
+    const reactionsMap = new Map()
     if (viewerUserId && posts && posts.length > 0) {
       const postIds = posts.map((p: any) => p.id)
       const { data: reactions } = await supabase

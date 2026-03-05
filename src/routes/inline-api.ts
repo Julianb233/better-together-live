@@ -175,7 +175,7 @@ inlineApi.post('/api/invite-partner', async (c) => {
     }
 
     // Check if partner exists, if not create invitation
-    let partner = await getUserByEmail(c.env, partner_email)
+    const partner = await getUserByEmail(c.env, partner_email)
 
     if (partner) {
       // Partner exists, create relationship immediately

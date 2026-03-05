@@ -168,7 +168,7 @@ export async function calculateCheckinStreak(env: Env, relationshipId: string): 
   today.setHours(0, 0, 0, 0)
 
   let streak = 0
-  let currentDate = new Date(today)
+  const currentDate = new Date(today)
 
   for (const date of dates) {
     date.setHours(0, 0, 0, 0)
