@@ -29,6 +29,8 @@ export {
   requireAuth,
   optionalAuth,
   requireAdmin,
+  supabaseCookieRelay,
+  clearLegacyCookies,
   getSupabaseFromContext,
   getUserFromContext,
   getUserIdFromContext

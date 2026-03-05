@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { except } from 'hono/combine'
-import { requireAuth, requireAdmin } from './lib/supabase/middleware'
+import { requireAuth, requireAdmin, supabaseCookieRelay, clearLegacyCookies } from './lib/supabase/middleware'
 import { rateLimitMiddleware } from './lib/rate-limit'
 import { checkOwnership, forbiddenResponse } from './lib/security'
 // Static files served by platform (Vercel/Cloudflare)
@@ -100,6 +100,12 @@ app.use('/api/*', cors({
   credentials: true,
   maxAge: 86400
 }))
+
+// Clear legacy bt_* cookies from old custom JWT auth system
+app.use('*', clearLegacyCookies())
+
+// Relay @supabase/ssr refreshed token cookies to the browser
+app.use('*', supabaseCookieRelay())
 
 // Global auth -- all /api/* routes require auth EXCEPT these public routes
 app.use('/api/*', except(

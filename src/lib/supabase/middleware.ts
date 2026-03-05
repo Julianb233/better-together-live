@@ -6,7 +6,43 @@
  */
 
 import type { Context, Next } from 'hono'
+import { deleteCookie } from 'hono/cookie'
 import { createClientWithContext } from './server'
+
+/**
+ * Cookie relay middleware.
+ * Applies Set-Cookie headers from @supabase/ssr (token refresh) to the actual response.
+ * Must run BEFORE auth middleware so that createClientWithContext's setAll cookies reach the browser.
+ */
+export function supabaseCookieRelay() {
+  return async (c: Context, next: Next) => {
+    await next()
+
+    // After route handler runs, check if @supabase/ssr set any cookies
+    const headers = c.get('supabaseResponseHeaders') as Headers | undefined
+    if (headers) {
+      headers.forEach((value, key) => {
+        c.header(key, value, { append: true })
+      })
+    }
+  }
+}
+
+/**
+ * Legacy cookie cleanup middleware.
+ * Clears old bt_access_token and bt_refresh_token cookies from the custom JWT auth system.
+ * These are no longer used since we migrated to Supabase Auth.
+ */
+export function clearLegacyCookies() {
+  return async (c: Context, next: Next) => {
+    const cookieHeader = c.req.header('Cookie') ?? ''
+    if (cookieHeader.includes('bt_access_token')) {
+      deleteCookie(c, 'bt_access_token', { path: '/' })
+      deleteCookie(c, 'bt_refresh_token', { path: '/' })
+    }
+    await next()
+  }
+}
 
 /**
  * Middleware that requires authentication
