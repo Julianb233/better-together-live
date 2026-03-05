@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 4 (Product Integrity) -- fixing broken UI elements
+**Current focus:** Phase 4 (Product Integrity) -- COMPLETE
 
 ## Current Position
 
 Phase: 4 of 10 (Product Integrity)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-03-05 -- Completed 04-02-PLAN.md (Remove Fake Social Proof & False Claims)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-03-05 -- Completed 04-03-PLAN.md (Unify Pricing & Mark Unimplemented Features)
 
-Progress: [███████████████░] 43% (15/35)
+Progress: [████████████████░] 46% (16/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: ~4.1 minutes
-- Total execution time: ~66.5 minutes
+- Total execution time: ~70.6 minutes
 
 **By Phase:**
 
@@ -30,7 +30,7 @@ Progress: [███████████████░] 43% (15/35)
 | 1 - Security | 5/5 | ~17.5m | ~3.5m |
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
 | 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
-| 4 - Product Integrity | 2/3 | ~9.5m | ~4.75m |
+| 4 - Product Integrity | 3/3 | ~13.6m | ~4.5m |
 
 ## Accumulated Context
 
@@ -79,6 +79,9 @@ Recent decisions affecting current work:
 - [03-05] Delete db-supabase.ts entirely (unused wrapper with broken rpc query method)
 - [03-05] RLS policies use user1_id/user2_id matching DB schema (TypeScript types differ but service role bypasses RLS)
 - [04-01] Replace dead footer nav links with real app routes instead of removing footer columns entirely
+- [04-03] Paywall ($39/$69) is canonical pricing source of truth for all pages
+- [04-03] Subscription box prices kept as aspirational (Coming Soon), not removed
+- [04-03] Annual tier updated to $390/year (~17% savings vs $39/mo)
 
 ### Pending Todos
 
@@ -96,11 +99,12 @@ Recent decisions affecting current work:
 - Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
 - Phase 4 plan 1 complete -- all homepage CTA buttons fixed, fake spinner removed, dead links cleaned up
 - Phase 4 plan 2 complete -- all fake social proof, false encryption claims, and exposed business metrics removed from every page
+- Phase 4 COMPLETE -- all 3 plans executed: CTA fixes, fake content removal, pricing unification
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 04-02-PLAN.md (Remove Fake Social Proof & False Claims)
+Stopped at: Completed 04-03-PLAN.md (Unify Pricing & Mark Unimplemented Features) -- Phase 4 complete
 Resume file: None
