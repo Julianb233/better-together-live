@@ -344,7 +344,7 @@ export const loginHtml = `<!DOCTYPE html>
                 <div class="liquid-glass rounded-xl p-4">
                     <div class="flex items-center justify-center text-gray-400 text-sm">
                         <i class="fas fa-shield-alt mr-2 text-green-400"></i>
-                        <span>Enterprise-grade security with end-to-end encryption</span>
+                        <span>Secured with bank-level TLS encryption</span>
                     </div>
                 </div>
             </div>

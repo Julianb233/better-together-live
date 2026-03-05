@@ -98,7 +98,7 @@ export const premiumPricingHtml = `<!DOCTYPE html>
             <div class="text-center">
                 <div class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-full text-sm font-semibold mb-8 shadow-lg">
                     <i class="fas fa-heart mr-2"></i>
-                    Join 50,000+ Couples Building Stronger Bonds
+                    Build a Stronger Relationship Together
                 </div>
                 
                 <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
@@ -122,9 +122,9 @@ export const premiumPricingHtml = `<!DOCTYPE html>
                             <div class="text-sm text-gray-500">From 2.3 to 7.4 hours per week</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-purple-600 mb-2 font-semibold">Relationship Satisfaction</div>
-                            <div class="text-3xl font-bold text-purple-600 mb-2">94%<span class="text-lg"> Better</span></div>
-                            <div class="text-sm text-gray-500">Couples report stronger bond</div>
+                            <div class="text-purple-600 mb-2 font-semibold">Relationship Growth</div>
+                            <div class="text-3xl font-bold text-purple-600 mb-2"><i class="fas fa-chart-line"></i></div>
+                            <div class="text-sm text-gray-500">Track your progress together</div>
                         </div>
                     </div>
                     <div class="savings-highlight text-center mt-6">

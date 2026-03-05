@@ -155,7 +155,7 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                         <div class="bg-white bg-opacity-80 rounded-xl p-6 shadow-lg backdrop-blur-sm">
                             <i class="fas fa-lock text-3xl text-rose-600 mb-2"></i>
                             <div class="font-semibold text-gray-900">100% Private</div>
-                            <div class="text-sm text-gray-600">End-to-end encryption</div>
+                            <div class="text-sm text-gray-600">Data encrypted in transit</div>
                         </div>
                         <div class="bg-white bg-opacity-80 rounded-xl p-6 shadow-lg backdrop-blur-sm">
                             <i class="fas fa-user-md text-3xl text-purple-600 mb-2"></i>
@@ -503,27 +503,27 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                     </div>
                 </div>
 
-                <!-- Revenue Breakdown -->
+                <!-- Premium Features -->
                 <div class="grid md:grid-cols-4 gap-8 text-center">
                     <div class="bg-gray-800 rounded-xl p-6">
-                        <div class="text-3xl font-bold text-rose-400 mb-2">$89</div>
-                        <div class="text-gray-300">Avg Monthly ARPU</div>
-                        <div class="text-sm text-gray-400">Per premium user</div>
+                        <div class="text-3xl font-bold text-rose-400 mb-2"><i class="fas fa-fire"></i></div>
+                        <div class="text-gray-300">Progressive Levels</div>
+                        <div class="text-sm text-gray-400">From gentle to adventurous</div>
                     </div>
                     <div class="bg-gray-800 rounded-xl p-6">
-                        <div class="text-3xl font-bold text-purple-400 mb-2">78%</div>
-                        <div class="text-gray-300">Profit Margin</div>
-                        <div class="text-sm text-gray-400">Digital content</div>
+                        <div class="text-3xl font-bold text-purple-400 mb-2"><i class="fas fa-lock"></i></div>
+                        <div class="text-gray-300">Fully Private</div>
+                        <div class="text-sm text-gray-400">Your data stays yours</div>
                     </div>
                     <div class="bg-gray-800 rounded-xl p-6">
-                        <div class="text-3xl font-bold text-blue-400 mb-2">94%</div>
-                        <div class="text-gray-300">Retention Rate</div>
-                        <div class="text-sm text-gray-400">Premium subscribers</div>
+                        <div class="text-3xl font-bold text-blue-400 mb-2"><i class="fas fa-user-md"></i></div>
+                        <div class="text-gray-300">Expert Designed</div>
+                        <div class="text-sm text-gray-400">By licensed therapists</div>
                     </div>
                     <div class="bg-gray-800 rounded-xl p-6">
-                        <div class="text-3xl font-bold text-green-400 mb-2">$1,068</div>
-                        <div class="text-gray-300">Annual LTV</div>
-                        <div class="text-sm text-gray-400">Per couple</div>
+                        <div class="text-3xl font-bold text-green-400 mb-2"><i class="fas fa-heart"></i></div>
+                        <div class="text-gray-300">For Couples</div>
+                        <div class="text-sm text-gray-400">Build deeper trust</div>
                     </div>
                 </div>
             </div>
@@ -546,8 +546,8 @@ export const intimacyChallengesHtml = `<!DOCTYPE html>
                                     <i class="fas fa-shield-alt text-white"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-gray-900 mb-2">End-to-End Encryption</h4>
-                                    <p class="text-gray-600">All content and communications are encrypted with military-grade security.</p>
+                                    <h4 class="font-semibold text-gray-900 mb-2">TLS Encryption</h4>
+                                    <p class="text-gray-600">All content and communications are protected with bank-level TLS security.</p>
                                 </div>
                             </div>
                             <div class="flex items-start">

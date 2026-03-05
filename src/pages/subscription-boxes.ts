@@ -7,7 +7,7 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relationship Subscription Boxes - Curated Experiences Delivered | Better Together</title>
-    <meta name="description" content="Premium subscription boxes with 60-70% margins. Romance, Adventure, Anniversary, Self-Care & Personalized boxes delivered monthly. AI-curated experiences for couples.">
+    <meta name="description" content="Premium subscription boxes for couples. Romance, Adventure, Anniversary, Self-Care & Personalized boxes delivered monthly. AI-curated experiences for couples.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -90,8 +90,8 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                 <!-- Key Metrics Preview -->
                 <div class="grid md:grid-cols-3 gap-6 max-w-3xl mx-auto mb-10">
                     <div class="bg-white rounded-xl p-6 shadow-lg">
-                        <div class="text-3xl font-bold text-pink-600 mb-2">60-70%</div>
-                        <div class="text-sm text-gray-600">Profit Margins</div>
+                        <div class="text-3xl font-bold text-pink-600 mb-2"><i class="fas fa-heart"></i></div>
+                        <div class="text-sm text-gray-600">AI-Curated</div>
                     </div>
                     <div class="bg-white rounded-xl p-6 shadow-lg">
                         <div class="text-3xl font-bold text-purple-600 mb-2">5 Types</div>
@@ -125,7 +125,7 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     Choose Your Relationship Experience
                 </h2>
                 <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                    Each box is AI-curated based on your relationship preferences and designed for maximum profit margins while delivering exceptional value.
+                    Each box is AI-curated based on your relationship preferences and designed to deliver exceptional value.
                 </p>
             </div>
 
@@ -139,34 +139,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                         <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center">
                             <i class="fas fa-heart text-white text-lg"></i>
                         </div>
-                        <div class="profit-badge">60% Margin</div>
+                        <div class="text-pink-600 font-semibold text-sm">Most Popular</div>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">Romance Box</h3>
                     <p class="text-gray-600 mb-6">Premium candle, artisan chocolates, luxury bath bomb, personalized love note card</p>
                     
-                    <!-- Cost Breakdown -->
-                    <div class="bg-white rounded-lg p-4 mb-6 text-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">COGS:</span>
-                            <span class="font-semibold">$15.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Shipping (1.5 lbs):</span>
-                            <span class="font-semibold">$5.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Packaging & Handling:</span>
-                            <span class="font-semibold">$4.25</span>
-                        </div>
-                        <div class="border-t pt-2 flex justify-between items-center font-bold">
-                            <span>Total Cost:</span>
-                            <span class="text-red-600">$24.25</span>
-                        </div>
-                    </div>
-
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$60<span class="text-lg font-normal text-gray-600">/month</span></div>
-                        <div class="text-green-600 font-semibold mb-4">Profit: $35.75 per box</div>
+                        <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
                         <button class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 transition-colors">
                             Subscribe Now
                         </button>
@@ -182,34 +162,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                         <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
                             <i class="fas fa-mountain text-white text-lg"></i>
                         </div>
-                        <div class="profit-badge">62% Margin</div>
+                        <div class="text-purple-600 font-semibold text-sm">Premium</div>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">Adventure Date Box</h3>
                     <p class="text-gray-600 mb-6">DIY painting kit, picnic blanket, couples game, adventure planning guide</p>
                     
-                    <!-- Cost Breakdown -->
-                    <div class="bg-white rounded-lg p-4 mb-6 text-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">COGS:</span>
-                            <span class="font-semibold">$20.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Shipping (3.0 lbs):</span>
-                            <span class="font-semibold">$8.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Packaging & Handling:</span>
-                            <span class="font-semibold">$4.50</span>
-                        </div>
-                        <div class="border-t pt-2 flex justify-between items-center font-bold">
-                            <span>Total Cost:</span>
-                            <span class="text-red-600">$32.50</span>
-                        </div>
-                    </div>
-
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$85<span class="text-lg font-normal text-gray-600">/month</span></div>
-                        <div class="text-green-600 font-semibold mb-4">Profit: $52.50 per box</div>
+                        <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
                         <button class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
                             Subscribe Now
                         </button>
@@ -225,34 +185,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                         <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
                             <i class="fas fa-gift text-white text-lg"></i>
                         </div>
-                        <div class="profit-badge">62% Margin</div>
+                        <div class="text-purple-600 font-semibold text-sm">Premium</div>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">Anniversary Box</h3>
                     <p class="text-gray-600 mb-6">Jewelry piece, wine glass set, gourmet snacks, celebration accessories</p>
                     
-                    <!-- Cost Breakdown -->
-                    <div class="bg-white rounded-lg p-4 mb-6 text-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">COGS:</span>
-                            <span class="font-semibold">$30.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Shipping (4.0 lbs):</span>
-                            <span class="font-semibold">$10.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Packaging & Handling:</span>
-                            <span class="font-semibold">$5.00</span>
-                        </div>
-                        <div class="border-t pt-2 flex justify-between items-center font-bold">
-                            <span>Total Cost:</span>
-                            <span class="text-red-600">$45.00</span>
-                        </div>
-                    </div>
-
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$120<span class="text-lg font-normal text-gray-600">/month</span></div>
-                        <div class="text-green-600 font-semibold mb-4">Profit: $75.00 per box</div>
+                        <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
                         <button class="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors">
                             Subscribe Now
                         </button>
@@ -268,34 +208,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                         <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
                             <i class="fas fa-leaf text-white text-lg"></i>
                         </div>
-                        <div class="profit-badge">57% Margin</div>
+                        <div class="text-green-600 font-semibold text-sm">Wellness</div>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">Self-Care Box</h3>
                     <p class="text-gray-600 mb-6">Relationship journal, premium tea set, aromatherapy oils, mindfulness guide</p>
                     
-                    <!-- Cost Breakdown -->
-                    <div class="bg-white rounded-lg p-4 mb-6 text-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">COGS:</span>
-                            <span class="font-semibold">$12.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Shipping (1.2 lbs):</span>
-                            <span class="font-semibold">$5.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Packaging & Handling:</span>
-                            <span class="font-semibold">$4.25</span>
-                        </div>
-                        <div class="border-t pt-2 flex justify-between items-center font-bold">
-                            <span>Total Cost:</span>
-                            <span class="text-red-600">$21.25</span>
-                        </div>
-                    </div>
-
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$50<span class="text-lg font-normal text-gray-600">/month</span></div>
-                        <div class="text-green-600 font-semibold mb-4">Profit: $28.75 per box</div>
+                        <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
                         <button class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
                             Subscribe Now
                         </button>
@@ -308,34 +228,14 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                         <div class="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center">
                             <i class="fas fa-star text-white text-2xl"></i>
                         </div>
-                        <div class="profit-badge">62% Margin</div>
+                        <div class="text-purple-600 font-semibold text-sm">Premium</div>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-4">Personalized Box</h3>
                     <p class="text-gray-600 mb-6">Custom engraved keepsake, personalized candle, luxury gift wrap, AI-selected items</p>
                     
-                    <!-- Cost Breakdown -->
-                    <div class="bg-white rounded-lg p-4 mb-6 text-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">COGS:</span>
-                            <span class="font-semibold">$25.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Shipping (2.5 lbs):</span>
-                            <span class="font-semibold">$8.00</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Packaging & Handling:</span>
-                            <span class="font-semibold">$4.75</span>
-                        </div>
-                        <div class="border-t pt-2 flex justify-between items-center font-bold">
-                            <span>Total Cost:</span>
-                            <span class="text-red-600">$37.75</span>
-                        </div>
-                    </div>
-
                     <div class="text-center">
                         <div class="text-3xl font-bold text-gray-900 mb-2">$100<span class="text-lg font-normal text-gray-600">/month</span></div>
-                        <div class="text-green-600 font-semibold mb-4">Profit: $62.25 per box</div>
+                        <div class="text-green-600 font-semibold mb-4">Free shipping included</div>
                         <button class="w-full bg-yellow-600 text-white py-3 rounded-lg font-semibold hover:bg-yellow-700 transition-colors">
                             Subscribe Now
                         </button>
@@ -345,86 +245,29 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
         </div>
     </section>
 
-    <!-- Revenue Projections -->
+    <!-- What's in Each Box -->
     <section class="py-16 bg-gray-900 text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold mb-4">Revenue & Profitability Projections</h2>
-                <p class="text-xl text-gray-300">Example revenue for 1,000 subscribers per box type</p>
-            </div>
-
-            <div class="overflow-x-auto mb-12">
-                <table class="w-full bg-gray-800 rounded-lg overflow-hidden">
-                    <thead class="bg-gray-700">
-                        <tr>
-                            <th class="px-6 py-4 text-left">Box Type</th>
-                            <th class="px-6 py-4 text-center">Retail Price</th>
-                            <th class="px-6 py-4 text-center">Total Cost</th>
-                            <th class="px-6 py-4 text-center">Profit Per Box</th>
-                            <th class="px-6 py-4 text-center">Monthly Revenue</th>
-                            <th class="px-6 py-4 text-center">Monthly Profit</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-700">
-                        <tr>
-                            <td class="px-6 py-4 font-semibold">Romance Box</td>
-                            <td class="px-6 py-4 text-center">$60</td>
-                            <td class="px-6 py-4 text-center text-red-400">$24.25</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$35.75</td>
-                            <td class="px-6 py-4 text-center font-semibold">$60,000</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$35,750</td>
-                        </tr>
-                        <tr>
-                            <td class="px-6 py-4 font-semibold">Adventure Date Box</td>
-                            <td class="px-6 py-4 text-center">$85</td>
-                            <td class="px-6 py-4 text-center text-red-400">$32.50</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$52.50</td>
-                            <td class="px-6 py-4 text-center font-semibold">$85,000</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$52,500</td>
-                        </tr>
-                        <tr>
-                            <td class="px-6 py-4 font-semibold">Anniversary Box</td>
-                            <td class="px-6 py-4 text-center">$120</td>
-                            <td class="px-6 py-4 text-center text-red-400">$45.00</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$75.00</td>
-                            <td class="px-6 py-4 text-center font-semibold">$120,000</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$75,000</td>
-                        </tr>
-                        <tr>
-                            <td class="px-6 py-4 font-semibold">Self-Care Box</td>
-                            <td class="px-6 py-4 text-center">$50</td>
-                            <td class="px-6 py-4 text-center text-red-400">$21.25</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$28.75</td>
-                            <td class="px-6 py-4 text-center font-semibold">$50,000</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$28,750</td>
-                        </tr>
-                        <tr>
-                            <td class="px-6 py-4 font-semibold">Personalized Box</td>
-                            <td class="px-6 py-4 text-center">$100</td>
-                            <td class="px-6 py-4 text-center text-red-400">$37.75</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$62.25</td>
-                            <td class="px-6 py-4 text-center font-semibold">$100,000</td>
-                            <td class="px-6 py-4 text-center text-green-400 font-bold">$62,250</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">What Makes Our Boxes Special</h2>
+                <p class="text-xl text-gray-300">Every item is hand-selected and AI-curated for your relationship</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-8 text-center">
                 <div class="bg-gray-800 rounded-xl p-6">
-                    <div class="text-3xl font-bold text-green-400 mb-2">$415,000</div>
-                    <div class="text-gray-300">Total Monthly Revenue</div>
-                    <div class="text-sm text-gray-400 mt-1">Per 1,000 subscribers each</div>
+                    <div class="text-3xl font-bold text-pink-400 mb-2"><i class="fas fa-brain"></i></div>
+                    <div class="text-gray-300">AI-Curated Selection</div>
+                    <div class="text-sm text-gray-400 mt-1">Personalized to your preferences</div>
                 </div>
                 <div class="bg-gray-800 rounded-xl p-6">
-                    <div class="text-3xl font-bold text-green-400 mb-2">$254,250</div>
-                    <div class="text-gray-300">Total Monthly Profit</div>
-                    <div class="text-sm text-gray-400 mt-1">61% average margin</div>
+                    <div class="text-3xl font-bold text-purple-400 mb-2"><i class="fas fa-gem"></i></div>
+                    <div class="text-gray-300">Premium Quality Items</div>
+                    <div class="text-sm text-gray-400 mt-1">Handpicked artisan products</div>
                 </div>
                 <div class="bg-gray-800 rounded-xl p-6">
-                    <div class="text-3xl font-bold text-blue-400 mb-2">$3.05M</div>
-                    <div class="text-gray-300">Annual Profit Potential</div>
-                    <div class="text-sm text-gray-400 mt-1">Scalable to millions</div>
+                    <div class="text-3xl font-bold text-blue-400 mb-2"><i class="fas fa-truck"></i></div>
+                    <div class="text-gray-300">Free Shipping</div>
+                    <div class="text-sm text-gray-400 mt-1">Delivered to your door monthly</div>
                 </div>
             </div>
         </div>
@@ -558,7 +401,7 @@ export const subscriptionBoxesHtml = `<!DOCTYPE html>
                     </div>
                     <h3 class="text-lg font-bold mb-3">Revenue Streams</h3>
                     <ul class="text-sm text-gray-300 space-y-2">
-                        <li>• Subscription boxes (60-70% margins)</li>
+                        <li>• Subscription boxes (recurring)</li>
                         <li>• App subscriptions (recurring revenue)</li>
                         <li>• Vendor partnerships & commissions</li>
                         <li>• Premium AI-executed services</li>

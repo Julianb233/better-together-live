@@ -441,11 +441,7 @@ app.get('/subscription-boxes.html', async (c) => {
   return c.html(subscriptionBoxesHtml);
 })
 
-// In-App Purchases
-app.get('/in-app-purchases.html', async (c) => {
-  const { inAppPurchasesHtml } = await import('./pages/in-app-purchases');
-  return c.html(inAppPurchasesHtml);
-})
+// In-App Purchases route removed (exposed internal business metrics)
 
 // Intimacy Challenges (Adult Content - Age Verified)
 app.get('/intimacy-challenges.html', async (c) => {
@@ -453,10 +449,9 @@ app.get('/intimacy-challenges.html', async (c) => {
   return c.html(intimacyChallengesHtml);
 })
 
-// Premium Pricing - Annual-First Strategy
-app.get('/premium-pricing.html', async (c) => {
-  const { premiumPricingHtml } = await import('./pages/premium-pricing');
-  return c.html(premiumPricingHtml);
+// Premium Pricing redirects to canonical paywall
+app.get('/premium-pricing.html', (c) => {
+  return c.redirect('/paywall', 301);
 })
 
 // Analytics API Routes
@@ -930,10 +925,10 @@ app.get('/', (c) => {
                 <div className="bg-white rounded-xl p-6 shadow-lg mb-4">
                   <div className="flex items-center justify-between mb-4">
                     <h5 className="font-semibold text-gray-900">Relationship Health</h5>
-                    <span className="text-2xl font-bold text-green-600">87%</span>
+                    <span className="text-2xl font-bold text-green-600"><i className="fas fa-heart text-green-500"></i></span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style={{width: '87%'}}></div>
+                    <div className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full" style={{width: '75%'}}></div>
                   </div>
                   <div className="flex justify-between text-sm text-gray-600 mt-2">
                     <span>Connection: 9.2/10</span>

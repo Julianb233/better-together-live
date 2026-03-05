@@ -516,7 +516,7 @@ export const smartSchedulingHtml = `<!DOCTYPE html>
                 Ready to Never Fight About Scheduling Again?
             </h2>
             <p class="text-lg sm:text-xl text-green-100 mb-8">
-                Join 50,000+ couples who've saved 5+ hours per week with AI scheduling
+                Save time every week with AI-powered relationship scheduling
             </p>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
                 <button class="w-full sm:w-auto bg-white text-green-600 px-8 py-4 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg">

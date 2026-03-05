@@ -7,7 +7,7 @@ export const becomeSponsorHtml = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Partner with Better Together | #1 Couples Platform</title>
-    <meta name="description" content="Join 500+ premium brands partnering with Better Together. Access 50,000+ engaged couples actively investing $2.4K+ annually in relationship experiences. Apply now for exclusive partnership opportunities.">
+    <meta name="description" content="Partner with Better Together, a growing relationship platform. Access an engaged community of couples actively investing in relationship experiences. Apply now for exclusive partnership opportunities.">
     <meta name="keywords" content="business partnership, couples marketing, relationship platform, B2B partnerships, customer acquisition, couple demographics, engagement marketing">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -222,9 +222,9 @@ export const becomeSponsorHtml = `<!DOCTYPE html>
                 <!-- Authority Badge with Live Counter - Liquid Glass -->
                 <div class="inline-flex items-center px-6 py-3 liquid-glass rounded-full shadow-lg text-gray-800 text-sm font-semibold mb-8 animate-fade-in-up liquid-hover">
                     <i class="fas fa-crown text-yellow-500 mr-3"></i>
-                    <span class="mr-2">Trusted by</span>
-                    <span class="text-pink-600 font-bold text-lg" id="partnerCount">500+</span>
-                    <span class="ml-1">Premium Brands</span>
+                    <span class="mr-2">Growing</span>
+                    <span class="text-pink-600 font-bold text-lg" id="partnerCount">Partner</span>
+                    <span class="ml-1">Network</span>
                     <div class="ml-3 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                     <span class="ml-1 text-green-600 text-xs">Live</span>
                 </div>
@@ -238,7 +238,7 @@ export const becomeSponsorHtml = `<!DOCTYPE html>
                 </h1>
                 
                 <p class="text-xl sm:text-2xl text-gray-700 mb-10 max-w-4xl mx-auto leading-relaxed font-medium animate-fade-in-up" style="animation-delay: 0.4s;">
-                    Partner with the #1 relationship platform to access <strong class="text-pink-600">50,000+ actively engaged couples</strong> who invest an average of <strong class="text-green-600">$2,400+ annually</strong> in meaningful experiences together
+                    Partner with a growing relationship platform to access <strong class="text-pink-600">a community of engaged couples</strong> who invest in <strong class="text-green-600">meaningful experiences together</strong>
                 </p>
                 
                 <!-- Enhanced Value Proposition Cards -->
@@ -248,8 +248,8 @@ export const becomeSponsorHtml = `<!DOCTYPE html>
                             <i class="fas fa-users-heart text-white text-2xl"></i>
                         </div>
                         <h3 class="text-lg font-bold text-gray-900 mb-2">High-Intent Audience</h3>
-                        <p class="text-gray-600">87% purchase within 7 days</p>
-                        <div class="mt-2 text-2xl font-black text-pink-600">87%</div>
+                        <p class="text-gray-600">Couples actively investing in their relationship</p>
+                        <div class="mt-2 text-2xl font-black text-pink-600"><i class="fas fa-users-heart"></i></div>
                     </div>
                     
                     <div class="liquid-glass rounded-2xl p-6 text-center liquid-hover">

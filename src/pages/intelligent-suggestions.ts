@@ -627,20 +627,20 @@ export const intelligentSuggestionsHtml = `<!DOCTYPE html>
                         <div>
                             <div class="flex justify-between text-sm mb-2">
                                 <span class="text-gray-600">Date Success Rate</span>
-                                <span class="text-green-600 font-medium">94%</span>
+                                <span class="text-green-600 font-medium">High</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="bg-green-500 h-3 rounded-full" style="width: 94%"></div>
+                                <div class="bg-green-500 h-3 rounded-full" style="width: 85%"></div>
                             </div>
                         </div>
                         
                         <div>
                             <div class="flex justify-between text-sm mb-2">
                                 <span class="text-gray-600">Preference Accuracy</span>
-                                <span class="text-blue-600 font-medium">87%</span>
+                                <span class="text-blue-600 font-medium">Good</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="bg-blue-500 h-3 rounded-full" style="width: 87%"></div>
+                                <div class="bg-blue-500 h-3 rounded-full" style="width: 75%"></div>
                             </div>
                         </div>
                         
@@ -680,7 +680,7 @@ export const intelligentSuggestionsHtml = `<!DOCTYPE html>
     <div class="py-12 sm:py-16 lg:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Join 50,000+ Happy Couples</h2>
+                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Personalized for Your Relationship</h2>
                 <p class="text-lg sm:text-xl text-gray-600">See what makes our suggestions so special</p>
             </div>
 
