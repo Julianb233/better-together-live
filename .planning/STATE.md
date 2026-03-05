@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 7 (Analytics & Performance) -- COMPLETE
+**Current focus:** Phase 5 (Payment System) -- COMPLETE
 
 ## Current Position
 
-Phase: 7 of 10 (Analytics & Performance)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-03-05 -- Completed 07-01-PLAN.md and 07-02-PLAN.md (parallel execution)
+Phase: 7 of 10 (multiple phases complete)
+Plan: Phase 5 complete (3/3), Phase 6 complete (3/3), Phase 7 complete (2/2)
+Status: Phases 1-7 complete
+Last activity: 2026-03-05 -- Completed 05-01, 05-02, 05-03 (Payment System)
 
-Progress: [████████████████████░] 60% (21/35)
+Progress: [████████████████████████░] 69% (24/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
-- Average duration: ~3.9 minutes
-- Total execution time: ~81.4 minutes
+- Total plans completed: 24
+- Average duration: ~3.6 minutes
+- Total execution time: ~87.4 minutes
 
 **By Phase:**
 
@@ -31,6 +31,7 @@ Progress: [████████████████████░] 60% 
 | 2 - Auth Consolidation | 3/3 | ~10m | ~3.3m |
 | 3 - Database Consolidation | 5/5 | ~29.5m | ~5.9m |
 | 4 - Product Integrity | 3/3 | ~13.6m | ~4.5m |
+| 5 - Payment System | 3/3 | ~6m | ~2m |
 | 6 - AI Coach | 3/3 | ~7m | ~2.3m |
 | 7 - Analytics & Performance | 2/2 | ~3.8m | ~1.9m |
 
@@ -81,9 +82,14 @@ Recent decisions affecting current work:
 - [03-05] Delete db-supabase.ts entirely (unused wrapper with broken rpc query method)
 - [03-05] RLS policies use user1_id/user2_id matching DB schema (TypeScript types differ but service role bypasses RLS)
 - [04-01] Replace dead footer nav links with real app routes instead of removing footer columns entirely
-- [04-03] Paywall ($39/$69) is canonical pricing source of truth for all pages
-- [04-03] Subscription box prices kept as aspirational (Coming Soon), not removed
-- [04-03] Annual tier updated to $390/year (~17% savings vs $39/mo)
+- [04-03] Paywall pricing updated to $30/mo and $240/yr (was $39/$69)
+- [05-01] Stripe SDK replaces raw fetch; per-request client via createStripeClient()
+- [05-01] SDK constructEventAsync replaces manual Web Crypto HMAC for webhooks
+- [05-01] Pre-created Price IDs from env vars (STRIPE_PRICE_TRY_IT_OUT, STRIPE_PRICE_BETTER_TOGETHER)
+- [05-01] Plan IDs: 'try-it-out' ($30/mo) and 'better-together' ($240/yr) replace growing-together variants
+- [05-02] requireTier middleware gates ai-coach, video, intimacy routes at index.tsx level
+- [05-02] Both plans unlock identical features (no differentiation between tiers)
+- [05-03] Subscription management delegates to Stripe Customer Portal
 - [06-01] claude-haiku-4-5 as primary AI coach model via Vercel AI SDK
 - [06-01] Fetch newest-first then reverse for chronological conversation history
 - [06-02] Heuristic question classification (word count + keywords, no LLM call)
@@ -105,6 +111,8 @@ Recent decisions affecting current work:
 - Run migration 0006_ai_coach_messages.sql against Supabase (creates ai_coach_messages + ai_coach_rate_limits tables)
 - Set ANTHROPIC_API_KEY and OPENAI_API_KEY in Vercel dashboard
 - Run migration `migrations/0010_extract_trending_topics.sql` on Supabase to enable trending topics RPC
+- Configure Stripe env vars in Vercel: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_TRY_IT_OUT, STRIPE_PRICE_BETTER_TOGETHER
+- Create Stripe Products/Prices in dashboard and enable Customer Portal
 
 ### Blockers/Concerns
 
@@ -114,6 +122,7 @@ Recent decisions affecting current work:
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
 - Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
 - Phase 4 COMPLETE -- all 3 plans executed: CTA fixes, fake content removal, pricing unification
+- Phase 5 COMPLETE -- all 3 plans executed: Stripe SDK, subscription gating, pricing unification
 - Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
 - Phase 7 COMPLETE -- all 2 plans executed: mock analytics removed, N+1 fixed, trending topics RPC created
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
@@ -123,5 +132,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 07-01-PLAN.md and 07-02-PLAN.md -- Phase 7 complete
+Stopped at: Completed 05-01, 05-02, 05-03 -- Phase 5 (Payment System) complete
 Resume file: None
