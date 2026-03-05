@@ -5,7 +5,6 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
-import { extractToken, verifyToken } from './auth'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 
 const usersApi = new Hono()
@@ -14,15 +13,10 @@ const usersApi = new Hono()
 usersApi.get('/me', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const accessToken = extractToken(c, 'access')
+    const userId = c.get('userId')
 
-    if (!accessToken) {
+    if (!userId) {
       return c.json({ error: 'Not authenticated' }, 401)
-    }
-
-    const payload = await verifyToken(accessToken, c.env, 'access')
-    if (!payload) {
-      return c.json({ error: 'Invalid or expired token' }, 401)
     }
 
     const user = await db.first<{
@@ -38,7 +32,7 @@ usersApi.get('/me', async (c: Context) => {
       `SELECT id, email, name, nickname, profile_photo_url, timezone,
               primary_love_language, secondary_love_language
        FROM users WHERE id = $1`,
-      [payload.userId]
+      [userId]
     )
 
     if (!user) {

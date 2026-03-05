@@ -5,20 +5,9 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
-import { verifyToken, extractToken } from './auth'
 import { getPaginationParams } from '../lib/pagination'
 
 const discoveryApi = new Hono()
-
-/**
- * Helper: Get authenticated user ID (optional - some endpoints are public)
- */
-async function getAuthUserId(c: Context): Promise<string | null> {
-  const token = extractToken(c, 'access')
-  if (!token) return null
-  const payload = await verifyToken(token, c.env, 'access')
-  return payload?.userId || null
-}
 
 /**
  * Helper: Check if user is blocked
@@ -44,7 +33,7 @@ async function getBlockedUserIds(db: any, userId: string): Promise<string[]> {
 discoveryApi.get('/search', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
     const type = c.req.query('type') || 'all'
@@ -266,7 +255,7 @@ discoveryApi.get('/search', async (c: Context) => {
 discoveryApi.get('/search/users', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
     const { limit, offset } = getPaginationParams(c)
@@ -359,7 +348,7 @@ discoveryApi.get('/search/users', async (c: Context) => {
 discoveryApi.get('/search/communities', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     const q = c.req.query('q') || ''
     const category = c.req.query('category')
@@ -466,7 +455,7 @@ discoveryApi.get('/search/communities', async (c: Context) => {
 discoveryApi.get('/discover/communities', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     const category = c.req.query('category') || 'featured'
     const { limit, offset } = getPaginationParams(c)
@@ -618,7 +607,7 @@ discoveryApi.get('/discover/communities', async (c: Context) => {
 discoveryApi.get('/discover/users', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     if (!userId) {
       return c.json({ error: 'Authentication required' }, 401)
@@ -736,7 +725,7 @@ discoveryApi.get('/discover/users', async (c: Context) => {
 discoveryApi.get('/discover/trending', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
-    const userId = await getAuthUserId(c)
+    const userId = c.get('userId')
 
     const timeframe = c.req.query('timeframe') || '24h'
     const { limit } = getPaginationParams(c)

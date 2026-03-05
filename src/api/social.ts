@@ -6,7 +6,6 @@ import type { Context } from 'hono'
 import { createDatabase } from '../db'
 import type { Env } from '../types'
 import { generateId, getCurrentDateTime } from '../utils'
-import { requireAuth } from './auth'
 import { getPaginationParams } from '../lib/pagination'
 import { sanitizeTextInput } from '../lib/sanitize'
 
@@ -20,7 +19,7 @@ const socialApi = new Hono()
  * POST /api/posts/:postId/reactions
  * React to a post (upsert: create or update reaction)
  */
-socialApi.post('/posts/:postId/reactions', requireAuth, async (c: Context) => {
+socialApi.post('/posts/:postId/reactions', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const postId = c.req.param('postId')
@@ -93,7 +92,7 @@ socialApi.post('/posts/:postId/reactions', requireAuth, async (c: Context) => {
  * DELETE /api/posts/:postId/reactions
  * Remove reaction from post
  */
-socialApi.delete('/posts/:postId/reactions', requireAuth, async (c: Context) => {
+socialApi.delete('/posts/:postId/reactions', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const postId = c.req.param('postId')
@@ -168,7 +167,7 @@ socialApi.get('/posts/:postId/reactions', async (c: Context) => {
  * POST /api/comments/:commentId/reactions
  * React to a comment
  */
-socialApi.post('/comments/:commentId/reactions', requireAuth, async (c: Context) => {
+socialApi.post('/comments/:commentId/reactions', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const commentId = c.req.param('commentId')
@@ -238,7 +237,7 @@ socialApi.post('/comments/:commentId/reactions', requireAuth, async (c: Context)
  * DELETE /api/comments/:commentId/reactions
  * Remove reaction from comment
  */
-socialApi.delete('/comments/:commentId/reactions', requireAuth, async (c: Context) => {
+socialApi.delete('/comments/:commentId/reactions', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const commentId = c.req.param('commentId')
@@ -335,7 +334,7 @@ socialApi.get('/posts/:postId/comments', async (c: Context) => {
  * POST /api/posts/:postId/comments
  * Create a new comment or reply
  */
-socialApi.post('/posts/:postId/comments', requireAuth, async (c: Context) => {
+socialApi.post('/posts/:postId/comments', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const postId = c.req.param('postId')
@@ -416,7 +415,7 @@ socialApi.post('/posts/:postId/comments', requireAuth, async (c: Context) => {
  * PUT /api/comments/:id
  * Update a comment (only author can update)
  */
-socialApi.put('/comments/:id', requireAuth, async (c: Context) => {
+socialApi.put('/comments/:id', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const commentId = c.req.param('id')
@@ -467,7 +466,7 @@ socialApi.put('/comments/:id', requireAuth, async (c: Context) => {
  * DELETE /api/comments/:id
  * Delete a comment (soft delete - author or post author can delete)
  */
-socialApi.delete('/comments/:id', requireAuth, async (c: Context) => {
+socialApi.delete('/comments/:id', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const commentId = c.req.param('id')
@@ -520,7 +519,7 @@ socialApi.delete('/comments/:id', requireAuth, async (c: Context) => {
  * GET /api/connections
  * Get user's connections (followers, following, friends)
  */
-socialApi.get('/connections', requireAuth, async (c: Context) => {
+socialApi.get('/connections', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.get('userId')
@@ -578,7 +577,7 @@ socialApi.get('/connections', requireAuth, async (c: Context) => {
  * POST /api/connections/:userId/follow
  * Follow a user
  */
-socialApi.post('/connections/:userId/follow', requireAuth, async (c: Context) => {
+socialApi.post('/connections/:userId/follow', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -645,7 +644,7 @@ socialApi.post('/connections/:userId/follow', requireAuth, async (c: Context) =>
  * DELETE /api/connections/:userId/unfollow
  * Unfollow a user
  */
-socialApi.delete('/connections/:userId/unfollow', requireAuth, async (c: Context) => {
+socialApi.delete('/connections/:userId/unfollow', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -670,7 +669,7 @@ socialApi.delete('/connections/:userId/unfollow', requireAuth, async (c: Context
  * POST /api/connections/:userId/friend
  * Send friend request
  */
-socialApi.post('/connections/:userId/friend', requireAuth, async (c: Context) => {
+socialApi.post('/connections/:userId/friend', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -741,7 +740,7 @@ socialApi.post('/connections/:userId/friend', requireAuth, async (c: Context) =>
  * PUT /api/connections/:userId/friend
  * Accept or reject friend request
  */
-socialApi.put('/connections/:userId/friend', requireAuth, async (c: Context) => {
+socialApi.put('/connections/:userId/friend', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -807,7 +806,7 @@ socialApi.put('/connections/:userId/friend', requireAuth, async (c: Context) => 
  * GET /api/connections/suggestions
  * Get follow suggestions based on mutual connections and interests
  */
-socialApi.get('/connections/suggestions', requireAuth, async (c: Context) => {
+socialApi.get('/connections/suggestions', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.get('userId')
@@ -852,7 +851,7 @@ socialApi.get('/connections/suggestions', requireAuth, async (c: Context) => {
  * POST /api/blocks/:userId
  * Block a user
  */
-socialApi.post('/blocks/:userId', requireAuth, async (c: Context) => {
+socialApi.post('/blocks/:userId', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -912,7 +911,7 @@ socialApi.post('/blocks/:userId', requireAuth, async (c: Context) => {
  * DELETE /api/blocks/:userId
  * Unblock a user
  */
-socialApi.delete('/blocks/:userId', requireAuth, async (c: Context) => {
+socialApi.delete('/blocks/:userId', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const currentUserId = c.get('userId')
@@ -937,7 +936,7 @@ socialApi.delete('/blocks/:userId', requireAuth, async (c: Context) => {
  * GET /api/blocks
  * List blocked users
  */
-socialApi.get('/blocks', requireAuth, async (c: Context) => {
+socialApi.get('/blocks', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.get('userId')
@@ -966,7 +965,7 @@ socialApi.get('/blocks', requireAuth, async (c: Context) => {
  * POST /api/reports
  * Report content for moderation
  */
-socialApi.post('/reports', requireAuth, async (c: Context) => {
+socialApi.post('/reports', async (c: Context) => {
   try {
     const db = createDatabase(c.env as Env)
     const userId = c.get('userId')
