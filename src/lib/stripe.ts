@@ -1,68 +1,52 @@
 /**
- * Stripe webhook signature verification using Web Crypto API (edge-compatible).
- * Does NOT require the Stripe SDK.
+ * Stripe Client Library
  *
- * Implements verification per Stripe docs:
- * https://docs.stripe.com/webhooks#verify-manually
+ * Creates per-request Stripe instances (env vars are per-request in Vercel edge)
+ * and provides plan configuration as the single source of truth for pricing.
  */
+
+import Stripe from 'stripe'
 
 /**
- * Verify Stripe webhook signature using Web Crypto API (edge-compatible).
- * Does NOT require the Stripe SDK.
- *
- * @param payload - Raw request body string
- * @param sigHeader - Value of stripe-signature header
- * @param secret - STRIPE_WEBHOOK_SECRET from env
- * @param toleranceSec - Max age of event in seconds (default 300 = 5 min)
- * @returns true if signature is valid
+ * Create a Stripe client instance.
+ * Must be called per-request since env vars are injected per-request on Vercel edge.
  */
-export async function verifyStripeSignature(
-  payload: string,
-  sigHeader: string,
-  secret: string,
-  toleranceSec: number = 300
-): Promise<boolean> {
-  // Step 1: Parse the stripe-signature header
-  const parts = sigHeader.split(',')
-  const timestamp = parts.find(p => p.startsWith('t='))?.slice(2)
-  const signature = parts.find(p => p.startsWith('v1='))?.slice(3)
-
-  if (!timestamp || !signature) return false
-
-  // Step 2: Check timestamp tolerance (prevent replay attacks)
-  const now = Math.floor(Date.now() / 1000)
-  if (Math.abs(now - parseInt(timestamp)) > toleranceSec) return false
-
-  // Step 3: Construct signed payload and compute HMAC-SHA256
-  const signedPayload = `${timestamp}.${payload}`
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const sig = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(signedPayload)
-  )
-  const expected = Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  // Step 4: Timing-safe comparison
-  return timingSafeEqual(expected, signature)
+export function createStripeClient(secretKey: string): Stripe {
+  return new Stripe(secretKey, {
+    apiVersion: '2025-06-30.basil' as any,
+    typescript: true,
+  })
 }
 
+/** Plan identifiers matching Stripe Products */
+export type PlanId = keyof typeof STRIPE_PLANS
+
 /**
- * Timing-safe string comparison to prevent side-channel attacks.
+ * Single source of truth for plan configuration.
+ * Price IDs are resolved at request time from env vars.
  */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-  return result === 0
+export const STRIPE_PLANS = {
+  'try-it-out': {
+    name: 'Try It Out',
+    interval: 'month' as const,
+    amount: 3000, // $30.00 in cents
+    priceEnvVar: 'STRIPE_PRICE_TRY_IT_OUT',
+    fallbackPriceId: 'price_placeholder_tryitout',
+  },
+  'better-together': {
+    name: 'Better Together',
+    interval: 'year' as const,
+    amount: 24000, // $240.00 in cents
+    priceEnvVar: 'STRIPE_PRICE_BETTER_TOGETHER',
+    fallbackPriceId: 'price_placeholder_bt',
+  },
+} as const
+
+/**
+ * Resolve the Stripe Price ID for a plan from environment variables.
+ * Must be called at request time since env is per-request in edge runtime.
+ */
+export function getPriceId(planId: PlanId, env: Record<string, string>): string {
+  const plan = STRIPE_PLANS[planId]
+  return env[plan.priceEnvVar] || plan.fallbackPriceId
 }
