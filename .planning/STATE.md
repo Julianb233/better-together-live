@@ -12,22 +12,22 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 1 of 10 (Security Hardening)
 Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-03-05 — Completed 01-04-PLAN.md (CORS Admin Secrets Lockdown)
+Last activity: 2026-03-05 — Completed 01-02-PLAN.md (IDOR Protection)
 
-Progress: [███░░░░░░░] 9% (3/35)
+Progress: [████░░░░░░] 11% (4/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: ~2 minutes
-- Total execution time: ~6.5 minutes
+- Total execution time: ~9.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 - Security | 3/5 | ~6.5m | ~2m |
+| 1 - Security | 4/5 | ~9.5m | ~2m |
 
 ## Accumulated Context
 
@@ -45,6 +45,9 @@ Recent decisions affecting current work:
 - [01-01] Use hono/combine except() for public route whitelist
 - [01-03] Web Crypto API for Stripe signature verification (no SDK needed)
 - [01-04] CORS origin allowlist with CORS_ORIGINS env var for flexibility
+- [01-02] Inline checkOwnership pattern for IDOR protection (over route middleware)
+- [01-02] Excluded social/communities/feed from IDOR (target-action, not identity)
+- [01-02] Deferred verifyRelationshipMembership to Phase 3
 - [01-04] Admin analytics page route protected with inline requireAuth + requireAdmin
 
 ### Pending Todos
@@ -61,5 +64,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 01-04-PLAN.md (CORS Admin Secrets Lockdown)
+Stopped at: Completed 01-02-PLAN.md (IDOR Protection)
 Resume file: None
