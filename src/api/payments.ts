@@ -3,9 +3,10 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
 import { verifyStripeSignature } from '../lib/stripe'
+import { zValidator, zodErrorHandler } from '../lib/validation'
+import { createCheckoutSchema, cancelSubscriptionSchema, createGiftCheckoutSchema, subscriptionStatusQuerySchema } from '../lib/validation/schemas/payments'
 
 const paymentsApi = new Hono()
 
@@ -50,52 +51,55 @@ async function stripeRequest(endpoint: string, method: string, body: any, apiKey
 
 // POST /api/payments/create-checkout-session
 // Create Stripe checkout session for subscription
-paymentsApi.post('/create-checkout-session', async (c: Context) => {
-  try {
-    const { tierId, userId, email, successUrl, cancelUrl } = await c.req.json()
-    const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+paymentsApi.post('/create-checkout-session',
+  zValidator('json', createCheckoutSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const { tierId, userId, email, successUrl, cancelUrl } = c.req.valid('json' as never)
+      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
 
-    if (!apiKey) {
-      return c.json({ error: 'Stripe not configured' }, 500)
+      if (!apiKey) {
+        return c.json({ error: 'Stripe not configured' }, 500)
+      }
+
+      const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
+      if (!tier) {
+        return c.json({ error: 'Invalid subscription tier' }, 400)
+      }
+
+      // Create Stripe checkout session
+      const session = await stripeRequest('/checkout/sessions', 'POST', {
+        'mode': 'subscription',
+        'customer_email': email,
+        'client_reference_id': userId,
+        'success_url': successUrl || 'https://better-together.app/portal?success=true',
+        'cancel_url': cancelUrl || 'https://better-together.app/paywall?canceled=true',
+        'line_items[0][price_data][currency]': 'usd',
+        'line_items[0][price_data][product_data][name]': tier.name,
+        'line_items[0][price_data][unit_amount]': tier.price,
+        'line_items[0][price_data][recurring][interval]': tier.interval,
+        'line_items[0][quantity]': 1,
+        'metadata[userId]': userId,
+        'metadata[tierId]': tierId,
+        'subscription_data[metadata][userId]': userId,
+        'subscription_data[metadata][tierId]': tierId,
+        'allow_promotion_codes': 'true'
+      }, apiKey)
+
+      if (session.error) {
+        return c.json({ error: session.error.message }, 400)
+      }
+
+      return c.json({
+        sessionId: session.id,
+        url: session.url
+      })
+    } catch (error) {
+      console.error('Checkout error:', error)
+      return c.json({ error: 'Failed to create checkout session' }, 500)
     }
-
-    const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
-    if (!tier) {
-      return c.json({ error: 'Invalid subscription tier' }, 400)
-    }
-
-    // Create Stripe checkout session
-    const session = await stripeRequest('/checkout/sessions', 'POST', {
-      'mode': 'subscription',
-      'customer_email': email,
-      'client_reference_id': userId,
-      'success_url': successUrl || 'https://better-together.app/portal?success=true',
-      'cancel_url': cancelUrl || 'https://better-together.app/paywall?canceled=true',
-      'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][product_data][name]': tier.name,
-      'line_items[0][price_data][unit_amount]': tier.price,
-      'line_items[0][price_data][recurring][interval]': tier.interval,
-      'line_items[0][quantity]': 1,
-      'metadata[userId]': userId,
-      'metadata[tierId]': tierId,
-      'subscription_data[metadata][userId]': userId,
-      'subscription_data[metadata][tierId]': tierId,
-      'allow_promotion_codes': 'true'
-    }, apiKey)
-
-    if (session.error) {
-      return c.json({ error: session.error.message }, 400)
-    }
-
-    return c.json({
-      sessionId: session.id,
-      url: session.url
-    })
-  } catch (error) {
-    console.error('Checkout error:', error)
-    return c.json({ error: 'Failed to create checkout session' }, 500)
   }
-})
+)
 
 // POST /api/payments/webhook
 // Handle Stripe webhook events
@@ -117,7 +121,7 @@ paymentsApi.post('/webhook', async (c: Context) => {
 
     const event = JSON.parse(body)
 
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -126,20 +130,19 @@ paymentsApi.post('/webhook', async (c: Context) => {
         const tierId = session.metadata?.tierId
 
         if (userId) {
-          await db.run(`
-            INSERT INTO subscriptions (id, user_id, tier_id, stripe_subscription_id, status, created_at)
-            VALUES ($1, $2, $3, $4, 'active', CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id) DO UPDATE SET
-              tier_id = EXCLUDED.tier_id,
-              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-              status = 'active',
-              updated_at = CURRENT_TIMESTAMP
-          `, [
-            `sub_${Date.now()}`,
-            userId,
-            tierId,
-            session.subscription
-          ])
+          const { error } = await supabase
+            .from('subscriptions')
+            .upsert({
+              id: `sub_${Date.now()}`,
+              user_id: userId,
+              tier_id: tierId,
+              stripe_subscription_id: session.subscription,
+              status: 'active',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' })
+
+          if (error) throw error
         }
         break
       }
@@ -149,10 +152,12 @@ paymentsApi.post('/webhook', async (c: Context) => {
         const userId = subscription.metadata?.userId
 
         if (userId) {
-          await db.run(`
-            UPDATE subscriptions SET status = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE stripe_subscription_id = $2
-          `, [subscription.status, subscription.id])
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({ status: subscription.status, updated_at: new Date().toISOString() })
+            .eq('stripe_subscription_id', subscription.id)
+
+          if (error) throw error
         }
         break
       }
@@ -160,10 +165,12 @@ paymentsApi.post('/webhook', async (c: Context) => {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object
 
-        await db.run(`
-          UPDATE subscriptions SET status = 'canceled', updated_at = CURRENT_TIMESTAMP
-          WHERE stripe_subscription_id = $1
-        `, [subscription.id])
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({ status: 'canceled', updated_at: new Date().toISOString() })
+          .eq('stripe_subscription_id', subscription.id)
+
+        if (error) throw error
         break
       }
 
@@ -186,16 +193,22 @@ paymentsApi.post('/webhook', async (c: Context) => {
 // Get current subscription status for user
 paymentsApi.get('/subscription-status', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.query('userId')
 
     if (!userId) {
       return c.json({ error: 'userId required' }, 400)
     }
 
-    const subscription = await db.first<any>(`
-      SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
-    `, [userId])
+    const { data: subscription, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!subscription) {
       return c.json({
@@ -222,95 +235,106 @@ paymentsApi.get('/subscription-status', async (c: Context) => {
 
 // POST /api/payments/cancel-subscription
 // Cancel subscription
-paymentsApi.post('/cancel-subscription', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { userId } = await c.req.json()
-    const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+paymentsApi.post('/cancel-subscription',
+  zValidator('json', cancelSubscriptionSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const { userId } = c.req.valid('json' as never)
+      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
 
-    if (!apiKey) {
-      return c.json({ error: 'Stripe not configured' }, 500)
+      if (!apiKey) {
+        return c.json({ error: 'Stripe not configured' }, 500)
+      }
+
+      // Get subscription from database
+      const { data: subscription, error } = await supabase
+        .from('subscriptions')
+        .select('stripe_subscription_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (error) throw error
+
+      if (!subscription?.stripe_subscription_id) {
+        return c.json({ error: 'No active subscription found' }, 404)
+      }
+
+      // Cancel at period end (not immediately)
+      const result = await stripeRequest(
+        `/subscriptions/${subscription.stripe_subscription_id}`,
+        'POST',
+        { 'cancel_at_period_end': 'true' },
+        apiKey
+      )
+
+      if (result.error) {
+        return c.json({ error: result.error.message }, 400)
+      }
+
+      return c.json({
+        success: true,
+        cancelAt: result.cancel_at,
+        message: 'Subscription will be canceled at end of billing period'
+      })
+    } catch (error) {
+      console.error('Cancel error:', error)
+      return c.json({ error: 'Failed to cancel subscription' }, 500)
     }
-
-    // Get subscription from database
-    const subscription = await db.first<{ stripe_subscription_id: string }>(`
-      SELECT stripe_subscription_id FROM subscriptions WHERE user_id = $1 AND status = 'active'
-    `, [userId])
-
-    if (!subscription?.stripe_subscription_id) {
-      return c.json({ error: 'No active subscription found' }, 404)
-    }
-
-    // Cancel at period end (not immediately)
-    const result = await stripeRequest(
-      `/subscriptions/${subscription.stripe_subscription_id}`,
-      'POST',
-      { 'cancel_at_period_end': 'true' },
-      apiKey
-    )
-
-    if (result.error) {
-      return c.json({ error: result.error.message }, 400)
-    }
-
-    return c.json({
-      success: true,
-      cancelAt: result.cancel_at,
-      message: 'Subscription will be canceled at end of billing period'
-    })
-  } catch (error) {
-    console.error('Cancel error:', error)
-    return c.json({ error: 'Failed to cancel subscription' }, 500)
   }
-})
+)
 
 // POST /api/payments/create-gift-checkout
 // Create checkout for gift subscription
-paymentsApi.post('/create-gift-checkout', async (c: Context) => {
-  try {
-    const { tierId, senderUserId, recipientEmail, recipientName, message, successUrl, cancelUrl } = await c.req.json()
-    const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
+paymentsApi.post('/create-gift-checkout',
+  zValidator('json', createGiftCheckoutSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const { tierId, senderUserId, recipientEmail, recipientName, message, successUrl, cancelUrl } = c.req.valid('json' as never)
+      const apiKey = (c.env as any)?.STRIPE_SECRET_KEY
 
-    if (!apiKey) {
-      return c.json({ error: 'Stripe not configured' }, 500)
+      if (!apiKey) {
+        return c.json({ error: 'Stripe not configured' }, 500)
+      }
+
+      const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
+      if (!tier) {
+        return c.json({ error: 'Invalid subscription tier' }, 400)
+      }
+
+      // Create one-time payment for gift
+      const session = await stripeRequest('/checkout/sessions', 'POST', {
+        'mode': 'payment',
+        'success_url': successUrl || 'https://better-together.app/gift-sent?success=true',
+        'cancel_url': cancelUrl || 'https://better-together.app/gift?canceled=true',
+        'line_items[0][price_data][currency]': 'usd',
+        'line_items[0][price_data][product_data][name]': `Gift: ${tier.name}`,
+        'line_items[0][price_data][product_data][description]': `Gift subscription for ${recipientName || recipientEmail}`,
+        'line_items[0][price_data][unit_amount]': tier.price,
+        'line_items[0][quantity]': 1,
+        'metadata[type]': 'gift',
+        'metadata[senderUserId]': senderUserId,
+        'metadata[recipientEmail]': recipientEmail,
+        'metadata[recipientName]': recipientName || '',
+        'metadata[message]': message || '',
+        'metadata[tierId]': tierId
+      }, apiKey)
+
+      if (session.error) {
+        return c.json({ error: session.error.message }, 400)
+      }
+
+      return c.json({
+        sessionId: session.id,
+        url: session.url
+      })
+    } catch (error) {
+      console.error('Gift checkout error:', error)
+      return c.json({ error: 'Failed to create gift checkout' }, 500)
     }
-
-    const tier = SUBSCRIPTION_TIERS[tierId as keyof typeof SUBSCRIPTION_TIERS]
-    if (!tier) {
-      return c.json({ error: 'Invalid subscription tier' }, 400)
-    }
-
-    // Create one-time payment for gift
-    const session = await stripeRequest('/checkout/sessions', 'POST', {
-      'mode': 'payment',
-      'success_url': successUrl || 'https://better-together.app/gift-sent?success=true',
-      'cancel_url': cancelUrl || 'https://better-together.app/gift?canceled=true',
-      'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][product_data][name]': `Gift: ${tier.name}`,
-      'line_items[0][price_data][product_data][description]': `Gift subscription for ${recipientName || recipientEmail}`,
-      'line_items[0][price_data][unit_amount]': tier.price,
-      'line_items[0][quantity]': 1,
-      'metadata[type]': 'gift',
-      'metadata[senderUserId]': senderUserId,
-      'metadata[recipientEmail]': recipientEmail,
-      'metadata[recipientName]': recipientName || '',
-      'metadata[message]': message || '',
-      'metadata[tierId]': tierId
-    }, apiKey)
-
-    if (session.error) {
-      return c.json({ error: session.error.message }, 400)
-    }
-
-    return c.json({
-      sessionId: session.id,
-      url: session.url
-    })
-  } catch (error) {
-    console.error('Gift checkout error:', error)
-    return c.json({ error: 'Failed to create gift checkout' }, 500)
   }
-})
+)
 
 // GET /api/payments/tiers
 // Get available subscription tiers

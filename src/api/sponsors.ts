@@ -3,154 +3,99 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
-import { generateId, getCurrentDateTime, isValidEmail } from '../utils'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
+import { generateId, getCurrentDateTime } from '../utils'
 import { getPaginationParams } from '../lib/pagination'
+import { zValidator, zodErrorHandler } from '../lib/validation'
+import { sponsorApplicationSchema, reviewApplicationSchema, listApplicationsQuerySchema } from '../lib/validation/schemas/sponsors'
 
 const sponsorsApi = new Hono()
 
-interface SponsorApplication {
-  // Business Information
-  businessName: string
-  businessType: string
-  website?: string
-  address: string
-  city: string
-  state: string
-  zipCode: string
-
-  // Contact Information
-  contactName: string
-  contactEmail: string
-  contactPhone: string
-  contactRole: string
-
-  // Partnership Details
-  partnershipType: string
-  offerDescription: string
-  targetAudience?: string
-  expectedReach?: string
-
-  // Additional Info
-  howDidYouHear?: string
-  additionalNotes?: string
-}
-
 // POST /api/sponsors/apply
 // Submit a sponsor/partner application
-sponsorsApi.post('/apply', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const body: SponsorApplication = await c.req.json()
+sponsorsApi.post('/apply',
+  zValidator('json', sponsorApplicationSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const body = c.req.valid('json' as never)
 
-    // Validate required fields
-    const requiredFields = [
-      'businessName', 'businessType', 'address', 'city', 'state', 'zipCode',
-      'contactName', 'contactEmail', 'contactPhone', 'contactRole',
-      'partnershipType', 'offerDescription'
-    ]
+      // Check if application already exists from this email
+      const { data: existingApp, error: checkError } = await supabase
+        .from('sponsor_applications')
+        .select('id, status')
+        .eq('contact_email', body.contactEmail.toLowerCase())
+        .neq('status', 'rejected')
+        .maybeSingle()
 
-    for (const field of requiredFields) {
-      if (!body[field as keyof SponsorApplication]) {
-        return c.json({ error: `${field} is required` }, 400)
+      if (checkError) throw checkError
+
+      if (existingApp) {
+        return c.json({
+          error: 'An application from this email is already being reviewed',
+          applicationId: existingApp.id,
+          status: existingApp.status
+        }, 409)
       }
-    }
 
-    // Validate email
-    if (!isValidEmail(body.contactEmail)) {
-      return c.json({ error: 'Invalid email format' }, 400)
-    }
+      // Create application
+      const applicationId = generateId()
+      const now = getCurrentDateTime()
 
-    // Validate phone (basic)
-    const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/
-    if (!phoneRegex.test(body.contactPhone)) {
-      return c.json({ error: 'Invalid phone number format' }, 400)
-    }
+      const { error } = await supabase
+        .from('sponsor_applications')
+        .insert({
+          id: applicationId,
+          business_name: body.businessName,
+          business_type: body.businessType,
+          website: body.website || null,
+          address: body.address,
+          city: body.city,
+          state: body.state,
+          zip_code: body.zipCode,
+          contact_name: body.contactName,
+          contact_email: body.contactEmail.toLowerCase(),
+          contact_phone: body.contactPhone,
+          contact_role: body.contactRole,
+          partnership_type: body.partnershipType,
+          offer_description: body.offerDescription,
+          target_audience: body.targetAudience || null,
+          expected_reach: body.expectedReach || null,
+          how_did_you_hear: body.howDidYouHear || null,
+          additional_notes: body.additionalNotes || null,
+          status: 'pending',
+          created_at: now,
+          updated_at: now
+        })
 
-    // Check if application already exists from this email
-    const existingApp = await db.first<{ id: string; status: string }>(
-      'SELECT id, status FROM sponsor_applications WHERE contact_email = $1 AND status != $2',
-      [body.contactEmail.toLowerCase(), 'rejected']
-    )
+      if (error) throw error
 
-    if (existingApp) {
       return c.json({
-        error: 'An application from this email is already being reviewed',
-        applicationId: existingApp.id,
-        status: existingApp.status
-      }, 409)
+        success: true,
+        message: 'Your application has been submitted successfully! We will review it and contact you within 3-5 business days.',
+        applicationId
+      }, 201)
+    } catch (error) {
+      console.error('Sponsor application error:', error)
+      return c.json({ error: 'Failed to submit application' }, 500)
     }
-
-    // Create application
-    const applicationId = generateId()
-    const now = getCurrentDateTime()
-
-    await db.run(`
-      INSERT INTO sponsor_applications (
-        id, business_name, business_type, website, address, city, state, zip_code,
-        contact_name, contact_email, contact_phone, contact_role,
-        partnership_type, offer_description, target_audience, expected_reach,
-        how_did_you_hear, additional_notes, status, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pending', $19, $20)
-    `, [
-      applicationId,
-      body.businessName,
-      body.businessType,
-      body.website || null,
-      body.address,
-      body.city,
-      body.state,
-      body.zipCode,
-      body.contactName,
-      body.contactEmail.toLowerCase(),
-      body.contactPhone,
-      body.contactRole,
-      body.partnershipType,
-      body.offerDescription,
-      body.targetAudience || null,
-      body.expectedReach || null,
-      body.howDidYouHear || null,
-      body.additionalNotes || null,
-      now,
-      now
-    ])
-
-    // TODO: Send confirmation email to applicant
-    // TODO: Send notification email to admin
-
-    return c.json({
-      success: true,
-      message: 'Your application has been submitted successfully! We will review it and contact you within 3-5 business days.',
-      applicationId
-    }, 201)
-  } catch (error) {
-    console.error('Sponsor application error:', error)
-    return c.json({ error: 'Failed to submit application' }, 500)
   }
-})
+)
 
 // GET /api/sponsors/application/:id
 // Check application status
 sponsorsApi.get('/application/:id', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const applicationId = c.req.param('id')
 
-    const application = await db.first<{
-      id: string
-      business_name: string
-      contact_email: string
-      status: string
-      created_at: string
-      reviewed_at: string | null
-      review_notes: string | null
-    }>(
-      `SELECT id, business_name, contact_email, status, created_at, reviewed_at, review_notes
-       FROM sponsor_applications WHERE id = $1`,
-      [applicationId]
-    )
+    const { data: application, error } = await supabase
+      .from('sponsor_applications')
+      .select('id, business_name, contact_email, status, created_at, reviewed_at, review_notes')
+      .eq('id', applicationId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!application) {
       return c.json({ error: 'Application not found' }, 404)
@@ -199,41 +144,46 @@ sponsorsApi.get('/categories', (c: Context) => {
 // List all applications (admin only)
 sponsorsApi.get('/applications', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const status = c.req.query('status') || 'all'
     const { limit, offset } = getPaginationParams(c)
 
-    let query = `
-      SELECT id, business_name, business_type, contact_name, contact_email,
-             partnership_type, status, created_at, reviewed_at
-      FROM sponsor_applications
-    `
-    const params: any[] = []
+    let query = supabase
+      .from('sponsor_applications')
+      .select('id, business_name, business_type, contact_name, contact_email, partnership_type, status, created_at, reviewed_at')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (status !== 'all') {
-      query += ' WHERE status = $1'
-      params.push(status)
+      query = query.eq('status', status)
     }
 
-    query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
-    params.push(limit, offset)
+    const { data: applications, error } = await query
 
-    const applications = await db.all(query, params)
+    if (error) throw error
 
     // Get total count
-    let countQuery = 'SELECT COUNT(*) as count FROM sponsor_applications'
+    let countQuery = supabase
+      .from('sponsor_applications')
+      .select('*', { count: 'exact', head: true })
+
     if (status !== 'all') {
-      countQuery += ' WHERE status = $1'
+      countQuery = countQuery.eq('status', status)
     }
-    const countResult = await db.first<{ count: number }>(countQuery, status !== 'all' ? [status] : [])
+
+    const { count, error: countError } = await countQuery
+
+    if (countError) throw countError
+
+    const page = Math.floor(offset / limit) + 1
 
     return c.json({
       applications,
       pagination: {
         page,
         limit,
-        total: countResult?.count || 0,
-        totalPages: Math.ceil((countResult?.count || 0) / limit)
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit)
       }
     })
   } catch (error) {
@@ -244,34 +194,37 @@ sponsorsApi.get('/applications', async (c: Context) => {
 
 // PUT /api/sponsors/applications/:id/review
 // Review an application (admin only)
-sponsorsApi.put('/applications/:id/review', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const applicationId = c.req.param('id')
-    const { status, reviewNotes } = await c.req.json()
+sponsorsApi.put('/applications/:id/review',
+  zValidator('json', reviewApplicationSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const applicationId = c.req.param('id')
+      const { status, reviewNotes } = c.req.valid('json' as never)
 
-    if (!['approved', 'rejected', 'pending'].includes(status)) {
-      return c.json({ error: 'Invalid status' }, 400)
+      const now = getCurrentDateTime()
+
+      const { error } = await supabase
+        .from('sponsor_applications')
+        .update({
+          status,
+          review_notes: reviewNotes || null,
+          reviewed_at: now,
+          updated_at: now
+        })
+        .eq('id', applicationId)
+
+      if (error) throw error
+
+      return c.json({
+        success: true,
+        message: `Application ${status}`
+      })
+    } catch (error) {
+      console.error('Review application error:', error)
+      return c.json({ error: 'Failed to review application' }, 500)
     }
-
-    const now = getCurrentDateTime()
-
-    await db.run(`
-      UPDATE sponsor_applications
-      SET status = $1, review_notes = $2, reviewed_at = $3, updated_at = $4
-      WHERE id = $5
-    `, [status, reviewNotes || null, now, now, applicationId])
-
-    // TODO: Send email notification to applicant
-
-    return c.json({
-      success: true,
-      message: `Application ${status}`
-    })
-  } catch (error) {
-    console.error('Review application error:', error)
-    return c.json({ error: 'Failed to review application' }, 500)
   }
-})
+)
 
 export default sponsorsApi

@@ -3,8 +3,7 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
 
 const analyticsApi = new Hono()
 
@@ -13,42 +12,52 @@ const analyticsApi = new Hono()
 analyticsApi.get('/relationship-health/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
     // Get check-ins for last 30 days
-    const checkins = await db.first<{
-      avg_connection: number | null
-      avg_mood: number | null
-      total_checkins: number
-    }>(`
-      SELECT AVG(connection_score) as avg_connection,
-             AVG(mood_score) as avg_mood,
-             COUNT(*) as total_checkins
-      FROM daily_checkins
-      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days'
-    `, [relationshipId])
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: checkinRows, error: checkinError } = await supabase
+      .from('daily_checkins')
+      .select('connection_score, mood_score')
+      .eq('relationship_id', relationshipId)
+      .gte('created_at', thirtyDaysAgo)
+
+    if (checkinError) throw checkinError
+
+    const totalCheckins = checkinRows?.length || 0
+    const avgConnection = totalCheckins > 0
+      ? checkinRows!.reduce((sum, r) => sum + (r.connection_score || 0), 0) / totalCheckins
+      : null
+    const avgMood = totalCheckins > 0
+      ? checkinRows!.reduce((sum, r) => sum + (r.mood_score || 0), 0) / totalCheckins
+      : null
 
     // Get goal completion rate
-    const goals = await db.first<{
-      total: number
-      completed: number
-    }>(`
-      SELECT COUNT(*) as total,
-             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-      FROM shared_goals WHERE relationship_id = $1
-    `, [relationshipId])
+    const { data: allGoals, error: goalsError } = await supabase
+      .from('shared_goals')
+      .select('status')
+      .eq('relationship_id', relationshipId)
+
+    if (goalsError) throw goalsError
+
+    const totalGoals = allGoals?.length || 0
+    const completedGoals = allGoals?.filter(g => g.status === 'completed').length || 0
 
     // Get activity frequency
-    const activities = await db.first<{ count: number }>(`
-      SELECT COUNT(*) as count FROM activities
-      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days'
-    `, [relationshipId])
+    const { count: activityCount, error: activityError } = await supabase
+      .from('activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
+      .gte('created_at', thirtyDaysAgo)
+
+    if (activityError) throw activityError
 
     // Calculate scores
-    const communicationScore = Math.min(100, (checkins?.total_checkins || 0) * 3.3) // 30 checkins = 100
-    const connectionScore = (checkins?.avg_connection || 5) * 10
-    const goalScore = goals?.total > 0 ? ((goals?.completed || 0) / goals.total) * 100 : 50
-    const activityScore = Math.min(100, (activities?.count || 0) * 12.5) // 8 activities = 100
+    const communicationScore = Math.min(100, totalCheckins * 3.3) // 30 checkins = 100
+    const connectionScore = (avgConnection || 5) * 10
+    const goalScore = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 50
+    const activityScore = Math.min(100, (activityCount || 0) * 12.5) // 8 activities = 100
 
     const overallScore = Math.round(
       (communicationScore * 0.25) +
@@ -86,42 +95,31 @@ analyticsApi.get('/relationship-health/:relationshipId', async (c: Context) => {
 analyticsApi.get('/engagement/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
-    // Weekly stats
-    const weekly = await db.first<{
-      checkins: number
-      activities: number
-      goals: number
-    }>(`
-      SELECT
-        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as checkins,
-        (SELECT COUNT(*) FROM activities WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as activities,
-        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days') as goals
-    `, [relationshipId])
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    // Monthly stats
-    const monthly = await db.first<{
-      checkins: number
-      activities: number
-      goals: number
-    }>(`
-      SELECT
-        (SELECT COUNT(*) FROM daily_checkins WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as checkins,
-        (SELECT COUNT(*) FROM activities WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as activities,
-        (SELECT COUNT(*) FROM shared_goals WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '30 days') as goals
-    `, [relationshipId])
+    // Weekly stats - parallel queries
+    const [weeklyCheckins, weeklyActivities, weeklyGoals, monthlyCheckins, monthlyActivities, monthlyGoals] = await Promise.all([
+      supabase.from('daily_checkins').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', sevenDaysAgo),
+      supabase.from('activities').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', sevenDaysAgo),
+      supabase.from('shared_goals').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', sevenDaysAgo),
+      supabase.from('daily_checkins').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', thirtyDaysAgo),
+      supabase.from('activities').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', thirtyDaysAgo),
+      supabase.from('shared_goals').select('*', { count: 'exact', head: true }).eq('relationship_id', relationshipId).gte('created_at', thirtyDaysAgo),
+    ])
 
     return c.json({
       weekly: {
-        checkins: weekly?.checkins || 0,
-        activities: weekly?.activities || 0,
-        goals: weekly?.goals || 0
+        checkins: weeklyCheckins.count || 0,
+        activities: weeklyActivities.count || 0,
+        goals: weeklyGoals.count || 0
       },
       monthly: {
-        checkins: monthly?.checkins || 0,
-        activities: monthly?.activities || 0,
-        goals: monthly?.goals || 0
+        checkins: monthlyCheckins.count || 0,
+        activities: monthlyActivities.count || 0,
+        goals: monthlyGoals.count || 0
       },
       streaks: { currentStreak: 0, longestStreak: 0 },
       balance: { user1Participation: 50, user2Participation: 50 }
@@ -138,26 +136,45 @@ analyticsApi.get('/trends/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
     const period = c.req.query('period') || '30d'
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
     const days = period === '7d' ? 7 : period === '90d' ? 90 : 30
+    const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-    const trends = await db.all<{
-      date: string
-      avg_connection: number
-      avg_mood: number
-      checkin_count: number
-    }>(`
-      SELECT
-        DATE(created_at) as date,
-        AVG(connection_score) as avg_connection,
-        AVG(mood_score) as avg_mood,
-        COUNT(*) as checkin_count
-      FROM daily_checkins
-      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '${days} days'
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `, [relationshipId])
+    // Fetch raw checkins and aggregate in-memory (Supabase query builder doesn't support GROUP BY with aggregates)
+    const { data: checkins, error } = await supabase
+      .from('daily_checkins')
+      .select('created_at, connection_score, mood_score')
+      .eq('relationship_id', relationshipId)
+      .gte('created_at', sinceDate)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    // Group by date and calculate averages
+    const dateMap = new Map<string, { connections: number[]; moods: number[]; count: number }>()
+
+    for (const checkin of checkins || []) {
+      const date = checkin.created_at?.split('T')[0] || ''
+      if (!dateMap.has(date)) {
+        dateMap.set(date, { connections: [], moods: [], count: 0 })
+      }
+      const entry = dateMap.get(date)!
+      if (checkin.connection_score != null) entry.connections.push(checkin.connection_score)
+      if (checkin.mood_score != null) entry.moods.push(checkin.mood_score)
+      entry.count++
+    }
+
+    const trends = Array.from(dateMap.entries()).map(([date, data]) => ({
+      date,
+      avg_connection: data.connections.length > 0
+        ? data.connections.reduce((a, b) => a + b, 0) / data.connections.length
+        : 0,
+      avg_mood: data.moods.length > 0
+        ? data.moods.reduce((a, b) => a + b, 0) / data.moods.length
+        : 0,
+      checkin_count: data.count
+    }))
 
     return c.json({
       period,
@@ -177,7 +194,7 @@ analyticsApi.get('/trends/:relationshipId', async (c: Context) => {
 analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
     // Base recommendations
     const recommendations = [
@@ -205,12 +222,17 @@ analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
     ]
 
     // Check recent activity to customize
-    const recentCheckins = await db.first<{ count: number }>(`
-      SELECT COUNT(*) as count FROM daily_checkins
-      WHERE relationship_id = $1 AND created_at > NOW() - INTERVAL '7 days'
-    `, [relationshipId])
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    if ((recentCheckins?.count || 0) < 3) {
+    const { count: recentCount, error } = await supabase
+      .from('daily_checkins')
+      .select('*', { count: 'exact', head: true })
+      .eq('relationship_id', relationshipId)
+      .gte('created_at', sevenDaysAgo)
+
+    if (error) throw error
+
+    if ((recentCount || 0) < 3) {
       recommendations.unshift({
         type: 'checkin',
         title: 'Complete Daily Check-ins',
@@ -232,14 +254,15 @@ analyticsApi.get('/recommendations/:relationshipId', async (c: Context) => {
 analyticsApi.get('/milestones/:relationshipId', async (c: Context) => {
   try {
     const relationshipId = c.req.param('relationshipId')
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
 
-    const relationship = await db.first<{
-      start_date: string
-      anniversary_date: string | null
-    }>(`
-      SELECT start_date, anniversary_date FROM relationships WHERE id = $1
-    `, [relationshipId])
+    const { data: relationship, error } = await supabase
+      .from('relationships')
+      .select('start_date, anniversary_date')
+      .eq('id', relationshipId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!relationship) {
       return c.json({ error: 'Relationship not found' }, 404)

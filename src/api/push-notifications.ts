@@ -3,9 +3,10 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
+import { zValidator, zodErrorHandler } from '../lib/validation'
+import { registerDeviceSchema, sendPushSchema, broadcastPushSchema, unregisterDeviceSchema } from '../lib/validation/schemas/push-notifications'
 
 const pushApi = new Hono()
 
@@ -35,8 +36,8 @@ function simulatePushNotification(
   const timestamp = new Date().toISOString()
   const simulatedId = `dev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-  console.log('\n📱 [DEV MODE] Push Notification Simulated')
-  console.log('═'.repeat(50))
+  console.log('\n[DEV MODE] Push Notification Simulated')
+  console.log('='.repeat(50))
   console.log(`Platform:     ${platform.toUpperCase()}`)
   console.log(`Token:        ${deviceToken.substring(0, 20)}...`)
   console.log(`Title:        ${payload.title}`)
@@ -46,9 +47,9 @@ function simulatePushNotification(
   console.log(`Badge:        ${payload.badge ?? 'none'}`)
   console.log(`Simulated ID: ${simulatedId}`)
   console.log(`Timestamp:    ${timestamp}`)
-  console.log('═'.repeat(50))
-  console.log('⚠️  In production, configure FCM_SERVER_KEY/FCM_PROJECT_ID (Android)')
-  console.log('⚠️  and APNS_TEAM_ID/APNS_KEY_ID/APNS_PRIVATE_KEY (iOS)')
+  console.log('='.repeat(50))
+  console.log('WARNING: In production, configure FCM_SERVER_KEY/FCM_PROJECT_ID (Android)')
+  console.log('WARNING: and APNS_TEAM_ID/APNS_KEY_ID/APNS_PRIVATE_KEY (iOS)')
   console.log('')
 
   return { success: true, messageId: simulatedId, simulated: true }
@@ -220,15 +221,15 @@ async function generateAPNsJWT(config: { teamId: string; keyId: string; privateK
 // Get device tokens for a user
 async function getUserDeviceTokens(env: any, userId: string): Promise<DeviceToken[]> {
   try {
-    const db = createDatabase(env as Env)
-    const result = await db.all<DeviceToken>(`
-      SELECT id, user_id, device_token, platform, created_at
-      FROM device_tokens
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-    `, [userId])
+    const supabase = createAdminClient(env as SupabaseEnv)
+    const { data, error } = await supabase
+      .from('device_tokens')
+      .select('id, user_id, device_token, platform, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
-    return result
+    if (error) throw error
+    return (data as DeviceToken[]) || []
   } catch (error) {
     console.error('Error fetching device tokens:', error)
     return []
@@ -238,14 +239,14 @@ async function getUserDeviceTokens(env: any, userId: string): Promise<DeviceToke
 // Get all device tokens (for broadcast)
 async function getAllDeviceTokens(env: any): Promise<DeviceToken[]> {
   try {
-    const db = createDatabase(env as Env)
-    const result = await db.all<DeviceToken>(`
-      SELECT id, user_id, device_token, platform, created_at
-      FROM device_tokens
-      ORDER BY created_at DESC
-    `)
+    const supabase = createAdminClient(env as SupabaseEnv)
+    const { data, error } = await supabase
+      .from('device_tokens')
+      .select('id, user_id, device_token, platform, created_at')
+      .order('created_at', { ascending: false })
 
-    return result
+    if (error) throw error
+    return (data as DeviceToken[]) || []
   } catch (error) {
     console.error('Error fetching all device tokens:', error)
     return []
@@ -268,8 +269,8 @@ const templates = {
     sound: 'default'
   }),
 
-  milestone_achieved: (milestone: string, emoji: string = '🎉') => ({
-    title: `${emoji} Milestone Achieved!`,
+  milestone_achieved: (milestone: string, emoji: string = '') => ({
+    title: `${emoji} Milestone Achieved!`.trim(),
     body: `You've reached: ${milestone}`,
     data: { type: 'milestone_achieved', action: 'view_achievements' },
     sound: 'celebration.wav',
@@ -284,7 +285,7 @@ const templates = {
   }),
 
   gift_received: (senderName: string, giftType: string) => ({
-    title: '🎁 You received a gift!',
+    title: 'You received a gift!',
     body: `${senderName} sent you a ${giftType}`,
     data: { type: 'gift_received', action: 'view_gifts' },
     sound: 'gift_notification.wav',
@@ -294,16 +295,16 @@ const templates = {
   anniversary_reminder: (milestone: string, daysUntil: number) => ({
     title: `${milestone} is coming up!`,
     body: daysUntil === 0
-      ? `Today is your ${milestone}! 💕`
+      ? `Today is your ${milestone}!`
       : daysUntil === 1
-        ? `Tomorrow is your ${milestone}! 💕`
+        ? `Tomorrow is your ${milestone}!`
         : `Your ${milestone} is in ${daysUntil} days!`,
     data: { type: 'anniversary_reminder', action: 'view_calendar' },
     sound: 'special_occasion.wav'
   }),
 
   goal_completed: (goalName: string) => ({
-    title: '🎯 Goal Completed!',
+    title: 'Goal Completed!',
     body: `You completed: ${goalName}`,
     data: { type: 'goal_completed', action: 'view_goals' },
     sound: 'achievement.wav',
@@ -312,211 +313,121 @@ const templates = {
 }
 
 // POST /api/push/register - Register a device token
-pushApi.post('/register', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { user_id, device_token, platform } = await c.req.json()
+pushApi.post('/register',
+  zValidator('json', registerDeviceSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const { user_id, device_token, platform } = c.req.valid('json' as never)
 
-    if (!user_id || !device_token || !platform) {
-      return c.json({ error: 'user_id, device_token, and platform are required' }, 400)
+      // Validate token format
+      if (platform === 'android' && !isValidFCMToken(device_token)) {
+        return c.json({ error: 'Invalid FCM token format' }, 400)
+      }
+
+      if (platform === 'ios' && !isValidAPNsToken(device_token)) {
+        return c.json({ error: 'Invalid APNs token format' }, 400)
+      }
+
+      // Check if token already exists
+      const { data: existing, error: checkError } = await supabase
+        .from('device_tokens')
+        .select('id')
+        .eq('device_token', device_token)
+        .maybeSingle()
+
+      if (checkError) throw checkError
+
+      if (existing) {
+        // Update the user_id if it changed (user logged in on different account)
+        const { error } = await supabase
+          .from('device_tokens')
+          .update({ user_id })
+          .eq('device_token', device_token)
+
+        if (error) throw error
+
+        return c.json({ message: 'Device token updated', token_id: existing.id })
+      }
+
+      // Generate token ID
+      const tokenId = `dt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const now = new Date().toISOString()
+
+      const { error } = await supabase
+        .from('device_tokens')
+        .insert({
+          id: tokenId,
+          user_id,
+          device_token,
+          platform,
+          created_at: now
+        })
+
+      if (error) throw error
+
+      return c.json({
+        message: 'Device token registered successfully',
+        token_id: tokenId,
+        platform
+      }, 201)
+
+    } catch (error) {
+      console.error('Register device token error:', error)
+      return c.json({ error: 'Failed to register device token' }, 500)
     }
-
-    if (!['ios', 'android'].includes(platform)) {
-      return c.json({ error: 'platform must be "ios" or "android"' }, 400)
-    }
-
-    // Validate token format
-    if (platform === 'android' && !isValidFCMToken(device_token)) {
-      return c.json({ error: 'Invalid FCM token format' }, 400)
-    }
-
-    if (platform === 'ios' && !isValidAPNsToken(device_token)) {
-      return c.json({ error: 'Invalid APNs token format' }, 400)
-    }
-
-    // Check if token already exists
-    const existing = await db.first<{ id: string }>(`
-      SELECT id FROM device_tokens WHERE device_token = $1
-    `, [device_token])
-
-    if (existing) {
-      // Update the user_id if it changed (user logged in on different account)
-      await db.run(`
-        UPDATE device_tokens SET user_id = $1 WHERE device_token = $2
-      `, [user_id, device_token])
-
-      return c.json({ message: 'Device token updated', token_id: existing.id })
-    }
-
-    // Generate token ID
-    const tokenId = `dt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const now = new Date().toISOString()
-
-    await db.run(`
-      INSERT INTO device_tokens (id, user_id, device_token, platform, created_at)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [tokenId, user_id, device_token, platform, now])
-
-    return c.json({
-      message: 'Device token registered successfully',
-      token_id: tokenId,
-      platform
-    }, 201)
-
-  } catch (error) {
-    console.error('Register device token error:', error)
-    return c.json({ error: 'Failed to register device token' }, 500)
   }
-})
+)
 
 // POST /api/push/send - Send push notification to specific user
-pushApi.post('/send', async (c: Context) => {
-  try {
-    const { user_id, notification_type, payload, custom_payload } = await c.req.json() as {
-      user_id: string
-      notification_type?: keyof typeof templates
-      payload?: any
-      custom_payload?: PushNotificationPayload
-    }
+pushApi.post('/send',
+  zValidator('json', sendPushSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const { user_id, notification_type, payload, custom_payload } = c.req.valid('json' as never) as {
+        user_id: string
+        notification_type?: keyof typeof templates
+        payload?: any
+        custom_payload?: PushNotificationPayload
+      }
 
-    if (!user_id) {
-      return c.json({ error: 'user_id is required' }, 400)
-    }
+      // Get FCM and APNs configuration from environment
+      const fcmServerKey = (c.env as any)?.FCM_SERVER_KEY
+      const fcmProjectId = (c.env as any)?.FCM_PROJECT_ID
+      const apnsTeamId = (c.env as any)?.APNS_TEAM_ID
+      const apnsKeyId = (c.env as any)?.APNS_KEY_ID
+      const apnsPrivateKey = (c.env as any)?.APNS_PRIVATE_KEY
+      const apnsBundleId = (c.env as any)?.APNS_BUNDLE_ID
+      const apnsProduction = (c.env as any)?.APNS_PRODUCTION === 'true'
 
-    // Get FCM and APNs configuration from environment
-    const fcmServerKey = (c.env as any)?.FCM_SERVER_KEY
-    const fcmProjectId = (c.env as any)?.FCM_PROJECT_ID
-    const apnsTeamId = (c.env as any)?.APNS_TEAM_ID
-    const apnsKeyId = (c.env as any)?.APNS_KEY_ID
-    const apnsPrivateKey = (c.env as any)?.APNS_PRIVATE_KEY
-    const apnsBundleId = (c.env as any)?.APNS_BUNDLE_ID
-    const apnsProduction = (c.env as any)?.APNS_PRODUCTION === 'true'
+      // Get user's device tokens
+      const deviceTokens = await getUserDeviceTokens(c.env, user_id)
 
-    // Get user's device tokens
-    const deviceTokens = await getUserDeviceTokens(c.env, user_id)
+      if (deviceTokens.length === 0) {
+        return c.json({
+          message: 'No device tokens registered for this user',
+          sent: 0
+        })
+      }
 
-    if (deviceTokens.length === 0) {
-      return c.json({
-        message: 'No device tokens registered for this user',
-        sent: 0
-      })
-    }
+      // Prepare notification payload
+      let notificationPayload: PushNotificationPayload
 
-    // Prepare notification payload
-    let notificationPayload: PushNotificationPayload
+      if (custom_payload) {
+        notificationPayload = custom_payload
+      } else if (notification_type && templates[notification_type]) {
+        // Use template with provided payload data
+        notificationPayload = (templates[notification_type] as any)(...(payload || []))
+      } else {
+        return c.json({ error: 'Either notification_type or custom_payload is required' }, 400)
+      }
 
-    if (custom_payload) {
-      notificationPayload = custom_payload
-    } else if (notification_type && templates[notification_type]) {
-      // Use template with provided payload data
-      notificationPayload = (templates[notification_type] as any)(...(payload || []))
-    } else {
-      return c.json({ error: 'Either notification_type or custom_payload is required' }, 400)
-    }
+      // Check for development mode
+      const devMode = isDevelopmentMode(c.env)
 
-    // Check for development mode
-    const devMode = isDevelopmentMode(c.env)
-
-    // Send to all user's devices
-    const results = await Promise.all(
-      deviceTokens.map(async (token) => {
-        // Development mode: simulate delivery
-        if (devMode) {
-          return simulatePushNotification(token.platform, token.device_token, notificationPayload)
-        }
-
-        // Production mode: send via FCM/APNs
-        if (token.platform === 'android' && fcmServerKey && fcmProjectId) {
-          return await sendFCMNotification(token.device_token, notificationPayload, fcmServerKey, fcmProjectId)
-        } else if (token.platform === 'ios' && apnsTeamId && apnsKeyId && apnsPrivateKey && apnsBundleId) {
-          return await sendAPNsNotification(
-            token.device_token,
-            notificationPayload,
-            { teamId: apnsTeamId, keyId: apnsKeyId, privateKey: apnsPrivateKey, bundleId: apnsBundleId, production: apnsProduction }
-          )
-        } else {
-          return { success: false, error: 'Push service not configured for this platform' }
-        }
-      })
-    )
-
-    const successful = results.filter(r => r.success).length
-    const failed = results.filter(r => !r.success)
-    const simulated = results.filter(r => (r as any).simulated).length
-
-    return c.json({
-      message: devMode ? 'Push notifications simulated (dev mode)' : 'Push notifications sent',
-      sent: successful,
-      failed: failed.length,
-      simulated: devMode ? simulated : undefined,
-      dev_mode: devMode || undefined,
-      failures: failed.length > 0 ? failed.map(f => (f as any).error) : undefined
-    })
-
-  } catch (error) {
-    console.error('Send push notification error:', error)
-    return c.json({ error: 'Failed to send push notification' }, 500)
-  }
-})
-
-// POST /api/push/broadcast - Send push to all users (admin only)
-pushApi.post('/broadcast', async (c: Context) => {
-  try {
-    const { notification_type, payload, custom_payload, admin_key } = await c.req.json() as BroadcastPushRequest & {
-      custom_payload?: PushNotificationPayload
-      payload?: any
-    }
-
-    // Verify admin key
-    const expectedAdminKey = (c.env as any)?.ADMIN_API_KEY
-    if (!expectedAdminKey || admin_key !== expectedAdminKey) {
-      return c.json({ error: 'Unauthorized: Invalid admin key' }, 401)
-    }
-
-    // Get FCM and APNs configuration
-    const fcmServerKey = (c.env as any)?.FCM_SERVER_KEY
-    const fcmProjectId = (c.env as any)?.FCM_PROJECT_ID
-    const apnsTeamId = (c.env as any)?.APNS_TEAM_ID
-    const apnsKeyId = (c.env as any)?.APNS_KEY_ID
-    const apnsPrivateKey = (c.env as any)?.APNS_PRIVATE_KEY
-    const apnsBundleId = (c.env as any)?.APNS_BUNDLE_ID
-    const apnsProduction = (c.env as any)?.APNS_PRODUCTION === 'true'
-
-    // Get all device tokens
-    const deviceTokens = await getAllDeviceTokens(c.env)
-
-    if (deviceTokens.length === 0) {
-      return c.json({
-        message: 'No device tokens registered',
-        sent: 0
-      })
-    }
-
-    // Prepare notification payload
-    let notificationPayload: PushNotificationPayload
-
-    if (custom_payload) {
-      notificationPayload = custom_payload
-    } else if (notification_type && templates[notification_type as keyof typeof templates]) {
-      notificationPayload = (templates[notification_type as keyof typeof templates] as any)(...(payload || []))
-    } else {
-      return c.json({ error: 'Either notification_type or custom_payload is required' }, 400)
-    }
-
-    // Check for development mode
-    const devMode = isDevelopmentMode(c.env)
-
-    // Send to all devices (batch process to avoid overwhelming the system)
-    const batchSize = 100
-    let totalSent = 0
-    let totalFailed = 0
-    let totalSimulated = 0
-
-    for (let i = 0; i < deviceTokens.length; i += batchSize) {
-      const batch = deviceTokens.slice(i, i + batchSize)
-
+      // Send to all user's devices
       const results = await Promise.all(
-        batch.map(async (token) => {
+        deviceTokens.map(async (token) => {
           // Development mode: simulate delivery
           if (devMode) {
             return simulatePushNotification(token.platform, token.device_token, notificationPayload)
@@ -532,61 +443,163 @@ pushApi.post('/broadcast', async (c: Context) => {
               { teamId: apnsTeamId, keyId: apnsKeyId, privateKey: apnsPrivateKey, bundleId: apnsBundleId, production: apnsProduction }
             )
           } else {
-            return { success: false, error: 'Push service not configured' }
+            return { success: false, error: 'Push service not configured for this platform' }
           }
         })
       )
 
-      totalSent += results.filter(r => r.success).length
-      totalFailed += results.filter(r => !r.success).length
-      totalSimulated += results.filter(r => (r as any).simulated).length
+      const successful = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success)
+      const simulated = results.filter(r => (r as any).simulated).length
+
+      return c.json({
+        message: devMode ? 'Push notifications simulated (dev mode)' : 'Push notifications sent',
+        sent: successful,
+        failed: failed.length,
+        simulated: devMode ? simulated : undefined,
+        dev_mode: devMode || undefined,
+        failures: failed.length > 0 ? failed.map(f => (f as any).error) : undefined
+      })
+
+    } catch (error) {
+      console.error('Send push notification error:', error)
+      return c.json({ error: 'Failed to send push notification' }, 500)
     }
-
-    return c.json({
-      message: devMode ? 'Broadcast simulated (dev mode)' : 'Broadcast completed',
-      total_devices: deviceTokens.length,
-      sent: totalSent,
-      failed: totalFailed,
-      simulated: devMode ? totalSimulated : undefined,
-      dev_mode: devMode || undefined
-    })
-
-  } catch (error) {
-    console.error('Broadcast push notification error:', error)
-    return c.json({ error: 'Failed to broadcast push notification' }, 500)
   }
-})
+)
+
+// POST /api/push/broadcast - Send push to all users (admin only)
+pushApi.post('/broadcast',
+  zValidator('json', broadcastPushSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const { notification_type, payload, custom_payload, admin_key } = c.req.valid('json' as never) as BroadcastPushRequest & {
+        custom_payload?: PushNotificationPayload
+        payload?: any
+      }
+
+      // Verify admin key
+      const expectedAdminKey = (c.env as any)?.ADMIN_API_KEY
+      if (!expectedAdminKey || admin_key !== expectedAdminKey) {
+        return c.json({ error: 'Unauthorized: Invalid admin key' }, 401)
+      }
+
+      // Get FCM and APNs configuration
+      const fcmServerKey = (c.env as any)?.FCM_SERVER_KEY
+      const fcmProjectId = (c.env as any)?.FCM_PROJECT_ID
+      const apnsTeamId = (c.env as any)?.APNS_TEAM_ID
+      const apnsKeyId = (c.env as any)?.APNS_KEY_ID
+      const apnsPrivateKey = (c.env as any)?.APNS_PRIVATE_KEY
+      const apnsBundleId = (c.env as any)?.APNS_BUNDLE_ID
+      const apnsProduction = (c.env as any)?.APNS_PRODUCTION === 'true'
+
+      // Get all device tokens
+      const deviceTokens = await getAllDeviceTokens(c.env)
+
+      if (deviceTokens.length === 0) {
+        return c.json({
+          message: 'No device tokens registered',
+          sent: 0
+        })
+      }
+
+      // Prepare notification payload
+      let notificationPayload: PushNotificationPayload
+
+      if (custom_payload) {
+        notificationPayload = custom_payload
+      } else if (notification_type && templates[notification_type as keyof typeof templates]) {
+        notificationPayload = (templates[notification_type as keyof typeof templates] as any)(...(payload || []))
+      } else {
+        return c.json({ error: 'Either notification_type or custom_payload is required' }, 400)
+      }
+
+      // Check for development mode
+      const devMode = isDevelopmentMode(c.env)
+
+      // Send to all devices (batch process to avoid overwhelming the system)
+      const batchSize = 100
+      let totalSent = 0
+      let totalFailed = 0
+      let totalSimulated = 0
+
+      for (let i = 0; i < deviceTokens.length; i += batchSize) {
+        const batch = deviceTokens.slice(i, i + batchSize)
+
+        const results = await Promise.all(
+          batch.map(async (token) => {
+            // Development mode: simulate delivery
+            if (devMode) {
+              return simulatePushNotification(token.platform, token.device_token, notificationPayload)
+            }
+
+            // Production mode: send via FCM/APNs
+            if (token.platform === 'android' && fcmServerKey && fcmProjectId) {
+              return await sendFCMNotification(token.device_token, notificationPayload, fcmServerKey, fcmProjectId)
+            } else if (token.platform === 'ios' && apnsTeamId && apnsKeyId && apnsPrivateKey && apnsBundleId) {
+              return await sendAPNsNotification(
+                token.device_token,
+                notificationPayload,
+                { teamId: apnsTeamId, keyId: apnsKeyId, privateKey: apnsPrivateKey, bundleId: apnsBundleId, production: apnsProduction }
+              )
+            } else {
+              return { success: false, error: 'Push service not configured' }
+            }
+          })
+        )
+
+        totalSent += results.filter(r => r.success).length
+        totalFailed += results.filter(r => !r.success).length
+        totalSimulated += results.filter(r => (r as any).simulated).length
+      }
+
+      return c.json({
+        message: devMode ? 'Broadcast simulated (dev mode)' : 'Broadcast completed',
+        total_devices: deviceTokens.length,
+        sent: totalSent,
+        failed: totalFailed,
+        simulated: devMode ? totalSimulated : undefined,
+        dev_mode: devMode || undefined
+      })
+
+    } catch (error) {
+      console.error('Broadcast push notification error:', error)
+      return c.json({ error: 'Failed to broadcast push notification' }, 500)
+    }
+  }
+)
 
 // DELETE /api/push/unregister - Remove device token
-pushApi.delete('/unregister', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const { device_token, user_id } = await c.req.json()
+pushApi.delete('/unregister',
+  zValidator('json', unregisterDeviceSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const { device_token, user_id } = c.req.valid('json' as never)
 
-    if (!device_token) {
-      return c.json({ error: 'device_token is required' }, 400)
+      let query = supabase
+        .from('device_tokens')
+        .delete()
+        .eq('device_token', device_token)
+
+      if (user_id) {
+        query = query.eq('user_id', user_id)
+      }
+
+      const { error } = await query
+
+      if (error) throw error
+
+      return c.json({
+        message: 'Device token unregistered successfully'
+      })
+
+    } catch (error) {
+      console.error('Unregister device token error:', error)
+      return c.json({ error: 'Failed to unregister device token' }, 500)
     }
-
-    // Build query with optional user_id filter for extra security
-    let query = 'DELETE FROM device_tokens WHERE device_token = $1'
-    const bindings = [device_token]
-
-    if (user_id) {
-      query += ' AND user_id = $2'
-      bindings.push(user_id)
-    }
-
-    await db.run(query, bindings)
-
-    return c.json({
-      message: 'Device token unregistered successfully'
-    })
-
-  } catch (error) {
-    console.error('Unregister device token error:', error)
-    return c.json({ error: 'Failed to unregister device token' }, 500)
   }
-})
+)
 
 // GET /api/push/tokens/:userId - Get user's registered device tokens (for debugging)
 pushApi.get('/tokens/:userId', async (c: Context) => {
