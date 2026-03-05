@@ -3,8 +3,6 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
 
 const recommendationsApi = new Hono()
 

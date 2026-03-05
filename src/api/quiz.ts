@@ -3,8 +3,6 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
 import { generateId, getCurrentDateTime } from '../utils'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 
@@ -87,7 +85,6 @@ quizApi.get('/questions', async (c: Context) => {
 // POST /api/quiz/responses - Submit single response
 quizApi.post('/responses', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const { userId, questionId, answerId, answerValue } = await c.req.json()
 
     if (!userId || !questionId || !answerId) {
@@ -117,7 +114,6 @@ quizApi.post('/responses', async (c: Context) => {
 // POST /api/quiz/responses/bulk - Submit all responses
 quizApi.post('/responses/bulk', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const { userId, responses } = await c.req.json()
 
     if (!userId || !responses || !Array.isArray(responses)) {

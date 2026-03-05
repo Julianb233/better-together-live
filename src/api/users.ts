@@ -3,37 +3,30 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
+import { zValidator, zodErrorHandler } from '../lib/validation'
+import { updatePreferencesSchema, updateLoveLanguagesSchema, updateNotificationSettingsSchema } from '../lib/validation/schemas/users'
 
 const usersApi = new Hono()
 
 // GET /api/users/me - Get current user (mobile compatibility alias for /api/auth/me)
 usersApi.get('/me', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.get('userId')
 
     if (!userId) {
       return c.json({ error: 'Not authenticated' }, 401)
     }
 
-    const user = await db.first<{
-      id: string
-      email: string
-      name: string
-      nickname: string | null
-      profile_photo_url: string | null
-      timezone: string
-      primary_love_language: string | null
-      secondary_love_language: string | null
-    }>(
-      `SELECT id, email, name, nickname, profile_photo_url, timezone,
-              primary_love_language, secondary_love_language
-       FROM users WHERE id = $1`,
-      [userId]
-    )
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, name, nickname, profile_photo_url, timezone, primary_love_language, secondary_love_language')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!user) {
       return c.json({ error: 'User not found' }, 404)
@@ -60,18 +53,20 @@ usersApi.get('/me', async (c: Context) => {
 // GET /api/users/:userId/preferences
 usersApi.get('/:userId/preferences', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    const user = await db.first<any>(`
-      SELECT id, name, email, primary_love_language, secondary_love_language,
-             communication_style, date_preferences, budget_range, interests
-      FROM users WHERE id = $1
-    `, [userId])
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, name, email, primary_love_language, secondary_love_language, communication_style, date_preferences, budget_range, interests')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!user) {
       return c.json({ error: 'User not found' }, 404)
@@ -97,58 +92,57 @@ usersApi.get('/:userId/preferences', async (c: Context) => {
 })
 
 // PUT /api/users/:userId/preferences
-usersApi.put('/:userId/preferences', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.req.param('userId')
+usersApi.put('/:userId/preferences',
+  zValidator('json', updatePreferencesSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const userId = c.req.param('userId')
 
-    if (!checkOwnership(c, userId)) {
-      return forbiddenResponse(c)
+      if (!checkOwnership(c, userId)) {
+        return forbiddenResponse(c)
+      }
+
+      const { communicationStyle, datePreferences, budgetRange, interests } = c.req.valid('json' as never)
+
+      const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (communicationStyle !== undefined) updateData.communication_style = communicationStyle
+      if (datePreferences !== undefined) updateData.date_preferences = JSON.stringify(datePreferences)
+      if (budgetRange !== undefined) updateData.budget_range = budgetRange
+      if (interests !== undefined) updateData.interests = JSON.stringify(interests)
+
+      const { error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+
+      if (error) throw error
+
+      return c.json({ success: true, message: 'Preferences updated' })
+    } catch (error) {
+      console.error('Update preferences error:', error)
+      return c.json({ error: 'Failed to update preferences' }, 500)
     }
-
-    const body = await c.req.json()
-
-    const { communicationStyle, datePreferences, budgetRange, interests } = body
-
-    await db.run(`
-      UPDATE users SET
-        communication_style = COALESCE($1, communication_style),
-        date_preferences = COALESCE($2, date_preferences),
-        budget_range = COALESCE($3, budget_range),
-        interests = COALESCE($4, interests),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $5
-    `, [
-      communicationStyle,
-      datePreferences ? JSON.stringify(datePreferences) : null,
-      budgetRange,
-      interests ? JSON.stringify(interests) : null,
-      userId
-    ])
-
-    return c.json({ success: true, message: 'Preferences updated' })
-  } catch (error) {
-    console.error('Update preferences error:', error)
-    return c.json({ error: 'Failed to update preferences' }, 500)
   }
-})
+)
 
 // GET /api/users/:userId/love-languages
 usersApi.get('/:userId/love-languages', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    const user = await db.first<{
-      primary_love_language: string | null
-      secondary_love_language: string | null
-    }>(`
-      SELECT primary_love_language, secondary_love_language FROM users WHERE id = $1
-    `, [userId])
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('primary_love_language, secondary_love_language')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!user) {
       return c.json({ error: 'User not found' }, 404)
@@ -174,54 +168,55 @@ usersApi.get('/:userId/love-languages', async (c: Context) => {
 })
 
 // PUT /api/users/:userId/love-languages
-usersApi.put('/:userId/love-languages', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.req.param('userId')
+usersApi.put('/:userId/love-languages',
+  zValidator('json', updateLoveLanguagesSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const userId = c.req.param('userId')
 
-    if (!checkOwnership(c, userId)) {
-      return forbiddenResponse(c)
+      if (!checkOwnership(c, userId)) {
+        return forbiddenResponse(c)
+      }
+
+      const { primary, secondary } = c.req.valid('json' as never)
+
+      const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (primary !== undefined) updateData.primary_love_language = primary
+      if (secondary !== undefined) updateData.secondary_love_language = secondary
+
+      const { error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+
+      if (error) throw error
+
+      return c.json({ success: true, message: 'Love languages updated' })
+    } catch (error) {
+      console.error('Update love languages error:', error)
+      return c.json({ error: 'Failed to update love languages' }, 500)
     }
-
-    const { primary, secondary } = await c.req.json()
-
-    const validLanguages = ['words_of_affirmation', 'quality_time', 'receiving_gifts', 'acts_of_service', 'physical_touch']
-
-    if (primary && !validLanguages.includes(primary)) {
-      return c.json({ error: 'Invalid primary love language' }, 400)
-    }
-    if (secondary && !validLanguages.includes(secondary)) {
-      return c.json({ error: 'Invalid secondary love language' }, 400)
-    }
-
-    await db.run(`
-      UPDATE users SET
-        primary_love_language = COALESCE($1, primary_love_language),
-        secondary_love_language = COALESCE($2, secondary_love_language),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
-    `, [primary, secondary, userId])
-
-    return c.json({ success: true, message: 'Love languages updated' })
-  } catch (error) {
-    console.error('Update love languages error:', error)
-    return c.json({ error: 'Failed to update love languages' }, 500)
   }
-})
+)
 
 // GET /api/users/:userId/notification-settings
 usersApi.get('/:userId/notification-settings', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    const settings = await db.first<{ notification_settings: string | null }>(`
-      SELECT notification_settings FROM users WHERE id = $1
-    `, [userId])
+    const { data: settings, error } = await supabase
+      .from('users')
+      .select('notification_settings')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) throw error
 
     if (!settings) {
       return c.json({ error: 'User not found' }, 404)
@@ -241,29 +236,35 @@ usersApi.get('/:userId/notification-settings', async (c: Context) => {
 })
 
 // PUT /api/users/:userId/notification-settings
-usersApi.put('/:userId/notification-settings', async (c: Context) => {
-  try {
-    const db = createDatabase(c.env as Env)
-    const userId = c.req.param('userId')
+usersApi.put('/:userId/notification-settings',
+  zValidator('json', updateNotificationSettingsSchema, zodErrorHandler),
+  async (c: Context) => {
+    try {
+      const supabase = createAdminClient(c.env as SupabaseEnv)
+      const userId = c.req.param('userId')
 
-    if (!checkOwnership(c, userId)) {
-      return forbiddenResponse(c)
+      if (!checkOwnership(c, userId)) {
+        return forbiddenResponse(c)
+      }
+
+      const settings = c.req.valid('json' as never)
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          notification_settings: JSON.stringify(settings),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (error) throw error
+
+      return c.json({ success: true, message: 'Notification settings updated' })
+    } catch (error) {
+      console.error('Update notification settings error:', error)
+      return c.json({ error: 'Failed to update notification settings' }, 500)
     }
-
-    const settings = await c.req.json()
-
-    await db.run(`
-      UPDATE users SET
-        notification_settings = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [JSON.stringify(settings), userId])
-
-    return c.json({ success: true, message: 'Notification settings updated' })
-  } catch (error) {
-    console.error('Update notification settings error:', error)
-    return c.json({ error: 'Failed to update notification settings' }, 500)
   }
-})
+)
 
 export default usersApi

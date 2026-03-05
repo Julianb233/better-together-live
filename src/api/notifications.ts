@@ -3,8 +3,7 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
 import { getPaginationParams } from '../lib/pagination'
 
@@ -14,7 +13,7 @@ const notificationsApi = new Hono()
 // Get notifications for user
 notificationsApi.get('/:userId', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
@@ -24,17 +23,20 @@ notificationsApi.get('/:userId', async (c: Context) => {
     const { limit } = getPaginationParams(c)
     const unread_only = c.req.query('unread_only') === 'true'
 
-    let query = 'SELECT * FROM notifications WHERE user_id = $1'
-    const params: any[] = [userId]
+    let query = supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
     if (unread_only) {
-      query += ' AND is_read = false'
+      query = query.eq('is_read', false)
     }
 
-    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`
-    params.push(limit)
+    const { data: results, error } = await query
 
-    const results = await db.all(query, params)
+    if (error) throw error
 
     return c.json({ notifications: results || [] })
   } catch (error) {
@@ -47,13 +49,15 @@ notificationsApi.get('/:userId', async (c: Context) => {
 // Mark notification as read
 notificationsApi.put('/:notificationId/read', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const notificationId = c.req.param('notificationId')
 
-    await db.run(
-      'UPDATE notifications SET is_read = true WHERE id = $1',
-      [notificationId]
-    )
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+
+    if (error) throw error
 
     return c.json({ message: 'Notification marked as read' })
   } catch (error) {
@@ -66,17 +70,20 @@ notificationsApi.put('/:notificationId/read', async (c: Context) => {
 // Mark all notifications as read for a user
 notificationsApi.put('/:userId/read-all', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    await db.run(
-      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false',
-      [userId]
-    )
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+
+    if (error) throw error
 
     return c.json({ message: 'All notifications marked as read' })
   } catch (error) {
@@ -89,19 +96,22 @@ notificationsApi.put('/:userId/read-all', async (c: Context) => {
 // Get unread notification count
 notificationsApi.get('/:userId/unread-count', async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
       return forbiddenResponse(c)
     }
 
-    const result = await db.first<{ count: number }>(
-      'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false',
-      [userId]
-    )
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
 
-    return c.json({ unread_count: result?.count || 0 })
+    if (error) throw error
+
+    return c.json({ unread_count: count || 0 })
   } catch (error) {
     console.error('Get unread count error:', error)
     return c.json({ error: 'Failed to get unread count' }, 500)
