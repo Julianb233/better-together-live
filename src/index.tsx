@@ -17,6 +17,7 @@ import { userPortalHtml } from './pages/user-portal'
 import { notificationSettingsHtml } from './pages/notification-settings'
 import { loveLanguagesHtml } from './pages/love-languages'
 import { passwordResetHtml } from './pages/password-reset'
+import { resetPasswordHtml } from './pages/reset-password'
 import { partnerInviteHtml } from './pages/partner-invite'
 import { relationshipStatusHtml } from './pages/relationship-status'
 import { checkinsPageHtml } from './pages/checkins'
@@ -38,7 +39,6 @@ import datesApi from './api/dates'
 import challengesApi from './api/challenges'
 import dashboardApi from './api/dashboard'
 import notificationsApi from './api/notifications'
-import authRoutes from './api/auth-routes'
 import supabaseAuth from './api/supabase-auth'
 import sponsorsApi from './api/sponsors'
 import usersApi from './api/users'
@@ -111,7 +111,6 @@ app.use('*', supabaseCookieRelay())
 app.use('/api/*', except(
   [
     '/api/auth/*',
-    '/api/auth/supabase/*',
     '/api/payments/webhook',
     '/api/health',
   ],
@@ -470,11 +469,8 @@ app.route('/api/dashboard', dashboardApi)
 // Notifications API Routes
 app.route('/api/notifications', notificationsApi)
 
-// Auth Routes (Legacy JWT-based)
-app.route('/api/auth', authRoutes)
-
-// Supabase Auth Routes (Primary - use /api/auth/supabase/*)
-app.route('/api/auth/supabase', supabaseAuth)
+// Supabase Auth Routes
+app.route('/api/auth', supabaseAuth)
 
 // Sponsors API Routes
 app.route('/api/sponsors', sponsorsApi)
@@ -531,6 +527,11 @@ app.route('/api/video', videoApi)
 // Login System
 app.get('/login', (c) => {
   return c.html(loginSystemHtml)
+})
+
+// Reset Password (Supabase PKCE callback flow)
+app.get('/auth/reset-password', (c) => {
+  return c.html(resetPasswordHtml)
 })
 
 // User Portal/Dashboard

@@ -208,7 +208,7 @@ supabaseAuth.post('/forgot-password', async (c: Context) => {
     const supabase = createAnonClient(env)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${c.req.url.split('/api')[0]}/auth/reset-password`
+      redirectTo: `${c.req.url.split('/api')[0]}/api/auth/supabase/callback`
     })
 
     // Always return success to prevent email enumeration
@@ -230,12 +230,69 @@ supabaseAuth.post('/forgot-password', async (c: Context) => {
 })
 
 /**
+ * GET /api/auth/supabase/callback
+ * Handle redirect from Supabase password reset / email verification links.
+ *
+ * Supabase emails contain a link with a PKCE `code` query param.
+ * We exchange the code for a session, then redirect:
+ *   - recovery type  -> /auth/reset-password page with tokens as query params
+ *   - signup/other   -> /login?verified=true
+ *   - error          -> /login?error=invalid_link
+ */
+supabaseAuth.get('/callback', async (c: Context) => {
+  try {
+    const code = c.req.query('code')
+
+    if (!code) {
+      return c.redirect('/login?error=invalid_link')
+    }
+
+    const env = getSupabaseEnv(c)
+    const supabase = createAnonClient(env)
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (error || !data.session) {
+      console.error('Code exchange error:', error)
+      return c.redirect('/login?error=invalid_link')
+    }
+
+    // Check if this is a recovery (password reset) flow
+    if (data.session.user?.recovery_sent_at || data.user?.recovery_sent_at) {
+      // Redirect to the reset password page with tokens so the page can call updateUser
+      const params = new URLSearchParams({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token
+      })
+      return c.redirect(`/auth/reset-password?${params.toString()}`)
+    }
+
+    // For email verification / signup confirmation
+    setSupabaseAuthCookies(
+      c,
+      data.session.access_token,
+      data.session.refresh_token,
+      data.session.expires_in ?? 3600
+    )
+
+    return c.redirect('/login?verified=true')
+  } catch (error) {
+    console.error('Auth callback error:', error)
+    return c.redirect('/login?error=invalid_link')
+  }
+})
+
+/**
  * POST /api/auth/supabase/reset-password
- * Reset password with token
+ * Reset password with recovery session tokens
+ *
+ * The frontend passes accessToken and refreshToken obtained from the
+ * /callback route (which exchanged the PKCE code). We establish the
+ * recovery session first, then update the password.
  */
 supabaseAuth.post('/reset-password', async (c: Context) => {
   try {
-    const { newPassword } = await c.req.json()
+    const { newPassword, accessToken, refreshToken } = await c.req.json()
 
     if (!newPassword) {
       return c.json({ error: 'New password is required' }, 400)
@@ -245,9 +302,25 @@ supabaseAuth.post('/reset-password', async (c: Context) => {
       return c.json({ error: 'Password must be at least 8 characters' }, 400)
     }
 
+    if (!accessToken || !refreshToken) {
+      return c.json({ error: 'Recovery session tokens are required' }, 400)
+    }
+
     const env = getSupabaseEnv(c)
     const supabase = createAnonClient(env)
 
+    // Establish the recovery session from the tokens
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    })
+
+    if (sessionError) {
+      console.error('Session restoration error:', sessionError)
+      return c.json({ error: 'Invalid or expired reset link. Please request a new one.' }, 400)
+    }
+
+    // Now update the password with the active session
     const { error } = await supabase.auth.updateUser({
       password: newPassword
     })
@@ -255,6 +328,17 @@ supabaseAuth.post('/reset-password', async (c: Context) => {
     if (error) {
       console.error('Password update error:', error)
       return c.json({ error: 'Failed to update password' }, 400)
+    }
+
+    // Set auth cookies so user stays logged in after reset
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      setSupabaseAuthCookies(
+        c,
+        session.access_token,
+        session.refresh_token,
+        session.expires_in ?? 3600
+      )
     }
 
     return c.json({
