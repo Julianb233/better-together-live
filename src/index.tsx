@@ -7,7 +7,7 @@ import { checkOwnership, forbiddenResponse } from './lib/security'
 // Static files served by platform (Vercel/Cloudflare)
 import { renderer } from './renderer'
 import type { Env } from './types'
-import { createDatabase } from './db'
+import { createAdminClient, type SupabaseEnv } from './lib/supabase/server'
 import { dashboardHtml } from './pages/dashboard'
 import { analyticsDashboardHtml } from './pages/analytics-dashboard'
 import { loginHtml } from './pages/login'
@@ -128,12 +128,11 @@ app.use(renderer)
 
 // Database availability check helper
 const checkDatabase = (c: any) => {
-  // Check for Supabase first, then fallback to Neon
-  if (!c.env?.SUPABASE_URL && !c.env?.DATABASE_URL) {
+  if (!c.env?.SUPABASE_URL) {
     return c.json({
       message: 'Database functionality is currently unavailable in this demo deployment.',
       demo: true,
-      note: 'Full functionality available with SUPABASE_URL or DATABASE_URL configured'
+      note: 'Full functionality available with SUPABASE_URL configured'
     }, 503)
   }
   return null
@@ -145,7 +144,7 @@ app.post('/api/users', async (c) => {
   if (dbCheck) return dbCheck
 
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as unknown as SupabaseEnv)
     const { email, name, nickname, phone_number, timezone, love_language_primary, love_language_secondary } = await c.req.json()
 
     if (!email || !name) {
@@ -165,10 +164,21 @@ app.post('/api/users', async (c) => {
     const userId = generateId()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO users (id, email, name, nickname, phone_number, timezone, love_language_primary, love_language_secondary, created_at, updated_at, last_active_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [userId, email, name, nickname || null, phone_number || null, timezone || 'UTC', love_language_primary || null, love_language_secondary || null, now, now, now])
+    const { error: insertError } = await supabase.from('users').insert({
+      id: userId,
+      email,
+      name,
+      nickname: nickname || null,
+      phone_number: phone_number || null,
+      timezone: timezone || 'UTC',
+      love_language_primary: love_language_primary || null,
+      love_language_secondary: love_language_secondary || null,
+      created_at: now,
+      updated_at: now,
+      last_active_at: now,
+    } as any)
+
+    if (insertError) throw insertError
 
     const user = await getUserById(c.env, userId)
     return c.json({ user }, 201)
@@ -203,7 +213,7 @@ app.get('/api/users/:userId', async (c) => {
 // Update user profile
 app.put('/api/users/:userId', async (c) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as unknown as SupabaseEnv)
     const userId = c.req.param('userId')
 
     if (!checkOwnership(c, userId)) {
@@ -220,20 +230,25 @@ app.put('/api/users/:userId', async (c) => {
     const now = getCurrentDateTime()
     const allowedFields = ['name', 'nickname', 'phone_number', 'timezone', 'love_language_primary', 'love_language_secondary', 'profile_photo_url']
 
-    const filteredKeys = Object.keys(updates).filter(key => allowedFields.includes(key))
-    if (filteredKeys.length === 0) {
+    const filteredUpdates: Record<string, any> = {}
+    for (const key of Object.keys(updates)) {
+      if (allowedFields.includes(key)) {
+        filteredUpdates[key] = updates[key]
+      }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
       return c.json({ error: 'No valid fields to update' }, 400)
     }
 
-    const updateFields = filteredKeys
-      .map((key, idx) => `${key} = $${idx + 1}`)
-      .join(', ')
+    filteredUpdates.updated_at = now
 
-    const values = filteredKeys.map(key => updates[key])
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(filteredUpdates as any)
+      .eq('id', userId)
 
-    await db.run(`
-      UPDATE users SET ${updateFields}, updated_at = $${values.length + 1} WHERE id = $${values.length + 2}
-    `, [...values, now, userId])
+    if (updateError) throw updateError
 
     const updatedUser = await getUserById(c.env, userId)
     return c.json({ user: updatedUser })
@@ -250,7 +265,7 @@ app.put('/api/users/:userId', async (c) => {
 // Invite partner to join relationship
 app.post('/api/invite-partner', async (c) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as unknown as SupabaseEnv)
     const { user_id, partner_email, relationship_type, start_date } = await c.req.json()
 
     if (!user_id || !partner_email) {
@@ -281,10 +296,18 @@ app.post('/api/invite-partner', async (c) => {
       const relationshipId = generateId()
       const now = getCurrentDateTime()
 
-      await db.run(`
-        INSERT INTO relationships (id, user_1_id, user_2_id, relationship_type, start_date, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, 'active', $6, $7)
-      `, [relationshipId, user_id, partner.id, relationship_type || 'dating', start_date || getCurrentDate(), now, now])
+      const { error: relError } = await supabase.from('relationships').insert({
+        id: relationshipId,
+        user_1_id: user_id,
+        user_2_id: partner.id,
+        relationship_type: relationship_type || 'dating',
+        start_date: start_date || getCurrentDate(),
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      } as any)
+
+      if (relError) throw relError
 
       // Send notification to partner
       await sendNotification(

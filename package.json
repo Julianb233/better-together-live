@@ -8,8 +8,7 @@
     "deploy": "npm run build && vercel --prod",
     "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
     "test": "curl http://localhost:3000",
-    "db:migrate": "node scripts/migrate.js",
-    "git:init": "git init && git add . && git commit -m 'Initial commit'",
+"git:init": "git init && git add . && git commit -m 'Initial commit'",
     "git:commit": "git add . && git commit -m",
     "git:status": "git status",
     "git:log": "git log --oneline"
@@ -17,7 +16,6 @@
   "dependencies": {
     "@hono/node-server": "^1.19.7",
     "@hono/zod-validator": "^0.7.6",
-    "@neondatabase/serverless": "^0.9.5",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@upstash/ratelimit": "^2.0.8",

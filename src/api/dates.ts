@@ -62,7 +62,7 @@ datesApi.post('/', zValidator('json', createDateSchema, zodErrorHandler), async 
       recurrence: is_recurring ? (recurrence_pattern || 'yearly') : 'none',
       reminder_days_before: reminder_days_before,
       created_at: now,
-    })
+    } as any)
 
     if (error) throw error
 

@@ -54,7 +54,7 @@ checkinsApi.post('/', zValidator('json', createCheckinSchema, zodErrorHandler), 
       gratitude: gratitude_note ?? null,
       notes: highlight_of_day ?? null,
       created_at: now,
-    })
+    } as any)
 
     if (error) throw error
 
