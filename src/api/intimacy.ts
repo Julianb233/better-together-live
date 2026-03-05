@@ -3,35 +3,44 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { zodErrorHandler } from '../lib/validation'
+import { uuidParam } from '../lib/validation/schemas/common'
 import { generateId, getCurrentDateTime } from '../utils'
+
+const eventTypeEnum = z.enum(['physical', 'emotional', 'quality_time', 'communication'])
+
+/** POST /api/intimacy/track - Log intimacy event */
+const trackIntimacySchema = z.object({
+  userId: uuidParam,
+  relationshipId: uuidParam,
+  eventType: eventTypeEnum,
+  intensity: z.number().min(1).max(10).optional(),
+  notes: z.string().max(1000).optional(),
+  timestamp: z.string().optional(),
+})
+
+/** GET /api/intimacy/stats - query params */
+const intimacyStatsQuerySchema = z.object({
+  relationshipId: z.string().uuid(),
+  timeframe: z.coerce.number().int().min(1).max(365).default(30),
+})
 
 const intimacyApi = new Hono()
 
 // POST /api/intimacy/track - Log intimacy event
-intimacyApi.post('/track', async (c: Context) => {
+intimacyApi.post('/track', zValidator('json', trackIntimacySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const {
       userId,
       relationshipId,
-      eventType, // 'physical', 'emotional', 'quality_time'
-      intensity, // 1-10 scale
+      eventType,
+      intensity,
       notes,
       timestamp
-    } = await c.req.json()
-
-    if (!userId || !relationshipId || !eventType) {
-      return c.json({ error: 'userId, relationshipId, and eventType are required' }, 400)
-    }
-
-    const validEventTypes = ['physical', 'emotional', 'quality_time', 'communication']
-    if (!validEventTypes.includes(eventType)) {
-      return c.json({
-        error: `Invalid eventType. Must be one of: ${validEventTypes.join(', ')}`
-      }, 400)
-    }
+    } = c.req.valid('json' as never)
 
     const eventId = generateId()
     const eventTime = timestamp || getCurrentDateTime()
@@ -54,14 +63,9 @@ intimacyApi.post('/track', async (c: Context) => {
 })
 
 // GET /api/intimacy/stats - Get stats
-intimacyApi.get('/stats', async (c: Context) => {
+intimacyApi.get('/stats', zValidator('query', intimacyStatsQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const relationshipId = c.req.query('relationshipId')
-    const timeframe = c.req.query('timeframe') || '30' // days
-
-    if (!relationshipId) {
-      return c.json({ error: 'relationshipId is required' }, 400)
-    }
+    const { relationshipId, timeframe } = c.req.valid('query' as never)
 
     // In production, calculate from database
     // This would aggregate intimacy_events with privacy safeguards

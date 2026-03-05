@@ -3,10 +3,35 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { zodErrorHandler } from '../lib/validation'
+import { uuidParam } from '../lib/validation/schemas/common'
 import { generateId, getCurrentDateTime } from '../utils'
 import { checkOwnership, forbiddenResponse } from '../lib/security'
+
+/** POST /api/experiences/:id/save - Save to favorites */
+const saveExperienceSchema = z.object({
+  userId: uuidParam,
+  relationshipId: uuidParam.optional(),
+})
+
+/** POST /api/experiences/:id/complete - Mark completed */
+const completeExperienceSchema = z.object({
+  userId: uuidParam,
+  relationshipId: uuidParam,
+  rating: z.number().min(1).max(5).optional(),
+  notes: z.string().max(1000).optional(),
+  completedAt: z.string().optional(),
+})
+
+/** GET /api/experiences - query params */
+const experienceFilterSchema = z.object({
+  category: z.enum(['outdoor', 'indoor', 'adventure', 'relaxation']).optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  cost: z.enum(['free', 'low', 'medium', 'high']).optional(),
+})
 
 const experiencesApi = new Hono()
 
@@ -69,11 +94,9 @@ const SAMPLE_EXPERIENCES = [
 ]
 
 // GET /api/experiences - List experiences
-experiencesApi.get('/', async (c: Context) => {
+experiencesApi.get('/', zValidator('query', experienceFilterSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const category = c.req.query('category')
-    const difficulty = c.req.query('difficulty')
-    const cost = c.req.query('cost')
+    const { category, difficulty, cost } = c.req.valid('query' as never)
 
     let filteredExperiences = [...SAMPLE_EXPERIENCES]
 
@@ -124,15 +147,10 @@ experiencesApi.get('/:id', async (c: Context) => {
 })
 
 // POST /api/experiences/:id/save - Save to favorites
-experiencesApi.post('/:id/save', async (c: Context) => {
+experiencesApi.post('/:id/save', zValidator('json', saveExperienceSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const experienceId = c.req.param('id')
-    const { userId, relationshipId } = await c.req.json()
-
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400)
-    }
+    const { userId } = c.req.valid('json' as never)
 
     const favoriteId = generateId()
     const now = getCurrentDateTime()
@@ -154,15 +172,10 @@ experiencesApi.post('/:id/save', async (c: Context) => {
 })
 
 // POST /api/experiences/:id/complete - Mark completed
-experiencesApi.post('/:id/complete', async (c: Context) => {
+experiencesApi.post('/:id/complete', zValidator('json', completeExperienceSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
     const experienceId = c.req.param('id')
-    const { userId, relationshipId, rating, notes, completedAt } = await c.req.json()
-
-    if (!userId || !relationshipId) {
-      return c.json({ error: 'userId and relationshipId are required' }, 400)
-    }
+    const { userId, relationshipId, rating, notes, completedAt } = c.req.valid('json' as never)
 
     const completionId = generateId()
     const now = completedAt || getCurrentDateTime()

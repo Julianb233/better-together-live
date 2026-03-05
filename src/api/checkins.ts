@@ -3,8 +3,10 @@
 
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { createDatabase } from '../db'
-import type { Env } from '../types'
+import { createAdminClient, type SupabaseEnv } from '../lib/supabase/server'
+import { zValidator } from '@hono/zod-validator'
+import { zodErrorHandler } from '../lib/validation'
+import { createCheckinSchema, checkinQuerySchema } from '../lib/validation/schemas/checkins'
 import {
   generateId,
   getCurrentDate,
@@ -12,15 +14,14 @@ import {
   hasTodayCheckin,
   checkAchievements
 } from '../utils'
-import { getPaginationParams } from '../lib/pagination'
 
 const checkinsApi = new Hono()
 
 // POST /api/checkins
 // Submit daily check-in
-checkinsApi.post('/', async (c: Context) => {
+checkinsApi.post('/', zValidator('json', createCheckinSchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const {
       relationship_id,
       user_id,
@@ -30,11 +31,7 @@ checkinsApi.post('/', async (c: Context) => {
       gratitude_note,
       support_needed,
       highlight_of_day
-    } = await c.req.json()
-
-    if (!relationship_id || !user_id) {
-      return c.json({ error: 'Relationship ID and User ID are required' }, 400)
-    }
+    } = c.req.valid('json' as never)
 
     // Check if already checked in today
     const hasCheckin = await hasTodayCheckin(c.env, relationship_id, user_id)
@@ -46,17 +43,20 @@ checkinsApi.post('/', async (c: Context) => {
     const today = getCurrentDate()
     const now = getCurrentDateTime()
 
-    await db.run(`
-      INSERT INTO daily_checkins (
-        id, relationship_id, user_id, checkin_date, connection_score, mood_score,
-        relationship_satisfaction, gratitude_note, support_needed, highlight_of_day, created_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [
-      checkinId, relationship_id, user_id, today, connection_score || null,
-      mood_score || null, relationship_satisfaction || null, gratitude_note || null,
-      support_needed || null, highlight_of_day || null, now
-    ])
+    const { error } = await supabase.from('daily_checkins').insert({
+      id: checkinId,
+      relationship_id,
+      user_id,
+      checkin_date: today,
+      connection_score: connection_score ?? null,
+      mood: mood_score != null ? String(mood_score) : null,
+      satisfaction: relationship_satisfaction ?? null,
+      gratitude: gratitude_note ?? null,
+      notes: highlight_of_day ?? null,
+      created_at: now,
+    })
+
+    if (error) throw error
 
     // Check for achievements
     const newAchievements = await checkAchievements(c.env, relationship_id, user_id)
@@ -74,22 +74,31 @@ checkinsApi.post('/', async (c: Context) => {
 
 // GET /api/checkins/:relationshipId
 // Get recent check-ins for relationship
-checkinsApi.get('/:relationshipId', async (c: Context) => {
+checkinsApi.get('/:relationshipId', zValidator('query', checkinQuerySchema, zodErrorHandler), async (c: Context) => {
   try {
-    const db = createDatabase(c.env as Env)
+    const supabase = createAdminClient(c.env as SupabaseEnv)
     const relationshipId = c.req.param('relationshipId')
-    const { limit } = getPaginationParams(c)
+    const { limit } = c.req.valid('query' as never)
 
-    const results = await db.all(`
-      SELECT c.*, u.name as user_name
-      FROM daily_checkins c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.relationship_id = $1
-      ORDER BY c.checkin_date DESC, c.created_at DESC
-      LIMIT $2
-    `, [relationshipId, limit])
+    // Join with users table to get user_name
+    const { data: checkins, error } = await supabase
+      .from('daily_checkins')
+      .select('*, users!daily_checkins_user_id_fkey(name)')
+      .eq('relationship_id', relationshipId)
+      .order('checkin_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
-    return c.json({ checkins: results || [] })
+    if (error) throw error
+
+    // Map to expected response shape (flatten user_name from join)
+    const results = (checkins || []).map((row: any) => ({
+      ...row,
+      user_name: row.users?.name ?? null,
+      users: undefined,
+    }))
+
+    return c.json({ checkins: results })
   } catch (error) {
     console.error('Get checkins error:', error)
     return c.json({ error: 'Failed to get check-ins' }, 500)
