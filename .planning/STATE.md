@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 8 (Infrastructure & Monitoring) -- COMPLETE
+**Current focus:** Phase 10 (Mobile Production Readiness) -- COMPLETE
 
 ## Current Position
 
-Phase: 8 of 10 (Infrastructure & Monitoring)
-Plan: 3 of 3 in current phase
+Phase: 10 of 10 (Mobile Production Readiness)
+Plan: 2 of 2 in current phase
 Status: Phase complete
-Last activity: 2026-03-05 -- Completed 08-03-PLAN.md (ESLint & CI/CD Pipeline)
+Last activity: 2026-03-05 -- Completed 10-02-PLAN.md (Screen Updates + Build Verification)
 
-Progress: [█████████████████████████████░] 77% (27/35)
+Progress: [██████████████████████████████] 83% (29/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
-- Average duration: ~3.5 minutes
-- Total execution time: ~98.5 minutes
+- Total plans completed: 29
+- Average duration: ~3.4 minutes
+- Total execution time: ~102.5 minutes
 
 **By Phase:**
 
@@ -35,6 +35,7 @@ Progress: [███████████████████████
 | 6 - AI Coach | 3/3 | ~7m | ~2.3m |
 | 7 - Analytics & Performance | 2/2 | ~3.8m | ~1.9m |
 | 8 - Infrastructure & Monitoring | 3/3 | ~11m | ~3.7m |
+| 10 - Mobile Production Readiness | 2/2 | ~4m | ~2m |
 
 ## Accumulated Context
 
@@ -106,6 +107,12 @@ Recent decisions affecting current work:
 - [08-02] Standalone logger for code outside request context (email.ts simulateEmail utility)
 - [08-03] no-unused-vars set to warn (51 pre-existing violations)
 - [08-03] typecheck CI step uses continue-on-error (1121 pre-existing type errors)
+- [10-01] expo-constants for Supabase config (app.json extra)
+- [10-01] Map Supabase User to app User type in useAuth hook
+- [10-01] Remove createUser/storeUserId from API client (Supabase SDK handles)
+- [10-02] Forgot Password redirects to web app (mobile reset is v2)
+- [10-02] Restore getUserId() as Supabase session wrapper (9 screens depend on it)
+- [10-02] OnboardingScreen uses updateUser instead of createUser
 
 ### Pending Todos
 
@@ -122,6 +129,8 @@ Recent decisions affecting current work:
 - Configure Vercel CI secrets in GitHub: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 - Fix 1121 TypeScript type errors to make typecheck CI step strict
 - Fix 51 unused variable warnings to promote no-unused-vars to error
+- Configure supabaseUrl and supabaseAnonKey in mobile/app.json before app launch
+- Fix 3 pre-existing LiveKit type errors in VideoCallScreen.tsx
 
 ### Blockers/Concerns
 
@@ -135,13 +144,15 @@ Recent decisions affecting current work:
 - Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
 - Phase 7 COMPLETE -- all 2 plans executed: mock analytics removed, N+1 fixed, trending topics RPC created
 - Phase 8 COMPLETE -- all 3 plans executed: index.tsx refactored 1890->191 lines, Sentry + pino logging, Vercel CI pipeline
+- Phase 10 COMPLETE -- all 2 plans executed: Supabase Auth mobile client, password screens, JWT WebSocket, clean build
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
 - Trending topics RPC function needs migration run on Supabase (JS fallback active until then)
 - 1121 TypeScript type errors prevent strict typecheck in CI
+- Mobile app.json needs real Supabase URL and anon key before launch
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 08-03-PLAN.md (ESLint & CI/CD Pipeline) -- Phase 8 complete
+Stopped at: Completed 10-02-PLAN.md (Screen Updates + Build Verification) -- Phase 10 complete
 Resume file: None
