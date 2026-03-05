@@ -1,11 +1,10 @@
-// AI Coach API endpoints -- Real Claude integration via Vercel AI SDK
+// AI Coach API endpoints -- Tiered routing via coach-router
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { generateText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
 import { requireAuth } from '../lib/supabase/middleware'
 import { COACH_SYSTEM_PROMPT } from '../lib/ai/prompts'
 import { getConversationHistory, saveMessages } from '../lib/ai/conversation'
+import { generateCoachResponse } from '../lib/ai/coach-router'
 
 const aiCoachApi = new Hono()
 
@@ -31,21 +30,15 @@ aiCoachApi.post('/ask', async (c) => {
     // Load conversation history for context
     const history = await getConversationHistory(supabase, userId, relationship_id)
 
-    // Build messages array with history + new user message
-    const messages = [
-      ...history.map((m: { role: string; content: string }) => ({
+    // Route to appropriate model (Claude for complex, OpenAI for simple) with fallback
+    const { text, tier, model } = await generateCoachResponse(
+      message,
+      history.map((m: { role: string; content: string }) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
-      { role: 'user' as const, content: message },
-    ]
-
-    // Call Claude via Vercel AI SDK
-    const { text } = await generateText({
-      model: anthropic('claude-haiku-4-5'),
-      system: COACH_SYSTEM_PROMPT,
-      messages,
-    })
+      COACH_SYSTEM_PROMPT
+    )
 
     // Save both user and assistant messages to database
     await saveMessages(supabase, [
@@ -61,14 +54,14 @@ aiCoachApi.post('/ask', async (c) => {
         relationship_id,
         role: 'assistant',
         content: text,
-        model_used: 'claude-haiku-4-5',
+        model_used: model,
       },
     ])
 
     return c.json({
       response: text,
-      tier: 'complex',
-      model: 'claude-haiku-4-5',
+      tier,
+      model,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
