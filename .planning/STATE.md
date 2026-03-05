@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Secure, tested production app for real couples with AI coaching, payments, and community
-**Current focus:** Phase 10 (Mobile Production Readiness) -- COMPLETE
+**Current focus:** Phase 9 (Test Suite) -- COMPLETE
 
 ## Current Position
 
-Phase: 10 of 10 (Mobile Production Readiness)
-Plan: 2 of 2 in current phase
+Phase: 9 of 10 (Test Suite)
+Plan: 4 of 4 in current phase
 Status: Phase complete
-Last activity: 2026-03-05 -- Completed 10-02-PLAN.md (Screen Updates + Build Verification)
+Last activity: 2026-03-05 -- Completed 09-04-PLAN.md (CI Pipeline Integration)
 
-Progress: [██████████████████████████████] 83% (29/35)
+Progress: [█████████████████████████████████] 94% (33/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
-- Average duration: ~3.4 minutes
-- Total execution time: ~102.5 minutes
+- Total plans completed: 33
+- Average duration: ~3.3 minutes
+- Total execution time: ~110.5 minutes
 
 **By Phase:**
 
@@ -35,6 +35,7 @@ Progress: [███████████████████████
 | 6 - AI Coach | 3/3 | ~7m | ~2.3m |
 | 7 - Analytics & Performance | 2/2 | ~3.8m | ~1.9m |
 | 8 - Infrastructure & Monitoring | 3/3 | ~11m | ~3.7m |
+| 9 - Test Suite | 4/4 | ~8m | ~2m |
 | 10 - Mobile Production Readiness | 2/2 | ~4m | ~2m |
 
 ## Accumulated Context
@@ -107,6 +108,12 @@ Recent decisions affecting current work:
 - [08-02] Standalone logger for code outside request context (email.ts simulateEmail utility)
 - [08-03] no-unused-vars set to warn (51 pre-existing violations)
 - [08-03] typecheck CI step uses continue-on-error (1121 pre-existing type errors)
+- [09-01] Separate vitest.config.ts from vite.config.ts (Hono plugins interfere with Vitest)
+- [09-01] Vitest 4.x (npm resolved latest stable)
+- [09-02] Mock c.var.logger via Hono middleware in test app
+- [09-03] Mock Stripe via createStripeClient override (not global fetch)
+- [09-03] Partial mock of src/utils for checkin tests (control hasTodayCheckin)
+- [09-04] Test step before lint in CI pipeline (fail fast)
 - [10-01] expo-constants for Supabase config (app.json extra)
 - [10-01] Map Supabase User to app User type in useAuth hook
 - [10-01] Remove createUser/storeUserId from API client (Supabase SDK handles)
@@ -135,7 +142,7 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - 58 v1 requirements across 10 phases -- aggressive scope for ASAP timeline
-- Zero existing tests means refactoring has high regression risk
+- 54 automated tests now cover utils, auth, payments, checkins, goals (was zero)
 - Phase 1 (security) complete -- all 5 plans executed
 - Phase 2 (auth consolidation) complete -- all 3 plans executed, custom JWT fully removed
 - Phase 3 (database consolidation) complete -- all 5 plans executed, Neon fully removed, 25 API files migrated
@@ -144,6 +151,7 @@ Recent decisions affecting current work:
 - Phase 6 COMPLETE -- all 3 plans executed: Claude integration, tiered routing, rate limiting + caching
 - Phase 7 COMPLETE -- all 2 plans executed: mock analytics removed, N+1 fixed, trending topics RPC created
 - Phase 8 COMPLETE -- all 3 plans executed: index.tsx refactored 1890->191 lines, Sentry + pino logging, Vercel CI pipeline
+- Phase 9 COMPLETE -- all 4 plans executed: Vitest setup, 54 tests (unit + integration), CI pipeline test gate
 - Phase 10 COMPLETE -- all 2 plans executed: Supabase Auth mobile client, password screens, JWT WebSocket, clean build
 - Supabase SMTP not yet configured -- password reset emails won't deliver until manual dashboard setup is done
 - Supabase Database types file has fewer columns than actual DB schema -- causes type errors requiring `as any` casts
@@ -154,5 +162,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 10-02-PLAN.md (Screen Updates + Build Verification) -- Phase 10 complete
+Stopped at: Completed 09-04-PLAN.md (CI Pipeline Integration) -- Phase 9 complete
 Resume file: None
