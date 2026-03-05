@@ -22,12 +22,12 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Auth Consolidation
 
-- [ ] **AUTH-01**: All authentication uses Supabase Auth exclusively (custom JWT removed)
-- [ ] **AUTH-02**: User can sign up with email and password via Supabase Auth
-- [ ] **AUTH-03**: User receives email verification after signup
-- [ ] **AUTH-04**: User can reset password via email link (actually sends email via Resend)
-- [ ] **AUTH-05**: User session persists across browser refresh (HTTP-only cookies)
-- [ ] **AUTH-06**: Login page uses Supabase Auth only (no dual login forms)
+- [x] **AUTH-01**: All authentication uses Supabase Auth exclusively (custom JWT removed)
+- [x] **AUTH-02**: User can sign up with email and password via Supabase Auth
+- [x] **AUTH-03**: User receives email verification after signup
+- [x] **AUTH-04**: User can reset password via email link (actually sends email via Resend)
+- [x] **AUTH-05**: User session persists across browser refresh (HTTP-only cookies)
+- [x] **AUTH-06**: Login page uses Supabase Auth only (no dual login forms)
 
 ### Database Consolidation
 
@@ -155,7 +155,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SEC-01 thru SEC-10 | Phase 1 | Complete |
-| AUTH-01 thru AUTH-06 | Phase 2 | Pending |
+| AUTH-01 thru AUTH-06 | Phase 2 | Complete |
 | DB-01 thru DB-05 | Phase 3 | Pending |
 | VAL-01 thru VAL-03 | Phase 3 | Pending |
 | INT-01 thru INT-07 | Phase 4 | Pending |
