@@ -45,25 +45,25 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### AI Coach
 
-- [ ] **AI-01**: AI coach uses Claude API for complex relationship questions
-- [ ] **AI-02**: AI coach uses OpenAI API for simple/quick responses
-- [ ] **AI-03**: Conversation history persisted in database per user
-- [ ] **AI-04**: AI requests are rate-limited per user
-- [ ] **AI-05**: Common responses cached to reduce API costs
+- [x] **AI-01**: AI coach uses Claude API for complex relationship questions
+- [x] **AI-02**: AI coach uses OpenAI API for simple/quick responses
+- [x] **AI-03**: Conversation history persisted in database per user
+- [x] **AI-04**: AI requests are rate-limited per user
+- [x] **AI-05**: Common responses cached to reduce API costs
 
 ### Payments
 
-- [ ] **PAY-01**: Stripe SDK installed and used (not raw fetch)
-- [ ] **PAY-02**: Freemium model: free tier with limited features, premium unlocks AI coach/video/advanced
-- [ ] **PAY-03**: Subscription checkout flow works end-to-end (select plan → Stripe → active subscription)
-- [ ] **PAY-04**: Subscription cancellation works and revokes premium access
-- [ ] **PAY-05**: Webhook properly updates user subscription status on payment events
-- [ ] **PAY-06**: Single consistent pricing model across all pages
+- [x] **PAY-01**: Stripe SDK installed and used (not raw fetch)
+- [x] **PAY-02**: Freemium model: free tier with limited features, premium unlocks AI coach/video/advanced
+- [x] **PAY-03**: Subscription checkout flow works end-to-end (select plan → Stripe → active subscription)
+- [x] **PAY-04**: Subscription cancellation works and revokes premium access
+- [x] **PAY-05**: Webhook properly updates user subscription status on payment events
+- [x] **PAY-06**: Single consistent pricing model across all pages
 
 ### Analytics
 
-- [ ] **ANL-01**: Analytics dashboard shows real data from database queries (no mock/hardcoded data)
-- [ ] **ANL-02**: User count, engagement metrics, and trends computed from actual records
+- [x] **ANL-01**: Analytics dashboard shows real data from database queries (no mock/hardcoded data)
+- [x] **ANL-02**: User count, engagement metrics, and trends computed from actual records
 
 ### Product Integrity
 
@@ -87,22 +87,22 @@ Requirements for production launch. Each maps to roadmap phases.
 
 ### Monitoring
 
-- [ ] **MON-01**: Error tracking service integrated (Sentry or equivalent)
-- [ ] **MON-02**: Structured logging replaces console.error in API routes
-- [ ] **MON-03**: Health check endpoint exists and is monitored
+- [x] **MON-01**: Error tracking service integrated (Sentry or equivalent)
+- [x] **MON-02**: Structured logging replaces console.error in API routes
+- [x] **MON-03**: Health check endpoint exists and is monitored
 
 ### Infrastructure
 
-- [ ] **INF-01**: Vercel deployment works with proper env vars
-- [ ] **INF-02**: CI/CD pipeline: lint → type-check → test → build → deploy
-- [ ] **INF-03**: Staging environment available for pre-production testing
-- [ ] **INF-04**: Entry point refactored (index.tsx under 500 lines, inline handlers extracted)
+- [x] **INF-01**: Vercel deployment works with proper env vars
+- [x] **INF-02**: CI/CD pipeline: lint → type-check → test → build → deploy
+- [x] **INF-03**: Staging environment available for pre-production testing
+- [x] **INF-04**: Entry point refactored (index.tsx under 500 lines, inline handlers extracted)
 
 ### Performance
 
-- [ ] **PERF-01**: N+1 queries fixed in messaging (conversations endpoint)
-- [ ] **PERF-02**: Discovery API migrated from raw SQL to Supabase query builder
-- [ ] **PERF-03**: Trending topics computed via database (not 1000-row in-memory scan)
+- [x] **PERF-01**: N+1 queries fixed in messaging (conversations endpoint)
+- [x] **PERF-02**: Discovery API migrated from raw SQL to Supabase query builder
+- [x] **PERF-03**: Trending topics computed via database (not 1000-row in-memory scan)
 
 ### Mobile
 
@@ -159,12 +159,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | DB-01 thru DB-05 | Phase 3 | Complete |
 | VAL-01 thru VAL-03 | Phase 3 | Complete |
 | INT-01 thru INT-07 | Phase 4 | Complete |
-| PAY-01 thru PAY-06 | Phase 5 | Pending |
-| AI-01 thru AI-05 | Phase 6 | Pending |
-| ANL-01 thru ANL-02 | Phase 7 | Pending |
-| PERF-01 thru PERF-03 | Phase 7 | Pending |
-| INF-01 thru INF-04 | Phase 8 | Pending |
-| MON-01 thru MON-03 | Phase 8 | Pending |
+| PAY-01 thru PAY-06 | Phase 5 | Complete |
+| AI-01 thru AI-05 | Phase 6 | Complete |
+| ANL-01 thru ANL-02 | Phase 7 | Complete |
+| PERF-01 thru PERF-03 | Phase 7 | Complete |
+| INF-01 thru INF-04 | Phase 8 | Complete |
+| MON-01 thru MON-03 | Phase 8 | Complete |
 | TST-01 thru TST-07 | Phase 9 | Pending |
 | MOB-01 thru MOB-03 | Phase 10 | Pending |
 

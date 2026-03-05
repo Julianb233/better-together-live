@@ -10,10 +10,10 @@ Take Better Together from a feature-rich but insecure prototype to a production-
 - [x] **Phase 2: Auth Consolidation** - Migrate to Supabase Auth as sole auth system
 - [x] **Phase 3: Database Consolidation** - Migrate all routes from Neon to Supabase client, add input validation
 - [x] **Phase 4: Product Integrity** - Fix fake CTAs, remove fake social proof, unify pricing, hide unimplemented features
-- [ ] **Phase 5: Payment System** - Implement real Stripe subscriptions with freemium gating
-- [ ] **Phase 6: AI Coach** - Build tiered AI coach with Claude + OpenAI
-- [ ] **Phase 7: Analytics & Performance** - Replace mock analytics, fix N+1 queries, optimize discovery
-- [ ] **Phase 8: Infrastructure & Monitoring** - CI/CD pipeline, Sentry, structured logging, entry point refactor
+- [x] **Phase 5: Payment System** - Implement real Stripe subscriptions with freemium gating
+- [x] **Phase 6: AI Coach** - Build tiered AI coach with Claude + OpenAI
+- [x] **Phase 7: Analytics & Performance** - Replace mock analytics, fix N+1 queries, optimize discovery
+- [x] **Phase 8: Infrastructure & Monitoring** - CI/CD pipeline, Sentry, structured logging, entry point refactor
 - [ ] **Phase 9: Test Suite** - Vitest setup, unit tests, integration tests, CI test gates
 - [ ] **Phase 10: Mobile Production Readiness** - Align mobile app with consolidated backend
 
@@ -104,9 +104,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Install Stripe SDK, implement checkout session creation and success/cancel callbacks
-- [ ] 05-02: Build premium feature gating middleware and update protected routes
-- [ ] 05-03: Implement subscription management (cancel, upgrade, billing portal)
+- [x] 05-01: Install Stripe SDK, implement checkout session creation and success/cancel callbacks
+- [x] 05-02: Build premium feature gating middleware and update protected routes
+- [x] 05-03: Implement subscription management (cancel, upgrade, billing portal)
 
 ### Phase 6: AI Coach
 **Goal**: Real AI-powered relationship coaching with tiered Claude/OpenAI and conversation history
@@ -121,9 +121,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Replace keyword-matching stub with Claude API integration and system prompt
-- [ ] 06-02: Add OpenAI tier for simple responses, implement routing logic
-- [ ] 06-03: Add conversation history storage, rate limiting, and response caching
+- [x] 06-01: Replace keyword-matching stub with Claude API integration and system prompt
+- [x] 06-02: Add OpenAI tier for simple responses, implement routing logic
+- [x] 06-03: Add conversation history storage, rate limiting, and response caching
 
 ### Phase 7: Analytics & Performance
 **Goal**: Real analytics data and optimized database queries
@@ -137,9 +137,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Replace mock analytics with real Supabase queries for all dashboard metrics
-- [ ] 07-02: Fix N+1 queries in messaging, add CTEs/joins for conversation listing
-- [ ] 07-03: Rewrite discovery API with Supabase query builder, add hashtags table for trending topics
+- [x] 07-01: Replace mock analytics with real Supabase queries for all dashboard metrics
+- [x] 07-02: Fix N+1 queries in messaging, add CTEs/joins for conversation listing
+- [x] 07-03: Rewrite discovery API with Supabase query builder, add hashtags table for trending topics
 
 ### Phase 8: Infrastructure & Monitoring
 **Goal**: Production-grade deployment pipeline with error tracking and observability
@@ -154,10 +154,9 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 08-01: Refactor index.tsx — extract inline handlers to API modules, move homepage to pages/
-- [ ] 08-02: Set up Sentry error tracking and structured logging
-- [ ] 08-03: Update CI/CD pipeline — add test step, env var management, staging environment
-- [ ] 08-04: Add health check endpoint, configure Vercel production deployment
+- [x] 08-01: Refactor index.tsx — extract inline handlers to API modules, move homepage to pages/
+- [x] 08-02: Set up Sentry error tracking and structured logging
+- [x] 08-03: Update CI/CD pipeline — add test step, env var management, staging environment (health check merged into 08-02)
 
 ### Phase 9: Test Suite
 **Goal**: Automated test coverage for critical paths with CI integration
@@ -202,11 +201,11 @@ Phases execute in dependency order: 1 → 2 → 3 → 4 (parallel with 2) → 5 
 | 2. Auth Consolidation | 3/3 | Complete | 2026-03-05 |
 | 3. Database Consolidation & Validation | 5/5 | Complete | 2026-03-05 |
 | 4. Product Integrity | 3/3 | Complete | 2026-03-05 |
-| 5. Payment System | 0/3 | Not started | - |
-| 6. AI Coach | 0/3 | Not started | - |
-| 7. Analytics & Performance | 0/3 | Not started | - |
-| 8. Infrastructure & Monitoring | 0/4 | Not started | - |
+| 5. Payment System | 3/3 | Complete | 2026-03-05 |
+| 6. AI Coach | 3/3 | Complete | 2026-03-05 |
+| 7. Analytics & Performance | 2/2 | Complete | 2026-03-05 |
+| 8. Infrastructure & Monitoring | 3/3 | Complete | 2026-03-05 |
 | 9. Test Suite | 0/4 | Not started | - |
 | 10. Mobile Production Readiness | 0/2 | Not started | - |
 
-**Total:** 16/35 plans complete
+**Total:** 27/33 plans complete
