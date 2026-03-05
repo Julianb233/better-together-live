@@ -156,10 +156,10 @@ export const subscriptionManagementHtml = `<!DOCTYPE html>
                     <i class="fas fa-chevron-right text-gray-400"></i>
                 </button>
 
-                <button onclick="pauseSubscription()" class="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                <button onclick="manageSubscription()" class="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
                     <div class="flex items-center">
-                        <i class="fas fa-pause-circle text-gray-500 mr-3"></i>
-                        <span class="text-gray-700">Pause Subscription</span>
+                        <i class="fas fa-cog text-gray-500 mr-3"></i>
+                        <span class="text-gray-700">Manage via Billing Portal</span>
                     </div>
                     <i class="fas fa-chevron-right text-gray-400"></i>
                 </button>
@@ -253,12 +253,12 @@ export const subscriptionManagementHtml = `<!DOCTYPE html>
 
             if (isPremium) {
                 const planNames = {
-                    monthly: 'Monthly Premium',
-                    biannual: '6-Month Premium',
-                    annual: 'Annual Premium'
+                    'try-it-out': 'Try It Out',
+                    'better-together': 'Better Together'
                 };
 
-                document.getElementById('planName').textContent = planNames[subscriptionData.plan] || 'Premium';
+                const planId = subscriptionData.plan?.id || subscriptionData.planId || '';
+                document.getElementById('planName').textContent = planNames[planId] || 'Premium';
                 document.getElementById('billingCycle').textContent = subscriptionData.interval || 'Monthly';
                 document.getElementById('nextBilling').textContent = subscriptionData.currentPeriodEnd
                     ? new Date(subscriptionData.currentPeriodEnd).toLocaleDateString()
@@ -350,27 +350,13 @@ export const subscriptionManagementHtml = `<!DOCTYPE html>
         }
 
         function changePlan() {
-            window.location.href = '/premium-pricing';
+            // Redirect to Stripe Customer Portal for plan changes
+            openBillingPortal();
         }
 
-        async function pauseSubscription() {
-            if (!confirm('Pause your subscription? You can resume anytime.')) return;
-
-            try {
-                const response = await fetch('/api/payments/pause-subscription', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: localStorage.getItem('userId') })
-                });
-
-                if (response.ok) {
-                    alert('Subscription paused. You can resume from this page anytime.');
-                    loadSubscription();
-                }
-            } catch (error) {
-                console.error('Pause error:', error);
-                alert('Failed to pause subscription');
-            }
+        function manageSubscription() {
+            // All subscription management handled via Stripe Customer Portal
+            openBillingPortal();
         }
 
         function cancelSubscription() {
