@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 1 of 10 (Security Hardening)
-Plan: 3 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-03-05 — Completed 01-03-PLAN.md (Stripe Webhook Verification)
+Last activity: 2026-03-05 — Completed 01-04-PLAN.md (CORS Admin Secrets Lockdown)
 
-Progress: [██░░░░░░░░] 6% (2/35)
+Progress: [███░░░░░░░] 9% (3/35)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~2.5 minutes
-- Total execution time: ~5 minutes
+- Total plans completed: 3
+- Average duration: ~2 minutes
+- Total execution time: ~6.5 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 - Security | 2/5 | ~5m | ~2.5m |
+| 1 - Security | 3/5 | ~6.5m | ~2m |
 
 ## Accumulated Context
 
@@ -44,6 +44,8 @@ Recent decisions affecting current work:
 - [01-01] Read Supabase env from c.env at request time (Vercel per-request injection)
 - [01-01] Use hono/combine except() for public route whitelist
 - [01-03] Web Crypto API for Stripe signature verification (no SDK needed)
+- [01-04] CORS origin allowlist with CORS_ORIGINS env var for flexibility
+- [01-04] Admin analytics page route protected with inline requireAuth + requireAdmin
 
 ### Pending Todos
 
@@ -59,5 +61,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 01-03-PLAN.md (Stripe Webhook Verification)
+Stopped at: Completed 01-04-PLAN.md (CORS Admin Secrets Lockdown)
 Resume file: None
