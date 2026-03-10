@@ -47,6 +47,20 @@ import videoApi from './api/video'
 
 const app = new Hono<{ Bindings: Env }>()
 
+// Populate c.env from process.env on Node.js runtimes (Vercel).
+// The @hono/node-server/vercel handle() does not pass process.env to app.fetch(),
+// so c.env is empty unless we inject it here.
+app.use('*', async (c, next) => {
+  if (typeof process !== 'undefined' && process.env && (!c.env || !c.env.SUPABASE_URL)) {
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        (c.env as Record<string, string>)[key] = value
+      }
+    }
+  }
+  await next()
+})
+
 // Sentry error tracking (must be first to catch all errors)
 app.use('*', sentryMiddleware())
 
