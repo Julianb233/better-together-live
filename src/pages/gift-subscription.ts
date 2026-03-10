@@ -1,4 +1,4 @@
-// Gift Subscription Page
+// Gift Subscription Page - Two Plans: Try It Out ($30) and Better Together ($240/yr)
 export const giftSubscriptionHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,7 +24,7 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
         <div class="text-center mb-8">
             <div class="float-animation inline-block mb-4">
                 <div class="w-20 h-20 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center shadow-xl">
-                    <span class="text-4xl">🎁</span>
+                    <span class="text-4xl">&#127873;</span>
                 </div>
             </div>
             <h1 class="text-3xl font-bold text-gray-900 mb-2">Gift Better Together</h1>
@@ -34,60 +34,42 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
         <!-- Gift Plan Selection -->
         <div class="mb-8">
             <h2 class="text-lg font-semibold text-gray-900 mb-4 text-center">Choose a Gift Plan</h2>
-            <div class="grid md:grid-cols-3 gap-4">
-                <!-- 1 Month -->
-                <div class="plan-card glass-card rounded-2xl p-6 border-2 border-transparent shadow-lg" data-plan="monthly" onclick="selectPlan('monthly')">
+            <div class="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                <!-- Try It Out - 1 Month -->
+                <div class="plan-card glass-card rounded-2xl p-6 border-2 border-transparent shadow-lg" data-plan="try-it-out" onclick="selectPlan('try-it-out')">
                     <div class="text-center mb-4">
-                        <div class="text-4xl mb-2">💝</div>
-                        <h3 class="font-bold text-gray-900">1 Month</h3>
-                        <div class="text-sm text-gray-500">Try it out</div>
+                        <div class="text-4xl mb-2">&#128157;</div>
+                        <h3 class="font-bold text-gray-900">Try It Out</h3>
+                        <div class="text-sm text-gray-500">1 month of premium</div>
                     </div>
                     <div class="text-center mb-4">
-                        <span class="text-3xl font-bold text-gray-900">$9.99</span>
+                        <span class="text-3xl font-bold text-gray-900">$30</span>
                     </div>
                     <ul class="space-y-2 text-sm text-gray-600">
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Full Premium Access</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>AI Relationship Coach</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>All Challenges</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>All Challenges & Video</li>
                     </ul>
                 </div>
 
-                <!-- 6 Months - Popular -->
-                <div class="plan-card glass-card rounded-2xl p-6 border-2 border-pink-500 shadow-lg relative selected" data-plan="biannual" onclick="selectPlan('biannual')">
+                <!-- Better Together - Annual -->
+                <div class="plan-card glass-card rounded-2xl p-6 border-2 border-pink-500 shadow-lg relative selected" data-plan="better-together" onclick="selectPlan('better-together')">
                     <div class="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <span class="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold">MOST POPULAR</span>
+                        <span class="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold">BEST VALUE</span>
                     </div>
                     <div class="text-center mb-4">
-                        <div class="text-4xl mb-2">💖</div>
-                        <h3 class="font-bold text-gray-900">6 Months</h3>
-                        <div class="text-sm text-gray-500">Best value</div>
+                        <div class="text-4xl mb-2">&#128150;</div>
+                        <h3 class="font-bold text-gray-900">Better Together</h3>
+                        <div class="text-sm text-gray-500">Full year of premium</div>
                     </div>
                     <div class="text-center mb-4">
-                        <span class="text-3xl font-bold text-gray-900">$49.99</span>
-                        <div class="text-sm text-green-600 font-medium">Save 17%</div>
+                        <span class="text-3xl font-bold text-gray-900">$240</span>
+                        <div class="text-sm text-green-600 font-medium">Save 33% vs monthly</div>
                     </div>
                     <ul class="space-y-2 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Everything in Monthly</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Everything in Try It Out</li>
                         <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Priority Support</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Bonus Challenges</li>
-                    </ul>
-                </div>
-
-                <!-- 1 Year -->
-                <div class="plan-card glass-card rounded-2xl p-6 border-2 border-transparent shadow-lg" data-plan="annual" onclick="selectPlan('annual')">
-                    <div class="text-center mb-4">
-                        <div class="text-4xl mb-2">💕</div>
-                        <h3 class="font-bold text-gray-900">1 Year</h3>
-                        <div class="text-sm text-gray-500">Full commitment</div>
-                    </div>
-                    <div class="text-center mb-4">
-                        <span class="text-3xl font-bold text-gray-900">$79.99</span>
-                        <div class="text-sm text-green-600 font-medium">Save 33%</div>
-                    </div>
-                    <ul class="space-y-2 text-sm text-gray-600">
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Everything in 6 Months</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Exclusive Content</li>
-                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>Date Box Discount</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>12 months for $20/mo</li>
                     </ul>
                 </div>
             </div>
@@ -118,40 +100,21 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
                     <textarea id="giftMessage" rows="3" placeholder="Add a heartfelt message..."
                         class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"></textarea>
                 </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Date</label>
-                    <div class="flex gap-4">
-                        <label class="flex items-center">
-                            <input type="radio" name="deliveryType" value="now" checked class="w-4 h-4 text-pink-600">
-                            <span class="ml-2 text-gray-700">Send immediately</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="deliveryType" value="scheduled" class="w-4 h-4 text-pink-600">
-                            <span class="ml-2 text-gray-700">Schedule delivery</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="scheduledDate" class="hidden mb-4">
-                    <input type="date" id="deliveryDate"
-                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                </div>
             </form>
         </div>
 
         <!-- Gift Preview -->
         <div class="glass-card rounded-2xl p-6 shadow-lg mb-6">
             <h2 class="font-semibold text-gray-900 mb-4">
-                <i class="fas fa-envelope-open-heart text-pink-500 mr-2"></i>
+                <i class="fas fa-envelope text-pink-500 mr-2"></i>
                 Gift Preview
             </h2>
             <div class="bg-gradient-to-r from-pink-100 to-purple-100 rounded-xl p-6 text-center">
-                <div class="text-4xl mb-3">🎁</div>
+                <div class="text-4xl mb-3">&#127873;</div>
                 <h3 class="font-bold text-gray-900 text-lg mb-2">You've Been Gifted Better Together!</h3>
                 <p class="text-gray-600 text-sm mb-4">Someone special wants you to experience a stronger, happier relationship.</p>
                 <div class="inline-block bg-white px-4 py-2 rounded-lg shadow">
-                    <span class="font-semibold text-pink-600" id="previewPlan">6 Months Premium</span>
+                    <span class="font-semibold text-pink-600" id="previewPlan">Better Together (1 Year)</span>
                 </div>
             </div>
         </div>
@@ -160,17 +123,17 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
         <div class="glass-card rounded-2xl p-6 shadow-lg mb-6">
             <h2 class="font-semibold text-gray-900 mb-4">Order Summary</h2>
             <div class="flex justify-between items-center mb-4 pb-4 border-b">
-                <span class="text-gray-600">Gift Subscription (<span id="summaryPlan">6 Months</span>)</span>
-                <span class="font-semibold text-gray-900" id="summaryPrice">$49.99</span>
+                <span class="text-gray-600">Gift Subscription (<span id="summaryPlan">Better Together</span>)</span>
+                <span class="font-semibold text-gray-900" id="summaryPrice">$240.00</span>
             </div>
             <div class="flex justify-between items-center text-lg font-bold">
                 <span class="text-gray-900">Total</span>
-                <span class="text-pink-600" id="summaryTotal">$49.99</span>
+                <span class="text-pink-600" id="summaryTotal">$240.00</span>
             </div>
         </div>
 
         <!-- Purchase Button -->
-        <button onclick="purchaseGift()" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-pink-700 hover:to-purple-700 transition shadow-lg hover:shadow-xl mb-4">
+        <button onclick="purchaseGift()" id="purchaseBtn" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-pink-700 hover:to-purple-700 transition shadow-lg hover:shadow-xl mb-4">
             <i class="fas fa-gift mr-2"></i>
             Purchase Gift
         </button>
@@ -189,11 +152,10 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
     </div>
 
     <script>
-        let selectedPlan = 'biannual';
+        let selectedPlan = 'better-together';
         const planDetails = {
-            monthly: { name: '1 Month Premium', price: 9.99 },
-            biannual: { name: '6 Months Premium', price: 49.99 },
-            annual: { name: '1 Year Premium', price: 79.99 }
+            'try-it-out': { name: 'Try It Out (1 Month)', price: 30.00 },
+            'better-together': { name: 'Better Together (1 Year)', price: 240.00 }
         };
 
         function selectPlan(plan) {
@@ -209,55 +171,55 @@ export const giftSubscriptionHtml = `<!DOCTYPE html>
         function updateSummary() {
             const details = planDetails[selectedPlan];
             document.getElementById('previewPlan').textContent = details.name;
-            document.getElementById('summaryPlan').textContent = details.name.replace(' Premium', '');
+            document.getElementById('summaryPlan').textContent = details.name;
             document.getElementById('summaryPrice').textContent = '$' + details.price.toFixed(2);
             document.getElementById('summaryTotal').textContent = '$' + details.price.toFixed(2);
         }
-
-        // Toggle scheduled date visibility
-        document.querySelectorAll('input[name="deliveryType"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                document.getElementById('scheduledDate').classList.toggle('hidden', e.target.value !== 'scheduled');
-            });
-        });
 
         async function purchaseGift() {
             const recipientName = document.getElementById('recipientName').value;
             const recipientEmail = document.getElementById('recipientEmail').value;
             const message = document.getElementById('giftMessage').value;
-            const deliveryType = document.querySelector('input[name="deliveryType"]:checked').value;
-            const deliveryDate = deliveryType === 'scheduled' ? document.getElementById('deliveryDate').value : null;
 
             if (!recipientName || !recipientEmail) {
                 alert('Please fill in recipient details');
                 return;
             }
 
+            const userId = localStorage.getItem('userId');
+            if (!userId) {
+                window.location.href = '/login?redirect=/gift-subscription';
+                return;
+            }
+
+            const btn = document.getElementById('purchaseBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>Processing...';
+
             try {
                 const response = await fetch('/api/payments/create-gift-checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        plan: selectedPlan,
-                        recipientName,
+                        planId: selectedPlan,
+                        senderUserId: userId,
                         recipientEmail,
-                        message,
-                        deliveryDate,
-                        purchaserUserId: localStorage.getItem('userId')
+                        recipientName,
+                        message
                     })
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.checkoutUrl) {
-                        window.location.href = data.checkoutUrl;
-                    }
+                const data = await response.json();
+                if (data.url) {
+                    window.location.href = data.url;
                 } else {
-                    throw new Error('Failed to create checkout');
+                    throw new Error(data.error || 'Failed to create checkout');
                 }
             } catch (error) {
                 console.error('Purchase error:', error);
                 alert('Failed to process gift purchase. Please try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-gift mr-2"></i>Purchase Gift';
             }
         }
 

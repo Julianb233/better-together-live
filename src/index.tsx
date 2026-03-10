@@ -89,6 +89,8 @@ app.use('/api/*', except(
   [
     '/api/auth/*',
     '/api/payments/webhook',
+    '/api/payments/config',
+    '/api/payments/tiers',
     '/api/health',
   ],
   requireAuth()

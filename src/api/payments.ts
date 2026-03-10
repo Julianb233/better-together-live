@@ -107,8 +107,18 @@ paymentsApi.post('/webhook', async (c: Context) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const userId = session.metadata?.userId || session.client_reference_id
-        const planId = session.subscription_data?.metadata?.planId || session.metadata?.planId
+        const userId = session.client_reference_id || session.metadata?.userId
+
+        // metadata is placed on subscription_data at checkout creation,
+        // which means it lives on the Stripe Subscription object — not the session.
+        // Retrieve subscription to read its metadata.
+        let planId: string | undefined = session.metadata?.planId
+        if (!planId && session.subscription) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(session.subscription as string)
+            planId = sub.metadata?.planId
+          } catch { /* best-effort */ }
+        }
 
         if (userId) {
           // Upsert subscription record
@@ -419,6 +429,65 @@ paymentsApi.get('/tiers', async (c: Context) => {
       priceFormatted: `$${(plan.amount / 100).toFixed(2)}`,
     })),
   })
+})
+
+// GET /api/payments/config
+// Return the publishable key so client-side Stripe.js can initialize
+paymentsApi.get('/config', async (c: Context) => {
+  const publishableKey = (c.env as any)?.STRIPE_PUBLISHABLE_KEY
+  if (!publishableKey) {
+    return c.json({ error: 'Stripe publishable key not configured' }, 500)
+  }
+  return c.json({ publishableKey })
+})
+
+// GET /api/payments/billing-history
+// Retrieve billing history (invoices) for a user via Stripe
+paymentsApi.get('/billing-history', async (c: Context) => {
+  try {
+    const userId = c.req.query('userId')
+    if (!userId) {
+      return c.json({ error: 'userId required' }, 400)
+    }
+
+    const stripe = getStripe(c)
+    if (!stripe) {
+      return c.json({ invoices: [] })
+    }
+
+    const supabase = createAdminClient(c.env as SupabaseEnv)
+
+    // Get stripe_customer_id from users table
+    const { data: user } = await supabase
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!user?.stripe_customer_id) {
+      return c.json({ invoices: [] })
+    }
+
+    // Fetch invoices from Stripe
+    const invoices = await stripe.invoices.list({
+      customer: user.stripe_customer_id,
+      limit: 10,
+    })
+
+    return c.json({
+      invoices: invoices.data.map((inv) => ({
+        id: inv.id,
+        amount: inv.amount_paid,
+        status: inv.status,
+        date: inv.created ? new Date(inv.created * 1000).toISOString() : null,
+        receiptUrl: inv.hosted_invoice_url,
+        description: inv.description || `Invoice ${inv.number || inv.id}`,
+      })),
+    })
+  } catch (error) {
+    c.var.logger.error({ err: error }, 'Billing history error')
+    return c.json({ invoices: [] })
+  }
 })
 
 export default paymentsApi
