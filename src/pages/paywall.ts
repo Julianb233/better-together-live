@@ -400,6 +400,13 @@ export const paywallHtml = `<!DOCTYPE html>
             const planId = planIdMap[planType] || 'try-it-out';
 
             try {
+                const userId = localStorage.getItem('userId');
+                if (!userId) {
+                    // Redirect to login, then come back to paywall after auth
+                    window.location.href = '/login?redirect=/paywall';
+                    return;
+                }
+
                 const response = await fetch('/api/payments/create-checkout-session', {
                     method: 'POST',
                     headers: {
@@ -408,7 +415,7 @@ export const paywallHtml = `<!DOCTYPE html>
                     body: JSON.stringify({
                         planId: planId,
                         email: email,
-                        userId: localStorage.getItem('userId') || 'anonymous',
+                        userId: userId,
                     }),
                 });
 
