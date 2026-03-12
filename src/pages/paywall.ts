@@ -386,6 +386,13 @@ export const paywallHtml = `<!DOCTYPE html>
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
 
+            // Check auth first before anything else
+            const userId = localStorage.getItem('userId');
+            if (!userId) {
+                window.location.href = '/login?redirect=/paywall';
+                return;
+            }
+
             submitButton.disabled = true;
             buttonText.classList.add('hidden');
             spinner.classList.remove('hidden');
@@ -400,6 +407,7 @@ export const paywallHtml = `<!DOCTYPE html>
             const planId = planIdMap[planType] || 'try-it-out';
 
             try {
+
                 const response = await fetch('/api/payments/create-checkout-session', {
                     method: 'POST',
                     headers: {
@@ -408,7 +416,7 @@ export const paywallHtml = `<!DOCTYPE html>
                     body: JSON.stringify({
                         planId: planId,
                         email: email,
-                        userId: localStorage.getItem('userId') || 'anonymous',
+                        userId: userId,
                     }),
                 });
 

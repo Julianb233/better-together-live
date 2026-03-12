@@ -91,6 +91,8 @@ app.use('/api/*', except(
     '/api/payments/webhook',
     '/api/payments/config',
     '/api/payments/tiers',
+    '/api/payments/create-checkout-session',
+    '/api/payments/create-gift-checkout',
     '/api/health',
   ],
   requireAuth()

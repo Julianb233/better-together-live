@@ -1,0 +1,268 @@
+/* ==========================================================================
+   Design Tokens — Better Together & Jesus Entered the Chat
+   Shared CSS custom properties for both brands.
+   Import this file to access all design tokens.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Better Together (BT) — Relationship Intelligence Platform
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* BT Colors — Pink (Primary) */
+  --bt-pink-50: #fdf2f8;
+  --bt-pink-100: #fce7f3;
+  --bt-pink-200: #fbcfe8;
+  --bt-pink-300: #f9a8d4;
+  --bt-pink-400: #f472b6;
+  --bt-pink-500: #ec4899;
+  --bt-pink-600: #db2777;
+  --bt-pink-700: #be185d;
+  --bt-pink-800: #9d174d;
+  --bt-pink-900: #831843;
+
+  /* BT Colors — Purple (Secondary) */
+  --bt-purple-50: #f5f3ff;
+  --bt-purple-100: #ede9fe;
+  --bt-purple-200: #ddd6fe;
+  --bt-purple-300: #c4b5fd;
+  --bt-purple-400: #a78bfa;
+  --bt-purple-500: #8b5cf6;
+  --bt-purple-600: #7c3aed;
+  --bt-purple-700: #6d28d9;
+  --bt-purple-800: #5b21b6;
+  --bt-purple-900: #4c1d95;
+
+  /* BT Colors — Blue (Tertiary) */
+  --bt-blue-500: #3b82f6;
+  --bt-blue-600: #2563eb;
+
+  /* BT Colors — Accent */
+  --bt-coral: #FF6B9D;
+
+  /* BT Gradients */
+  --bt-gradient-hero: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 50%, #3B82F6 100%);
+  --bt-gradient-subtle: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 50%, #f5f3ff 100%);
+  --bt-gradient-accent: linear-gradient(to bottom, #ec4899, #8b5cf6);
+  --bt-gradient-primary: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  --bt-gradient-button: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+
+  /* --------------------------------------------------------------------------
+     Jesus Entered the Chat (JETC) — Faith Community Platform
+     -------------------------------------------------------------------------- */
+
+  /* JETC Colors — Indigo (Primary) */
+  --jetc-indigo-50: #EEF2FF;
+  --jetc-indigo-100: #E0E7FF;
+  --jetc-indigo-200: #C7D2FE;
+  --jetc-indigo-300: #A5B4FC;
+  --jetc-indigo-400: #818CF8;
+  --jetc-indigo-500: #6366F1;
+  --jetc-indigo-600: #4F46E5;
+  --jetc-indigo-700: #4338CA;
+  --jetc-indigo-800: #3730A3;
+  --jetc-indigo-900: #312E81;
+
+  /* JETC Colors — Gold (Accent) */
+  --jetc-gold-50: #FFFBEB;
+  --jetc-gold-100: #FEF3C7;
+  --jetc-gold-200: #FDE68A;
+  --jetc-gold-300: #FCD34D;
+  --jetc-gold-400: #FBBF24;
+  --jetc-gold-500: #F59E0B;
+  --jetc-gold-600: #D97706;
+  --jetc-gold-700: #B45309;
+
+  /* JETC Colors — Sky (Secondary) */
+  --jetc-sky-50: #F0F9FF;
+  --jetc-sky-100: #E0F2FE;
+  --jetc-sky-200: #BAE6FD;
+  --jetc-sky-300: #7DD3FC;
+  --jetc-sky-400: #38BDF8;
+  --jetc-sky-500: #0EA5E9;
+  --jetc-sky-600: #0284C7;
+
+  /* JETC Colors — Warm (Community) */
+  --jetc-warm-50: #FFF7ED;
+  --jetc-warm-100: #FFEDD5;
+  --jetc-warm-500: #F97316;
+
+  /* JETC Colors — Sage (Growth/Success) */
+  --jetc-sage-50: #F0FDF4;
+  --jetc-sage-100: #DCFCE7;
+  --jetc-sage-500: #22C55E;
+
+  /* JETC Colors — Slate (Dark Mode) */
+  --jetc-slate-700: #334155;
+  --jetc-slate-800: #1E293B;
+  --jetc-slate-900: #0F172A;
+
+  /* JETC Gradients */
+  --jetc-gradient-hero: linear-gradient(135deg, #6366F1 0%, #0EA5E9 50%, #F59E0B 100%);
+  --jetc-gradient-subtle: linear-gradient(135deg, #EEF2FF 0%, #E0F2FE 50%, #FFFBEB 100%);
+  --jetc-gradient-faith: linear-gradient(135deg, #312E81 0%, #4F46E5 100%);
+  --jetc-gradient-gold: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+  --jetc-gradient-community: linear-gradient(135deg, #4F46E5 0%, #0EA5E9 100%);
+
+  /* --------------------------------------------------------------------------
+     Shared Tokens
+     -------------------------------------------------------------------------- */
+
+  /* Semantic Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Neutrals */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
+  --font-size-4xl: 2.25rem;   /* 36px */
+  --font-size-5xl: 3rem;      /* 48px */
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  --line-height-tight: 1.1;
+  --line-height-snug: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.8;
+
+  /* Spacing (4px base grid) */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+  --space-20: 5rem;    /* 80px */
+  --space-24: 6rem;    /* 96px */
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;  /* 6px */
+  --radius-md: 0.5rem;    /* 8px */
+  --radius-lg: 0.75rem;   /* 12px */
+  --radius-xl: 1rem;      /* 16px */
+  --radius-2xl: 1.5rem;   /* 24px */
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-glow-pink: 0 0 30px rgba(236, 72, 153, 0.5);
+  --shadow-glow-indigo: 0 0 30px rgba(99, 102, 241, 0.5);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+
+  /* Glass Effects */
+  --glass-blur: 40px;
+  --glass-saturate: 180%;
+  --glass-bg-light: rgba(255, 255, 255, 0.15);
+  --glass-bg-dark: rgba(0, 0, 0, 0.3);
+  --glass-border: rgba(255, 255, 255, 0.18);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 300ms ease;
+  --transition-slow: 500ms ease;
+  --transition-spring: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-Index Scale */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+/* --------------------------------------------------------------------------
+   Utility Classes — Better Together
+   -------------------------------------------------------------------------- */
+
+.bt-gradient-text {
+  background: var(--bt-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bt-gradient-bg {
+  background: var(--bt-gradient-hero);
+}
+
+.bt-gradient-subtle-bg {
+  background: var(--bt-gradient-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Utility Classes — JETC
+   -------------------------------------------------------------------------- */
+
+.jetc-gradient-text {
+  background: var(--jetc-gradient-hero);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.jetc-gradient-bg {
+  background: var(--jetc-gradient-hero);
+}
+
+.jetc-gradient-subtle-bg {
+  background: var(--jetc-gradient-subtle);
+}
+
+.jetc-faith-bg {
+  background: var(--jetc-gradient-faith);
+}
+
+/* --------------------------------------------------------------------------
+   Glass Utilities (Shared)
+   -------------------------------------------------------------------------- */
+
+.glass {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-dark {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  background: var(--glass-bg-dark);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}

@@ -120,7 +120,7 @@ export const HomePage = () => (
             <div className="mb-8 px-4 animate-scale-in" style="animation-delay: 1s;">
               <div className="inline-flex items-center bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-full px-6 py-3 text-emerald-700 text-xs sm:text-sm font-bold animate-glow shadow-lg">
                 <i className="fas fa-crown mr-2 text-emerald-500 animate-pulse"></i>
-                Premium Plans Starting at $39/mo for Couples
+                Premium Plans Starting at $30/mo for Couples
                 <span className="ml-2 bg-emerald-500 text-white px-2 py-1 rounded-full text-xs animate-bounce">7-Day Free Trial</span>
               </div>
             </div>
@@ -839,7 +839,7 @@ export const HomePage = () => (
               <div className="text-center">
                 <h3 className="text-2xl font-semibold mb-2">Growing Together</h3>
                 <div className="mb-6">
-                  <span className="text-5xl font-bold">$39</span>
+                  <span className="text-5xl font-bold">$30</span>
                   <span className="text-pink-200">/month</span>
                   <div className="text-lg text-pink-100 mt-2">
                     Per couple &middot; Billed monthly
