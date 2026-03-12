@@ -7,7 +7,7 @@
 
 import type { Context, Next } from 'hono'
 import { deleteCookie } from 'hono/cookie'
-import { createClientWithContext } from './server'
+import { createClientWithContext, createAnonClient } from './server'
 
 /**
  * Cookie relay middleware.
@@ -51,6 +51,27 @@ export function clearLegacyCookies() {
 export function requireAuth() {
   return async (c: Context, next: Next) => {
     try {
+      // Check for Bearer token (mobile clients)
+      const authHeader = c.req.header('Authorization')
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7)
+        const env = {
+          SUPABASE_URL: c.env?.SUPABASE_URL || '',
+          SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+        }
+        const anonClient = createAnonClient(env)
+        const { data: { user }, error } = await anonClient.auth.getUser(token)
+        if (!error && user) {
+          c.set('userId', user.id)
+          c.set('userEmail', user.email)
+          c.set('user', user)
+          c.set('supabase', anonClient)
+          await next()
+          return
+        }
+        // If Bearer token invalid, fall through to cookie auth
+      }
+
       const env = {
         SUPABASE_URL: c.env?.SUPABASE_URL || '',
         SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
@@ -84,6 +105,27 @@ export function requireAuth() {
 export function optionalAuth() {
   return async (c: Context, next: Next) => {
     try {
+      // Check for Bearer token (mobile clients)
+      const authHeader = c.req.header('Authorization')
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7)
+        const env = {
+          SUPABASE_URL: c.env?.SUPABASE_URL || '',
+          SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
+        }
+        const anonClient = createAnonClient(env)
+        const { data: { user }, error } = await anonClient.auth.getUser(token)
+        if (!error && user) {
+          c.set('userId', user.id)
+          c.set('userEmail', user.email)
+          c.set('user', user)
+          c.set('supabase', anonClient)
+          await next()
+          return
+        }
+        // If Bearer token invalid, fall through to cookie auth
+      }
+
       const env = {
         SUPABASE_URL: c.env?.SUPABASE_URL || '',
         SUPABASE_ANON_KEY: c.env?.SUPABASE_ANON_KEY || '',
