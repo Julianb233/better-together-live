@@ -31,6 +31,8 @@ import { intelligentSuggestionsHtml } from '../pages/intelligent-suggestions'
 import { iphoneExamplesHtml } from '../pages/iphone-examples'
 import { memberRewardsHtml } from '../pages/member-rewards'
 import { becomeSponsorHtml } from '../pages/become-sponsor'
+import { termsPage } from '../pages/terms'
+import { privacyPage } from '../pages/privacy'
 import { HomePage } from '../pages/home'
 
 export const pageRoutes = new Hono<{ Bindings: Env }>()
@@ -197,6 +199,18 @@ pageRoutes.get('/bundles', (c) => {
 
 pageRoutes.get('/shop', (c) => {
   return c.html(bundlesHtml)
+})
+
+// =============================================================================
+// LEGAL PAGES
+// =============================================================================
+
+pageRoutes.get('/terms', (c) => {
+  return c.html(termsPage())
+})
+
+pageRoutes.get('/privacy', (c) => {
+  return c.html(privacyPage())
 })
 
 // =============================================================================
