@@ -62,9 +62,11 @@ app.use('/api/*', cors({
     const allowed = [
       'https://bettertogether.app',
       'https://www.bettertogether.app',
+      'https://better-together-live.vercel.app',
     ]
     // Allow localhost in non-production
-    if (c.env?.NODE_ENV !== 'production' || !c.env?.NODE_ENV) {
+    const env = c.env?.VERCEL_ENV || c.env?.NODE_ENV
+    if (env !== 'production' || !env) {
       allowed.push('http://localhost:3000', 'http://localhost:5173')
     }
     // Allow additional origins from CORS_ORIGINS env var
@@ -107,14 +109,14 @@ app.onError((err, c) => {
 })
 
 // =============================================================================
-// HEALTH CHECK
+// HEALTH CHECK (available at both /health and /api/health)
 // =============================================================================
-app.get('/health', async (c) => {
+const healthHandler = async (c: any) => {
   const health: Record<string, unknown> = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || 'dev',
-    environment: process.env.VERCEL_ENV || 'development',
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
   }
   try {
     const supabase = createAdminClient(c.env as unknown as SupabaseEnv)
@@ -126,7 +128,9 @@ app.get('/health', async (c) => {
     health.status = 'degraded'
   }
   return c.json(health, health.status === 'ok' ? 200 : 503)
-})
+}
+app.get('/health', healthHandler)
+app.get('/api/health', healthHandler)
 
 // =============================================================================
 // INLINE API ROUTES (user CRUD, invite-partner, relationships)
