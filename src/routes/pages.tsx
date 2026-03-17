@@ -31,6 +31,8 @@ import { intelligentSuggestionsHtml } from '../pages/intelligent-suggestions'
 import { iphoneExamplesHtml } from '../pages/iphone-examples'
 import { memberRewardsHtml } from '../pages/member-rewards'
 import { becomeSponsorHtml } from '../pages/become-sponsor'
+import { sponsorDashboardHtml } from '../pages/sponsor-dashboard'
+import { discoverVenuesHtml } from '../pages/discover-venues'
 import { termsPage } from '../pages/terms'
 import { privacyPage } from '../pages/privacy'
 import { HomePage } from '../pages/home'
@@ -67,6 +69,14 @@ pageRoutes.get('/member-rewards.html', (c) => {
 
 pageRoutes.get('/become-sponsor.html', (c) => {
   return c.html(becomeSponsorHtml)
+})
+
+pageRoutes.get('/sponsor-dashboard', (c) => {
+  return c.html(sponsorDashboardHtml)
+})
+
+pageRoutes.get('/discover-venues', (c) => {
+  return c.html(discoverVenuesHtml)
 })
 
 // Analytics Login

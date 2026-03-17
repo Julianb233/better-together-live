@@ -44,6 +44,7 @@ import recommendationsApi from './api/recommendations'
 import intimacyApi from './api/intimacy'
 import relationshipsApi from './api/relationships'
 import videoApi from './api/video'
+import venuePortalApi from './api/venue-portal'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -94,6 +95,9 @@ app.use('/api/*', except(
     '/api/payments/config',
     '/api/payments/tiers',
     '/api/health',
+    '/api/venues',
+    '/api/venues/categories/all',
+    '/api/venues/discover/*',
   ],
   requireAuth()
 ))
@@ -224,6 +228,9 @@ app.route('/api', relationshipsApi)
 
 // Video calling routes
 app.route('/api/video', videoApi)
+
+// Venue/Sponsor Partnership Portal
+app.route('/api/venues', venuePortalApi)
 
 // =============================================================================
 // PAGE ROUTES (HTML pages, homepage, API docs)
