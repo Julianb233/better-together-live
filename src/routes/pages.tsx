@@ -31,6 +31,8 @@ import { intelligentSuggestionsHtml } from '../pages/intelligent-suggestions'
 import { iphoneExamplesHtml } from '../pages/iphone-examples'
 import { memberRewardsHtml } from '../pages/member-rewards'
 import { becomeSponsorHtml } from '../pages/become-sponsor'
+import { donatePageHtml } from '../pages/donate'
+import { donateThankyouHtml } from '../pages/donate-thankyou'
 import { termsPage } from '../pages/terms'
 import { privacyPage } from '../pages/privacy'
 import { HomePage } from '../pages/home'
@@ -199,6 +201,20 @@ pageRoutes.get('/bundles', (c) => {
 
 pageRoutes.get('/shop', (c) => {
   return c.html(bundlesHtml)
+})
+
+// =============================================================================
+// DONATE PAGES
+// =============================================================================
+
+// Donate Page - "Let's Help These Kids" nonprofit donations
+pageRoutes.get('/donate', (c) => {
+  return c.html(donatePageHtml)
+})
+
+// Post-donation thank you page with social sharing
+pageRoutes.get('/donate/thank-you', (c) => {
+  return c.html(donateThankyouHtml)
 })
 
 // =============================================================================

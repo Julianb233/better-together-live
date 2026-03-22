@@ -44,6 +44,7 @@ import recommendationsApi from './api/recommendations'
 import intimacyApi from './api/intimacy'
 import relationshipsApi from './api/relationships'
 import videoApi from './api/video'
+import donationsApi from './api/donations'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -93,6 +94,8 @@ app.use('/api/*', except(
     '/api/payments/webhook',
     '/api/payments/config',
     '/api/payments/tiers',
+    '/api/donations/create-checkout',
+    '/api/donations/webhook',
     '/api/health',
   ],
   requireAuth()
@@ -185,6 +188,9 @@ app.route('/api/users', usersApi)
 
 // Payments API Routes
 app.route('/api/payments', paymentsApi)
+
+// Donations API Routes (nonprofit "Let's Help These Kids" donations)
+app.route('/api/donations', donationsApi)
 
 // Communities API Routes
 app.route('/api/communities', communitiesApi)
